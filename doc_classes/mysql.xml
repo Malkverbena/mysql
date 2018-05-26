@@ -1,0 +1,12 @@
+<class name="mysql" inherits="NetworkedMultiplayerPeer" category="reference" version="3.1">
+	<brief_description>
+		A connector to MySQL
+	</brief_description><description>
+		Allows to connect to a MySQL database. Has several ways to fetch data.
+	</description>
+	<tutorials>
+		Not ready yet, but on the way.
+	</tutorials>
+	<demos> </demos>
+
+</class>

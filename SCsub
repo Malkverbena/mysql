@@ -1,0 +1,27 @@
+#SCsub
+Import('env')
+
+
+env.add_source_files(env.modules_sources,"*.cpp")
+
+
+if env['platform'] == 'x11':
+	env.Append(LIBPATH=['/usr/lib'])
+
+if env['platform'] == 'windows':
+	# Add the path to Boost and libmysqlcppconn here
+	# Boost libs are needed only to Windows
+	env.Append(LIBPATH=['put/the/path/to/mysqlcppconn/here'])
+	env.Append(CPPPATH=['put/the/path/to/mysqlcppconn/here'])   
+
+
+env.Append(LIBS=['mysqlcppconn'])
+
+
+
+
+
+
+
+
+
