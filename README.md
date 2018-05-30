@@ -40,7 +40,7 @@ https://github.com/Malkverbena/Mysql_module_exemple
 - void select_database(String, database)  
  Select the defalt schema.
 
-- String query(String statement)  
+- Void query(String statement)  
  Run your statement.
 
 - Array fetch_dictinary(String, query)  
