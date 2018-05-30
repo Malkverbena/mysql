@@ -37,7 +37,7 @@ You can find a exemple project here:
 https://github.com/Malkverbena/Mysql_module_exemple
 
 
-- void select_database(String, database)  
+- Void select_database(String, database)  
  Select the defalt schema.
 
 - Void query(String statement)  
