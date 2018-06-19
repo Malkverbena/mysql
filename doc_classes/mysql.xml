@@ -1,4 +1,4 @@
-<class name="mysql" inherits="NetworkedMultiplayerPeer" category="reference" version="3.1">
+<class name="mysql" inherits="reference" category="reference" version="3.1">
 	<brief_description>
 		A connector to MySQL
 	</brief_description><description>
