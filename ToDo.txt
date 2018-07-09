@@ -1,3 +1,5 @@
+- Support prepared statements (To avoid SQL injection)
+
 - Do not you use global variables to store con or stmt variables like.
 
 - Use a smaller scope. 
@@ -10,5 +12,4 @@
 
 - delete-lines are never run if an exception is thrown... (Fix it)
 
-- Support prepared statements (To avoid SQL injection)
  
