@@ -1,4 +1,4 @@
-- Support prepared statements (To avoid SQL injection)
+- Support prepared statements (To avoid SQL injection).
 
 - Do not you use global variables to store con or stmt variables like.
 
@@ -10,6 +10,8 @@
 
 - Keep C++98 compatible and not use C++11's smart pointers. maybe std::auto_ptr to make the code exception safe.
 
-- delete-lines are never run if an exception is thrown... (Fix it)
+- Delete-lines are never run if an exception is thrown... (Fix it).
+
+-  Write docs.
 
  
