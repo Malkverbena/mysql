@@ -1,20 +1,10 @@
 /*  mysql.cpp */
 
-#include <string>
-#include <sstream>
-#include <stdlib.h>
-#include <iostream>
-#include <stdexcept>
 
 #include "mysql.h"
 
-#include <mysql_error.h>
-#include <mysql_driver.h>
-#include <mysql_connection.h>
-
-
-
 using namespace std;
+
 
 sql::mysql::MySQL_Driver *driver;  //Thread-safe
 //sql::Driver *driver;  //Not Thread-safe
@@ -28,21 +18,19 @@ sql::SQLString user;
 sql::SQLString pass;
 sql::SQLString database;
 
-void MySQL::connecting(String shost, String suser, String spass)
-{
+void MySQL::connecting(String shost, String suser, String spass){
     host=shost.utf8().get_data();
     user=suser.utf8().get_data();
     pass=spass.utf8().get_data();
 }
 
-void MySQL::select_database(String db)
-{
+void MySQL::select_database(String db){
     database=db.utf8().get_data();
 }
 
 
-String MySQL::query(String s)
-{
+String MySQL::query(String s){
+
 	sql::SQLString sql = s.utf8().get_data();
 
 	try {
@@ -95,14 +83,14 @@ Array MySQL::fetch_dictinary(String q){
 		res_meta = res->getMetaData();
 				
 		while (res->next()){
+		
 			Dictionary row;
-
 			Array datando;
+
 			for (int j = 1; j <= res_meta->getColumnCount(); j++) 
 			{
 				String testype = sql2String(res_meta->getColumnTypeName(j));  
 				bool othertypes = false;
-
 				
 				//Returns an Interger
 				if (testype == "INT" || testype == "TINYINT" || testype == "SMALLINT"|| testype == "MEDIUMINT" || testype == "BIGINT" || testype == "INTEGER"){
@@ -117,21 +105,21 @@ Array MySQL::fetch_dictinary(String q){
 				}
 
 				//Returns a float
-				if (testype == "FLOAT" or testype == "DECIMAL" or testype == "REAL" or testype == "DOUBLE" or testype == "NUMERIC"){
+				if (testype == "FLOAT" || testype == "DECIMAL" || testype == "REAL" || testype == "DOUBLE" || testype == "NUMERIC"){
 					float floteando = res->getDouble(j);
 					row[sql2String(res_meta->getColumnName(j))] = floteando;
 					othertypes = true;
 				}
 			
 				//Returns boolean
-				if (testype == "BOOL" or testype == "BOOLEAN" or testype == "BIT"){
+				if (testype == "BOOL" || testype == "BOOLEAN" || testype == "BIT"){
 					row[sql2String(res_meta->getColumnName(j))] = res->getBoolean(j);
 					othertypes = true;
 				}
 
 				//Returns dates as Dictionary
-				if ( testype == "DATETIME"|| testype == "TIMESTAMP" || testype == "DATE" || testype == "TIME" || testype == "YEAR") 
-				{
+				if ( testype == "DATETIME"|| testype == "TIMESTAMP" || testype == "DATE" || testype == "TIME" || testype == "YEAR") {
+				
 					string str = (sql2String(res->getString(j))).utf8().get_data();
 					char seps[] = ": -";
 					char *token;
@@ -145,15 +133,14 @@ Array MySQL::fetch_dictinary(String q){
 
 
 					//From Array to Dictionary?
-
 					/*
 					Dictionary datinha;
 					int contad = (sizeof((datando))/sizeof((datando[0]))); 
 
-					for (int p = 0; p <= contad; p++) 
-					{
+					for (int p = 0; p < contad; p++) {
 						datinha[p] = datando[p];			
 					}
+					
 					row[sql2String(res_meta->getColumnName(j))] = datinha;
 					*/
 
@@ -339,14 +326,14 @@ Array MySQL::fetch_array(String m)
 				}
 
 				//Returns a float
-				if (testype == "FLOAT" or testype == "DECIMAL" or testype == "REAL" or testype == "DOUBLE" or testype == "NUMERIC"){
+				if (testype == "FLOAT" || testype == "DECIMAL" || testype == "REAL" || testype == "DOUBLE" || testype == "NUMERIC"){
 					float floteando = res->getDouble(j);
 					linha.push_back(floteando);
 					othertypes = true;
 				}
 			
 				//Returns boolean
-				if (testype == "BOOL" or testype == "BOOLEAN" or testype == "BIT"){
+				if (testype == "BOOL" || testype == "BOOLEAN" || testype == "BIT"){
 					linha.push_back(res->getBoolean(j));
 					othertypes = true;
 				}

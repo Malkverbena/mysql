@@ -2,11 +2,7 @@
 #ifndef MYSQL_H
 #define MYSQL_H
 
-#include <sstream>
-#include <stdlib.h>
-#include <iostream>
-#include <stdexcept>
-
+#include <string>
 #include "reference.h"
 
 #include <mysql_error.h>
@@ -24,13 +20,10 @@ class MySQL : public Reference {
 
 
 protected:
+
 	static void _bind_methods();
 	String sql2String(sql::SQLString r);
 
-	sql::SQLString host;
-	sql::SQLString user;
-	sql::SQLString pass;
-	sql::SQLString database;
 
 public:
 
@@ -49,4 +42,4 @@ public:
 	MySQL();
 };
 
-#endif
+#endif	/* mysql.h */
