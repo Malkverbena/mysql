@@ -1,16 +1,16 @@
-# MySQL Module #
+# MySQL Module 
 
 This module is a MySQL connector for Godot.
 
 
-#### Requirements: ####
+#### Requirements: 
 
 C++ MySQL Connector Library. 
 
 You can get here https://dev.mysql.com/downloads/connector/cpp/. On linux you can use sudo apt-get install libmysqlcppconn-dev.
 
    
-#### Installation: ####
+#### Installation: 
 
 Copy or clone the repository into Godot_path/modules
 
@@ -31,12 +31,15 @@ Should work fine on Mac
 - One last thing: Feel free to change, upgrede or add more functions to this module. ;)
 
 
-#### Methods: ####
+#### Methods: 
 
 You can find a exemple project here:
 https://github.com/Malkverbena/Mysql_module_exemple
 
 
+- Void set_credentials(String hostname, String username, String password)  
+ Set your connections credentials.
+ 
 - Void select_database(String, database)  
  Select the defalt schema.
 
