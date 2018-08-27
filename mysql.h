@@ -19,17 +19,19 @@ class MySQL : public Reference {
 	GDCLASS(MySQL,Reference);
 
 
+private:
+
+	String sql2String(sql::SQLString r);
+
 protected:
 
 	static void _bind_methods();
-	String sql2String(sql::SQLString r);
-
 
 public:
 
-	void connecting(String shost, String suser, String spass);
+	void set_credentials(String shost, String suser, String spass);
 	void select_database(String db);
-	String query(String s);
+	void query(String s);
 
 	Array fetch_dictinary(String q);
 	Array fetch_dictinary_string(String q);
@@ -40,6 +42,7 @@ public:
 	Array get_column_types(String l);
 
 	MySQL();
+	
 };
 
-#endif	/* mysql.h */
+#endif	// MYSQL_H

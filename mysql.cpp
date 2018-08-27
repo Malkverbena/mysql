@@ -6,6 +6,7 @@
 using namespace std;
 
 
+
 sql::mysql::MySQL_Driver *driver;  //Thread-safe
 //sql::Driver *driver;  //Not Thread-safe
 sql::Connection *con;
@@ -18,7 +19,7 @@ sql::SQLString user;
 sql::SQLString pass;
 sql::SQLString database;
 
-void MySQL::connecting(String shost, String suser, String spass){
+void MySQL::set_credentials(String shost, String suser, String spass){
     host=shost.utf8().get_data();
     user=suser.utf8().get_data();
     pass=spass.utf8().get_data();
@@ -29,7 +30,7 @@ void MySQL::select_database(String db){
 }
 
 
-String MySQL::query(String s){
+void MySQL::query(String s){
 
 	sql::SQLString sql = s.utf8().get_data();
 
@@ -62,7 +63,7 @@ String MySQL::query(String s){
 			print_line(" (MySQL error code: "+String(errCode)+")");
 			print_line("SQLState: "+sql2String(e.getSQLState()));
 	}
-	return("Query executed: "+String(s));
+	//return("Query executed: "+String(s));
 }
 
 
@@ -117,7 +118,9 @@ Array MySQL::fetch_dictinary(String q){
 					othertypes = true;
 				}
 
-				//Returns dates as Dictionary
+				// It should return time information as a dictionary, but if the sequencing of the data be 
+				// modified (using TIME_FORMAT or DATE_FORMAT for exemple), it will return the dictionary fields with wrong names. 
+				// So I preferred return the data as an array.
 				if ( testype == "DATETIME"|| testype == "TIMESTAMP" || testype == "DATE" || testype == "TIME" || testype == "YEAR") {
 				
 					string str = (sql2String(res->getString(j))).utf8().get_data();
@@ -130,20 +133,6 @@ Array MySQL::fetch_dictinary(String q){
 						datando.push_back(atoi(token));
 						token = strtok( NULL, seps );
 					}
-
-
-					//From Array to Dictionary?
-					/*
-					Dictionary datinha;
-					int contad = (sizeof((datando))/sizeof((datando[0]))); 
-
-					for (int p = 0; p < contad; p++) {
-						datinha[p] = datando[p];			
-					}
-					
-					row[sql2String(res_meta->getColumnName(j))] = datinha;
-					*/
-
 
 					row[sql2String(res_meta->getColumnName(j))] = datando;
 					othertypes = true;
@@ -487,7 +476,7 @@ String MySQL::sql2String(sql::SQLString r)
 
 void MySQL::_bind_methods(){
 
-	ClassDB::bind_method(D_METHOD("connecting","hostname","username","password"),&MySQL::connecting);
+	ClassDB::bind_method(D_METHOD("set_credentials","hostname","username","password"),&MySQL::set_credentials);
 	ClassDB::bind_method(D_METHOD("select_database","database"),&MySQL::select_database);
 	ClassDB::bind_method(D_METHOD("query","sql_query"),&MySQL::query);
 	ClassDB::bind_method(D_METHOD("fetch_dictinary","sql_query"),&MySQL::fetch_dictinary);
