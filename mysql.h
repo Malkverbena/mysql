@@ -21,25 +21,26 @@ class MySQL : public Reference {
 
 private:
 
-	String sql2String(sql::SQLString r);
-
+	String sql2String(sql::SQLString p_str);
+	Array sql_tasks(String p_sql_query, int task);
+	
 protected:
 
 	static void _bind_methods();
 
 public:
 
-	void set_credentials(String shost, String suser, String spass);
-	void select_database(String db);
-	void query(String s);
+	void set_credentials(String p_host, String p_user, String p_pass);
+	void select_database(String p_database);
+	void query(String p_sql_query);
 
-	Array fetch_dictinary(String q);
-	Array fetch_dictinary_string(String q);
-	Array fetch_array_string(String m);
-	Array fetch_array(String m);
+	Array fetch_dictinary(String p_sql_query);
+	Array fetch_dictinary_string(String p_sql_query);
+	Array fetch_array_string(String p_sql_query);
+	Array fetch_array(String p_sql_query);
 
-	Array get_columns_name(String p);
-	Array get_column_types(String l);
+	Array get_columns_name(String p_sql_query);
+	Array get_column_types(String p_sql_query);
 
 	MySQL();
 	
