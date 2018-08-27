@@ -1,7 +1,5 @@
 - Support prepared statements (To avoid SQL injection).
 
-- Do not you use global variables to store con or stmt variables like.
-
 - Use a smaller scope. 
 
 - Declare con only once, not at the start of each function.
