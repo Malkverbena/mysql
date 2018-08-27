@@ -31,10 +31,7 @@ void MySQL::select_database(String p_database){
 
 
 //--- Common Functions
-void MySQL::query(String p_sql_query){ 
-
-	sql_tasks( p_sql_query, 0); 
-}
+void MySQL::query(String p_sql_query){ sql_tasks( p_sql_query, 0); }
 
 
 Array MySQL::fetch_dictinary(String p_sql_query)  { return sql_tasks( p_sql_query, 1); }
