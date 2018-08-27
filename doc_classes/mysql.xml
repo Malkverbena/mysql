@@ -1,12 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" ?>
 <class name="mysql" inherits="reference" category="reference" version="3.1">
 	<brief_description>
 		A connector to MySQL
-	</brief_description><description>
+	</brief_description>
+	<description>
 		Allows to connect to a MySQL database. Has several ways to fetch data.
 	</description>
 	<tutorials>
-		Not ready yet, but on the way.
 	</tutorials>
-	<demos> </demos>
+	<demos> 
+		https://github.com/Malkverbena/Mysql_module_exemple
+	</demos>
+	<methods>
+		<method name="set_credentials">
+			<return type="void">
+			</return>  
+			<argument index="0" name="hostname" type="String">
+			</argument>
+			<argument index="1" name="username" type="String">
+			</argument>
+			<argument index="2" name="password" type="String">
+			</argument>
+			<description>
+				Stores the connection's credentials of the current MySQL instance. Can be changed any time.
+			</description>
+		<method name="select_database">
+			<return type="void">
+			</return>  
+			<argument index="0" name="database" type="String">
+			</argument>
+			<description>
+				Selects a database.
+			</description>					
+		<method name="query">
+			<return type="void">
+			</return>  
+			<argument index="0" name="sql_query" type="String">
+			</argument>
+			<description>
+				Executes a query.
+			</description>		
+		<method name="get_columns_name">
+			<return type="Array">
+			</return>  
+			<argument index="0" name="sql_query" type="String">
+			</argument>
+			<description>
+				Returns a Array containing only the column names.
+			</description>		
+		<method name="get_column_types">
+			<return type="Array">
+			</return>  
+			<argument index="0" name="sql_query" type="String">
+			</argument>
+			<description>
+				Returns an array containing only the column types.
+			</description>
+		<method name="fetch_array">
+			<return type="Array">
+			</return>  
+			<argument index="0" name="sql_query" type="String">
+			</argument>
+			<description>
+				Returns a two-dimensional array containing the query result.
+				The returned data has the same datatype of the saved data on SQL database.
+			</description>	
+		<method name="fetch_array_string">
+			<return type="Array">
+			</return>  
+			<argument index="0" name="sql_query" type="String">
+			</argument>
+			<description>
+				Returns a two-dimensional array containing the query result.
+				All the data are returned as Strings.
+			</description>	
+		<method name="fetch_dictinary">
+			<return type="Array">
+			</return>  
+			<argument index="0" name="sql_query" type="String">
+			</argument>
+			<description>
+				Returns an array of dictionaries containing the query result.
+				Every dictionaries represents a row in the done query.
+				The returned data has the same datatype of the saved data on SQL database.
+			</description>	
+		<method name="fetch_dictinary_string">
+			<return type="Array">
+			</return>  
+			<argument index="0" name="sql_query" type="String">
+			</argument>
+			<description>
+				Returns an array of dictionaries containing the query result.
+				Every array's element is dictionaries and each of these dictionaries represents a row in the done query.
+				All the data are returned as Strings.
+			</description>			
+	</methods>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 </class>
