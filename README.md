@@ -38,7 +38,7 @@ https://github.com/Malkverbena/Mysql_module_exemple
 
 
 - Void set_credentials(String hostname, String username, String password)  
- Set your connections credentials.
+ Set your connection's credentials.
  
 - Void select_database(String, database)  
  Select the defalt schema.
