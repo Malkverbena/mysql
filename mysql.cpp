@@ -31,30 +31,23 @@ void MySQL::select_database(String p_database){
 
 
 //--- Common Functions
-void MySQL::query(String p_sql_query){ sql_tasks( p_sql_query, 0); }
-
+void MySQL::query(String p_sql_query)  { sql_tasks( p_sql_query, 0); }
 
 Array MySQL::fetch_dictinary(String p_sql_query)  { return sql_tasks( p_sql_query, 1); }
 
-
 Array MySQL::fetch_dictinary_string(String p_sql_query)  { return sql_tasks( p_sql_query, 2); }
-
 
 Array MySQL::fetch_array_string(String p_sql_query)  { return sql_tasks( p_sql_query, 3); }
 
-
 Array MySQL::fetch_array(String p_sql_query)  { return sql_tasks( p_sql_query, 4); }
 
-
 Array MySQL::get_columns_name(String p_sql_query)   { return sql_tasks( p_sql_query, 5); }
-
 
 Array MySQL::get_column_types(String p_sql_query)  { return sql_tasks( p_sql_query, 6); }
 
 
-
 //-- True Gears
-Array MySQL::sql_tasks(String p_sql_query, int task){
+Array MySQL::sql_tasks(String p_sql_query, const int task){
 
 	sql::SQLString SQLquery = p_sql_query.utf8().get_data();
 	Array ret;
@@ -277,7 +270,6 @@ Array MySQL::sql_tasks(String p_sql_query, int task){
 			break;		
 		
 		} //-- end switch
-
 
 		delete res;
 		delete stmt;

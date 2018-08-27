@@ -22,7 +22,7 @@ class MySQL : public Reference {
 private:
 
 	String sql2String(sql::SQLString p_str);
-	Array sql_tasks(String p_sql_query, int task);
+	Array sql_tasks(String p_sql_query, const int task);
 	
 protected:
 
