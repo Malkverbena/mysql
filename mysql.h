@@ -2,7 +2,6 @@
 #ifndef MYSQL_H
 #define MYSQL_H
 
-#include <string>
 #include "reference.h"
 
 #include <mysql_error.h>
