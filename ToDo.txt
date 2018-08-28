@@ -1,4 +1,4 @@
-- Support prepared statements (To avoid SQL injection).
+- Support prepared statements/transaction ??? - (SQL injection avoidation can be easily done on GDscritp).
 
 - Use a smaller scope.  Done!
 
