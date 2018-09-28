@@ -37,31 +37,4 @@ You can find a exemple project here:
 https://github.com/Malkverbena/Mysql_module_exemple
 
 
-- Void set_credentials(String hostname, String username, String password)  
- Set your connection's credentials.
- 
-- Void select_database(String, database)  
- Select the defalt schema.
-
-- Void query(String statement)  
- Run your statement.
-
-- Array fetch_dictinary(String, query)  
- Return the query as an array where every row is a dictionary and the values respect original the datatypes.
-
-- Array fetch_dictinary_string(String, query)  
- Return the query as an array where every row is a dictionary and all values returns like strings.
-
-- Array fetch_array(String, query)  
- Return the query as a bidimencional array where the rows are a dictionaries and the values respect original the datatypes.
-
-- Array fetch_array_string(String, query)  
- Return the query as a bidimencional array where the rows are a dictionaries and the values returns like strings.
-
-- Array get_columns_name(String, query)  
- Returns the names of the columns.
-
-- Array get_column_types(String, query)  
- Returns the types of the columns.
-
 
