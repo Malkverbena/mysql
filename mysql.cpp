@@ -2,12 +2,7 @@
 
 #include "mysql.h"
 
-//#include <iostream> 
-
 #include <memory>
-
-//#include <string.h>
-//#include <stdio.h>
 
 using namespace std;
 
@@ -36,7 +31,6 @@ void MySQL::set_client_options(String p_option, String p_value){
 	sql::SQLString value = p_value.utf8().get_data();
 
 	con->setClientOption(option, value);
-	
 }
 
 
@@ -45,7 +39,6 @@ String MySQL::get_client_options(String p_option){
 	shared_ptr <sql::Connection> con(connection(ACT_DO));
 	sql::SQLString option = p_option.utf8().get_data();
 	return sql2String( con->getClientOption( option ) );
-
 }
 
 
@@ -85,7 +78,6 @@ int MySQL::query_execute(String p_SQLquery)
 }
 
 
-
 //-------------- Prepared Query
 
 Array MySQL::prep_fetch_dictionary(String p_SQLquery, Array prep_val, bool return_string) 
@@ -121,7 +113,6 @@ int MySQL::prep_execute(String p_SQLquery, Array prep_val)
 }
 
 
-
 //-------------- Database
 
 String MySQL::get_database()
@@ -141,9 +132,11 @@ void MySQL::set_database( String p_database )
 		shared_ptr< sql::Connection > con(connection(ACT_DO));
 		if (con != NULL){
 			con->setSchema(database);
-		}else{
-				 connection_properties["schema"] = database;
-			 }
+		}
+		else
+		{
+			 connection_properties["schema"] = database;
+		}
 	}
 }
 
@@ -288,9 +281,7 @@ Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return
 	catch (runtime_error &e) { print_runtime_error(e); 	}
 
 	return ret;
-
 }
-
 
 shared_ptr<sql::Connection> MySQL::connection(int what){
 	
@@ -318,7 +309,6 @@ shared_ptr<sql::Connection> MySQL::connection(int what){
 			catch (runtime_error &e) {	print_runtime_error(e);	 }
 		}
 	}
-
 	return con;
 }
 
@@ -361,12 +351,12 @@ void MySQL::determine_datatype( std::shared_ptr <sql::PreparedStatement> prep_st
 
 		else if ( prep_val[i].get_type() == Variant::REAL)	{	prep_stmt->setDouble(d, float(prep_val[i]));	}
 
-		else  // - Gonna handle any other datatype as string
+		else  // - Gonna handle any other Godot datatype as string
 		{
 			String stri = String(prep_val[i]);
 			sql::SQLString caracteres = stri.utf8().get_data();
 
-			if ( is_mysql_time( stri ))  // -- If the string has the mysql data type format, this gonna be handle as Date and Time Types
+			if ( is_mysql_time( stri ))  // -- If the string has the mysql time type format, this gonna be handle as Date and Time types
 
 				{ prep_stmt->setDateTime(d, caracteres ); }
 			else
@@ -448,7 +438,7 @@ bool MySQL::is_mysql_time(String time){
 //********
 void MySQL::print_SQLException(sql::SQLException &e) {
 	
-	//(e.getErrorCode() == 1047) == No prepareted support at all
+	//(e.getErrorCode() == 1047) == No prepareted statement support at all.
 
 	print_line("# EXCEPTION Caught ˇ");
 	Variant file = __FILE__;
