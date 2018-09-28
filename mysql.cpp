@@ -1,299 +1,343 @@
 /*  mysql.cpp */
 
-
 #include "mysql.h"
+
+//#include <iostream> 
+
+#include <memory>
+
+//#include <string.h>
+//#include <stdio.h>
 
 using namespace std;
 
 
+//-------------- Connection Managers
 
-sql::mysql::MySQL_Driver *driver;  //Thread-safe
-//sql::Driver *driver;  //Not Thread-safe
-sql::Connection *con;
-sql::Statement *stmt;
-sql::ResultSet *res;
-sql::ResultSetMetaData *res_meta;
+bool MySQL::connection_start() { return check(ACT_DO); }  
 
-sql::SQLString host;
-sql::SQLString user;
-sql::SQLString pass;
-sql::SQLString database;
+bool MySQL::connection_check() { return check(ACT_CHECK); }  
 
-void MySQL::set_credentials(String p_host, String p_user, String p_pass){
-    host = p_host.utf8().get_data();
-    user = p_user.utf8().get_data();
-    pass = p_pass.utf8().get_data();
-}
+bool MySQL::connection_close() { return check(ACT_CLOSE); } 
 
-void MySQL::select_database(String p_database){
-    database = p_database.utf8().get_data();
+void MySQL::set_credentials( String p_host, String p_user, String p_pass ){
+
+	connection_properties["hostName"] = p_host.utf8().get_data(); 
+	connection_properties["userName"] = p_user.utf8().get_data(); 
+	connection_properties["password"] = p_pass.utf8().get_data();
 }
 
 
-//--- Common Functions
-void MySQL::query(String p_sql_query)  { sql_tasks( p_sql_query, 0); }
+void MySQL::set_client_options(String p_option, String p_value){
 
-Array MySQL::fetch_dictinary(String p_sql_query)  { return sql_tasks( p_sql_query, 1); }
-
-Array MySQL::fetch_dictinary_string(String p_sql_query)  { return sql_tasks( p_sql_query, 2); }
-
-Array MySQL::fetch_array_string(String p_sql_query)  { return sql_tasks( p_sql_query, 3); }
-
-Array MySQL::fetch_array(String p_sql_query)  { return sql_tasks( p_sql_query, 4); }
-
-Array MySQL::get_columns_name(String p_sql_query)   { return sql_tasks( p_sql_query, 5); }
-
-Array MySQL::get_column_types(String p_sql_query)  { return sql_tasks( p_sql_query, 6); }
-
-
-//-- True Gears
-Array MySQL::sql_tasks(String p_sql_query, const int task){
-
-	sql::SQLString SQLquery = p_sql_query.utf8().get_data();
-	Array ret;
-
-	try {
-		driver = sql::mysql::get_mysql_driver_instance(); // Thread-safe
-		//driver = get_driver_instance(); //Not Thread-safe
-		con = driver->connect(host, user, pass);
-
-		if(database != "")
-		{
-			con->setSchema(database);
-		}
-
-		switch(task){
-			case 0:  //--query		
-			
-				stmt = con->createStatement();
-				stmt->execute(SQLquery);	
-				
-			break;
-			
-			case 1:  //--fetch_dictinary  
-
-				stmt = con->createStatement();
-				res = stmt->executeQuery(SQLquery);
-				res_meta = res->getMetaData();
-						
-				while (res->next()){
-				
-					Dictionary row;
-					Array datando;
-
-					for (int j = 1; j <= res_meta->getColumnCount(); j++) 
-					{
-						String testype = sql2String(res_meta->getColumnTypeName(j));  
-						bool othertypes = false;
-						
-						//Returns an Interger
-						if (testype == "INT" || testype == "TINYINT" || testype == "SMALLINT"|| testype == "MEDIUMINT" || testype == "BIGINT" || testype == "INTEGER"){
-		 					row[sql2String(res_meta->getColumnName(j))] = res->getInt(j);
-							othertypes = true;
-						}
-
-						//Returns strings
-						if (testype == "VARCHAR"|| testype == "CHAR" || testype == "TINYTEXT" || testype == "TEXT" || testype == "MEIUMTEXT" || testype == "LONGTEXT" || testype == "LONGVARCHAR") {
-							row[sql2String(res_meta->getColumnName(j))] = sql2String(res->getString(j));
-							othertypes = true;
-						}
-
-						//Returns a float
-						if (testype == "FLOAT" || testype == "DECIMAL" || testype == "REAL" || testype == "DOUBLE" || testype == "NUMERIC"){
-							float floteando = res->getDouble(j);
-							row[sql2String(res_meta->getColumnName(j))] = floteando;
-							othertypes = true;
-						}
-					
-						//Returns boolean
-						if (testype == "BOOL" || testype == "BOOLEAN" || testype == "BIT"){
-							row[sql2String(res_meta->getColumnName(j))] = res->getBoolean(j);
-							othertypes = true;
-						}
-
-						// It should return time information as a dictionary, but if the sequencing of the data be 
-						// modified (using TIME_FORMAT or DATE_FORMAT for exemple), it will return the dictionary fields with wrong names. 
-						// So I preferred return the data as an array.
-						if ( testype == "DATETIME"|| testype == "TIMESTAMP" || testype == "DATE" || testype == "TIME" || testype == "YEAR") {
-						
-							string str = (sql2String(res->getString(j))).utf8().get_data();
-							char seps[] = ": -";
-							char *token;
-							token = strtok( &str[0], seps );
-
-							while( token != NULL )
-							{
-								datando.push_back(atoi(token));
-								token = strtok( NULL, seps );
-							}
-
-							row[sql2String(res_meta->getColumnName(j))] = datando;
-							othertypes = true;
-						}
-
-
-						//Return any other datatpe as string
-						if (othertypes == false){
-							row[sql2String(res_meta->getColumnName(j))] = sql2String(res->getString(j));
-						}
-
-					}
-					ret.push_back(row);
-				}
-			break;
-			
-			case 2:  //--fetch_dictinary_string		
-			
-				stmt = con->createStatement();
-				res = stmt->executeQuery(SQLquery);
-				res_meta = res->getMetaData();
-
-				while (res->next())
-				{
-					Dictionary row;
-					for (int j = 1; j <= res_meta->getColumnCount(); j++) {
-						row[sql2String(res_meta->getColumnName(j))] = sql2String(res->getString(j));
-					}
-
-				ret.push_back(row);
-				}
-			break;
-		
-			case 3:  //--fetch_array_string		
-			
-				stmt = con->createStatement();
-				res = stmt->executeQuery(SQLquery);
-				res_meta = res->getMetaData();
-
-				while (res->next())
-				{
-					Array linha;
-					for (int j = 1; j <= res_meta->getColumnCount(); j++)       	    
-					{            	           	    
-						linha.push_back(sql2String(res->getString(j)));               
-					}
-
-				ret.push_back(linha);
-				}       			
-			break;
-
-			case 4:  //--fetch_array		
-			
-				stmt = con->createStatement();
-				res = stmt->executeQuery(SQLquery);
-				res_meta = res->getMetaData();
-
-				while (res->next())
-				{
-					Array linha;
-					Array datando;
-					for (int j = 1; j <= res_meta->getColumnCount(); j++)       	    
-					{            	           	    
-
-						String testype = sql2String(res_meta->getColumnTypeName(j));  
-						bool othertypes = false;
-						
-						//Returns an Interger
-						if (testype == "INT" || testype == "TINYINT" || testype == "SMALLINT"|| testype == "MEDIUMINT" || testype == "BIGINT" || testype == "INTEGER"){
-		 					linha.push_back(res->getInt(j));
-							othertypes = true;
-						}
-
-						//Returns strings
-						if (testype == "VARCHAR"|| testype == "CHAR" || testype == "TINYTEXT" || testype == "TEXT" || testype == "MEIUMTEXT" || testype == "LONGTEXT" || testype == "LONGVARCHAR") {
-							linha.push_back(sql2String(res->getString(j)));
-							othertypes = true;
-						}
-
-						//Returns a float
-						if (testype == "FLOAT" || testype == "DECIMAL" || testype == "REAL" || testype == "DOUBLE" || testype == "NUMERIC"){
-							float floteando = res->getDouble(j);
-							linha.push_back(floteando);
-							othertypes = true;
-						}
-					
-						//Returns boolean
-						if (testype == "BOOL" || testype == "BOOLEAN" || testype == "BIT"){
-							linha.push_back(res->getBoolean(j));
-							othertypes = true;
-						}
-
-						//Returns an Interger Array 
-						if (testype == "DATE"|| testype == "DATETIME"|| testype == "TIME"|| testype == "TIMESTAMP"|| testype == "YEAR") 
-						{
-							string str = (sql2String(res->getString(j))).utf8().get_data();
-							char seps[] = ": -";
-							char *token;
-							token = strtok( &str[0], seps );
-
-							while( token != NULL )
-							{
-								datando.push_back(atoi(token));
-								token = strtok( NULL, seps );
-							}
-
-							linha.push_back(datando);
-							othertypes = true;
-						}
-
-						//Return any other datatpe as string
-						if (othertypes == false){
-							linha.push_back(sql2String(res->getString(j)));
-						}				    
-					}
-				ret.push_back(linha);
-			}   				
-			break;	
-		
-			case 5:  //--get_columns_name		
-			
-				stmt = con->createStatement();
-				res = stmt->executeQuery(SQLquery);
-				res_meta = res->getMetaData();
-
-				for (int j = 1; j <= res_meta->getColumnCount(); j++)       	    
-				{            	           	    
-					ret.push_back(sql2String(res_meta->getColumnName(j)));
-				}				
-			break;		
-		
-			case 6:  //--get_column_types		
-			
-				stmt = con->createStatement();
-				res = stmt->executeQuery(SQLquery);
-				res_meta = res->getMetaData();
-
-				for (int t = 1; t <= res_meta->getColumnCount(); t++)       	    
-				{    
-					ret.push_back(sql2String(res_meta->getColumnTypeName(t)));
-				}				
-			break;		
-		
-		} //-- end switch
-
-		delete res;
-		delete stmt;
-		delete con;
-
-	}
-	catch (sql::SQLException &e) {
-		print_line("# EXCEPTION Caught ˇ");
-		Variant file = __FILE__;
-		Variant line = __LINE__;
-		Variant func = __FUNCTION__;
-			print_line("# ERR: SQLException in: "+String(file)+" in function: "+String(func)+"() on line "+String(line));
-			print_line("# ERR: "+String(e.what()));
-		Variant errCode = e.getErrorCode();
-			print_line(" (MySQL error code: "+String(errCode)+")");
-			print_line("SQLState: "+sql2String(e.getSQLState()));
-	}
+	shared_ptr <sql::Connection> con(connection(ACT_DO));
 	
-	return ret;
+	sql::SQLString option = p_option.utf8().get_data();
+	sql::SQLString value = p_value.utf8().get_data();
+
+	con->setClientOption(option, value);
+	
 }
 
 
-//---Staff
+String MySQL::get_client_options(String p_option){
 
+	shared_ptr <sql::Connection> con(connection(ACT_DO));
+	sql::SQLString option = p_option.utf8().get_data();
+	return sql2String( con->getClientOption( option ) );
+
+}
+
+
+
+//-------------- Query
+
+Array MySQL::query_fetch_dictionary(String p_SQLquery, bool return_string) 
+{  
+	return make_query(p_SQLquery, FUNC_DICT, emptyarray, return_string); 
+}
+
+	
+Array MySQL::query_fetch_array(String p_SQLquery, bool return_string) 
+{  
+	return make_query(p_SQLquery, FUNC_ARRAY, emptyarray, return_string); 
+}
+
+
+Array MySQL::query_get_columns_types(String p_SQLquery) 
+{   
+	return make_query(p_SQLquery, FUNC_TYPE, emptyarray, true);  
+}	
+
+
+Array MySQL::query_get_columns_names(String p_SQLquery) 
+{  
+	return make_query(p_SQLquery, FUNC_NAME, emptyarray, true); 
+}	
+
+
+int MySQL::query_execute(String p_SQLquery) 
+{   
+	make_query(p_SQLquery, FUNC_EXEC, emptyarray, false);
+	int rows = afectedrows;
+	afectedrows = 0;
+	return  rows;
+}
+
+
+
+//-------------- Prepared Query
+
+Array MySQL::prep_fetch_dictionary(String p_SQLquery, Array prep_val, bool return_string) 
+{  
+	return make_query(p_SQLquery, FUNC_DICT_PREP, prep_val, return_string); 
+}
+
+	
+Array MySQL::prep_fetch_array(String p_SQLquery, Array prep_val, bool return_string )
+{  
+	return make_query(p_SQLquery, FUNC_ARRAY_PREP, prep_val, return_string); 
+}
+
+
+Array MySQL::prep_get_columns_types(String p_SQLquery, Array prep_val) 
+{   
+	return make_query(p_SQLquery, FUNC_TYPE_PREP, prep_val, true);  
+}	
+
+
+Array MySQL::prep_get_columns_names(String p_SQLquery, Array prep_val) 
+{  
+	return make_query(p_SQLquery, FUNC_NAME_PREP, prep_val, true); 
+}	
+
+
+int MySQL::prep_execute(String p_SQLquery, Array prep_val) 
+{   
+	make_query(p_SQLquery, FUNC_EXEC_PREP, prep_val, false);
+	int rows = afectedrows;
+	afectedrows = 0;
+	return  rows;
+}
+
+
+
+//-------------- Database
+
+String MySQL::get_database()
+{
+	shared_ptr< sql::Connection > con(connection(ACT_DO));
+	if (con != NULL){
+		return sql2String( con->getSchema() ); }
+}
+
+
+void MySQL::set_database( String p_database )
+{
+	sql::SQLString database = p_database.utf8().get_data();
+
+	if(database != "")
+	{
+		shared_ptr< sql::Connection > con(connection(ACT_DO));
+		if (con != NULL){
+			con->setSchema(database);
+		}else{
+				 connection_properties["schema"] = database;
+			 }
+	}
+}
+
+
+
+Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return_string){
+
+	sql::SQLString SQLquery = p_SQLquery.utf8().get_data();
+	Array ret;
+	bool querystatus;
+
+	shared_ptr <sql::Connection> con(connection(ACT_DO));
+
+	shared_ptr <sql::Statement> stmt;
+	shared_ptr <sql::PreparedStatement> prep_stmt;
+	shared_ptr <sql::ResultSet> res;
+	sql::ResultSetMetaData *res_meta;
+
+	try
+	{
+		//----------- EXECUTE
+		if ( type == FUNC_EXEC || type == FUNC_EXEC_PREP )  // ExecuteUpdate functions
+	 	{
+			if ( type == FUNC_EXEC )
+			{
+				stmt.reset(con->createStatement());
+				afectedrows = stmt->executeUpdate(SQLquery);
+			}
+			else
+			{
+			    prep_stmt.reset(con->prepareStatement(SQLquery));
+				determine_datatype( prep_stmt,  prep_val);
+				afectedrows = prep_stmt->executeUpdate();
+			}
+		}
+		else // - Non executeUpdate functions
+		{
+
+			if ( (type == FUNC_TYPE || type == FUNC_TYPE || type == FUNC_DICT || type == FUNC_ARRAY) ) // Non prep statement
+			{
+				stmt.reset(con->createStatement());
+				res.reset( stmt->executeQuery(SQLquery));
+				res_meta = res->getMetaData();
+			}
+			else // Prep statement
+			{
+				prep_stmt.reset(con->prepareStatement(SQLquery));
+				determine_datatype( prep_stmt,  prep_val);
+				res.reset( prep_stmt->executeQuery());    //----Combo Arrays???
+				res_meta = res->getMetaData();		
+			}
+
+			//----------- NAME && TYPE
+			if ( type == FUNC_NAME || type == FUNC_TYPE || type == FUNC_NAME_PREP || type == FUNC_TYPE_PREP) 
+			{
+				for (int i = 1; i <= res_meta->getColumnCount(); i++)       	    
+				{  
+					if ( type == FUNC_TYPE || type == FUNC_TYPE_PREP )
+						{ ret.push_back(sql2String(res_meta->getColumnTypeName(i))); }
+
+					if ( type == FUNC_NAME || type == FUNC_NAME_PREP )
+						{ ret.push_back(sql2String(res_meta->getColumnName(i))); }
+				}
+			}	
+
+			//----------- DICT && ARRAY
+			if ( type == FUNC_DICT || type == FUNC_ARRAY || type == FUNC_DICT_PREP || type == FUNC_ARRAY_PREP ) 
+			{
+				while (res->next())
+				{			
+					Array line;
+					Dictionary row;
+
+					for (int i = 1; i <= res_meta->getColumnCount(); i++) 
+					{
+
+						if ( (type == FUNC_DICT || type == FUNC_DICT_PREP ) && return_string  )		// - return_string DICT
+							{ row[sql2String(res_meta->getColumnName(i))] = sql2String(res->getString(i)); }
+
+						if ( (type == FUNC_ARRAY || type == FUNC_ARRAY_PREP) && return_string)		// - return_string ARRAY
+							{ line.push_back( (sql2String(res->getString(i))) ); }
+
+
+						if ( !return_string )
+							{
+								int g_type = res->getType();
+
+						//---------- INT
+								if ( g_type == sql::DataType::BIT || g_type == sql::DataType::TINYINT || g_type == sql::DataType::SMALLINT || g_type == sql::DataType::MEDIUMINT || g_type == sql::DataType::INTEGER || g_type == sql::DataType::BIGINT )
+								{
+									if ( type == FUNC_DICT || type == FUNC_DICT_PREP )
+										{ row[sql2String(res_meta->getColumnName(i))] = res->getInt(i); }
+									if ( type == FUNC_ARRAY || type == FUNC_ARRAY_PREP )
+										{ line.push_back( res->getInt(i) ); }
+								}
+						//----------  FLOAT
+
+								else if ( g_type == sql::DataType::REAL || g_type == sql::DataType::DOUBLE || g_type == sql::DataType::DECIMAL || g_type == sql::DataType::NUMERIC ) 
+								{ 
+									float floteando = res->getDouble(i);
+
+									if ( type == FUNC_DICT || type == FUNC_DICT_PREP )
+										{row[sql2String(res_meta->getColumnName(i))] = floteando;} 
+
+									if ( type == FUNC_ARRAY || type == FUNC_ARRAY_PREP )
+										{line.push_back( floteando ); } 
+								} 
+
+						//----------  TIME
+								else if (g_type == sql::DataType::DATE || g_type == sql::DataType::TIME || g_type == sql::DataType::TIMESTAMP || g_type == sql::DataType::YEAR )
+								/*		It should return time information as a dictionary when calling "fetch_dictionary", but if the sequence of the  
+								data be modified (using TIME_FORMAT or DATE_FORMAT for exemple), it will return the dictionary fields with wrong names. 
+								so I prefer return the data as an array.	*/
+								{
+									line.push_back( format_time( ((sql2String(res->getString(i))).utf8().get_data()) , false) );
+								}
+
+						//----------  STRING
+								else // - ANY OTHER DATATYPE non listed above gonna be returned as STRING (Including char types, of course).
+								{
+									{ row[sql2String(res_meta->getColumnName(i))] = sql2String(res->getString(i)); }
+								}
+
+							}  // if  !return_string 
+
+					}// for
+
+					if ( type == FUNC_DICT || type == FUNC_DICT_PREP)
+						{ ret.push_back( row ); }
+					else if ( type == FUNC_ARRAY || type == FUNC_ARRAY_PREP)
+						{ ret.push_back( line ); }
+
+				}  /// while 
+
+			} // if FUNC = DICT || ARRAY || DICT_PREP || ARRAY_PREP
+
+		} // - Non executeUpdate functions
+
+	}  //-Try
+
+	catch (sql::SQLException &e) { print_SQLException(e); } 
+	catch (runtime_error &e) { print_runtime_error(e); 	}
+
+	return ret;
+
+}
+
+
+shared_ptr<sql::Connection> MySQL::connection(int what){
+	
+	static sql::mysql::MySQL_Driver *driver; 
+	static shared_ptr <sql::Connection> con;
+
+	if (what == ACT_CLOSE)  
+	{  if (con.get()) // != NULL
+		{ 
+			if (!con->isClosed())	{ con->close();  }
+		}
+	}
+
+	if ( what == ACT_DO  )
+	{
+		if ( con == NULL || (!con->isValid()) || (!con->reconnect()) ) 
+		{	
+			try
+			{	
+				driver = sql::mysql::get_mysql_driver_instance();
+				con.reset(driver->connect(connection_properties)); 
+			}
+
+			catch (sql::SQLException &e) {	print_SQLException(e); 	} 
+			catch (runtime_error &e) {	print_runtime_error(e);	 }
+		}
+	}
+
+	return con;
+}
+
+
+//-------------- Helpers
+
+//********
+bool MySQL::check(int what)
+{
+	shared_ptr< sql::Connection > con(connection(what));
+	if (con != NULL){ 
+ 		if (!con->isClosed()){ 
+			return con->isValid();	
+		}
+	}
+	return false;
+}
+
+//********
 String MySQL::sql2String(sql::SQLString p_str)
 {
 	const char * c = p_str.c_str();
@@ -301,20 +345,176 @@ String MySQL::sql2String(sql::SQLString p_str)
 	return str;
 }
 
+
+//**********
+void MySQL::determine_datatype( std::shared_ptr <sql::PreparedStatement> prep_stmt , Array prep_val){
+
+	for (int i = 0; i <= (prep_val.size() -1); i++) // Determine datatype      
+	{
+		int d = i+1;
+
+		if 		( prep_val[i].get_type() == Variant::NIL )	{	prep_stmt->setNull(d, sql::DataType::SQLNULL);	}
+				
+		else if ( prep_val[i].get_type() == Variant::BOOL)	{	prep_stmt->setBoolean(d, bool(prep_val[i]));	}
+								
+		else if ( prep_val[i].get_type() == Variant::INT)	{	prep_stmt->setInt(d, int(prep_val[i]));	}
+
+		else if ( prep_val[i].get_type() == Variant::REAL)	{	prep_stmt->setDouble(d, float(prep_val[i]));	}
+
+		else  // - Gonna handle any other datatype as string
+		{
+			String stri = String(prep_val[i]);
+			sql::SQLString caracteres = stri.utf8().get_data();
+
+			if ( is_mysql_time( stri ))  // -- If the string has the mysql data type format, this gonna be handle as Date and Time Types
+
+				{ prep_stmt->setDateTime(d, caracteres ); }
+			else
+				{ prep_stmt->setString(d, caracteres ); }
+		}
+	}
+}
+//********
+
+Array MySQL::format_time(String str, bool return_string){
+
+	Array datando;																		
+	string strss = 	str.utf8().get_data();				
+	char seps[] = ": -";
+	char *token;
+	token = strtok( &strss[0], seps );
+
+	while( token != NULL )
+	{
+		if (return_string) { datando.push_back( String(token) ); }   //--As String
+		else  { datando.push_back(atoi(token)); } 
+
+		token = strtok( NULL, seps );
+	}
+
+	return datando;
+}
+//********
+
+bool MySQL::is_mysql_time(String time){
+
+	string s_time = time.utf8().get_data();    ///Impo
+
+	int len = time.length();
+
+	if (s_time.find_first_not_of( "0123456789:- " ) == string::npos)
+	{
+	
+	// - 0000
+		if ( len == 4 )			
+		{
+			return true; 
+		}
+
+	// - 00:00:00
+		else if ( len == 8 )		
+		{
+			if ( time[2] ==  ':' && time[5] == ':' )
+			{
+				Array arr_time = format_time(time, true);
+				if ( arr_time.size() == 3 && String(arr_time[2]).length() == 2)  { return true; }
+			}
+		}
+
+	// - 0000-00-00
+		else if ( len == 10 )	
+		{
+			if ( time[4] ==  '-' && time[7] == '-')
+			{
+				Array arr_time = format_time(time, true);
+				if ( arr_time.size() == 3 && String(arr_time[2]).length() == 2)  { return true; }
+			}
+		}
+
+	// - 0000-00-00 00:00:00
+		else if ( len == 19 )		
+		{
+			if ( time[4] ==  '-' && time[7] == '-' && time[13] ==  ':' && time[16] == ':' && time[10] == ' ' )
+			{
+				Array arr_time = format_time(time, true);
+				if ( arr_time.size() == 6 && String(arr_time[2]).length() == 2)  { return true; }
+			}
+		}
+	}
+
+	return false;
+}	
+
+//********
+void MySQL::print_SQLException(sql::SQLException &e) {
+	
+	//(e.getErrorCode() == 1047) == No prepareted support at all
+
+	print_line("# EXCEPTION Caught ˇ");
+	Variant file = __FILE__;
+	Variant line = __LINE__;
+	Variant func = __FUNCTION__;
+		print_line("# ERR: SQLException in: "+String(file)+" in function: "+String(func)+"() on line "+String(line));
+		print_line("# ERR: "+String(e.what()));
+	Variant errCode = e.getErrorCode();
+		print_line(" (MySQL error code: "+String(errCode)+")");
+		print_line("SQLState: "+sql2String(e.getSQLState()));
+} 
+
+//********
+void MySQL::print_runtime_error(runtime_error &e) {
+	
+	cout << "ERROR: runtime_error in " << __FILE__;
+	cout << " (" << __func__ << ") on line " << __LINE__ << endl;
+	cout << "ERROR: " << e.what() << endl;
+}
+
+
+
 void MySQL::_bind_methods()
 {
+	//--- Connection Managers
+	ClassDB::bind_method(D_METHOD("connection_start"),&MySQL::connection_start);
+	ClassDB::bind_method(D_METHOD("connection_check"),&MySQL::connection_check);
+	ClassDB::bind_method(D_METHOD("connection_close"),&MySQL::connection_close);
 
-	ClassDB::bind_method(D_METHOD("set_credentials","hostname","username","password"),&MySQL::set_credentials);
-	ClassDB::bind_method(D_METHOD("select_database","database"),&MySQL::select_database);
-	ClassDB::bind_method(D_METHOD("query","sql_query"),&MySQL::query);
-	ClassDB::bind_method(D_METHOD("fetch_dictinary","sql_query"),&MySQL::fetch_dictinary);
-	ClassDB::bind_method(D_METHOD("fetch_dictinary_string","sql_query"),&MySQL::fetch_dictinary_string);
-	ClassDB::bind_method(D_METHOD("fetch_array_string","sql_query"),&MySQL::fetch_array_string);
-	ClassDB::bind_method(D_METHOD("fetch_array","sql_query"),&MySQL::fetch_array);
-	ClassDB::bind_method(D_METHOD("get_columns_name","sql_query"),&MySQL::get_columns_name);
-	ClassDB::bind_method(D_METHOD("get_column_types","sql_query"),&MySQL::get_column_types);
+	ClassDB::bind_method(D_METHOD("set_credentials", "Host", "User", "Password"),&MySQL::set_credentials);	
+	ClassDB::bind_method(D_METHOD("set_client_options", "Option", "Value"),&MySQL::set_client_options);	
+	ClassDB::bind_method(D_METHOD("get_client_options", "Option"),&MySQL::get_client_options);	
+
+
+	//--- Database
+	ClassDB::bind_method(D_METHOD("set_database", "Database"),&MySQL::set_database);	
+	ClassDB::bind_method(D_METHOD("get_database"),&MySQL::get_database);	
+
+
+	//--- Prepared Query
+	ClassDB::bind_method(D_METHOD("prep_execute", "SQL_execute", "return data as string"),&MySQL::prep_execute);	
+	ClassDB::bind_method(D_METHOD("prep_fetch_dictionary", "SQL_query", "Array of values", "return data as string"),&MySQL::prep_fetch_dictionary);	
+	ClassDB::bind_method(D_METHOD("prep_fetch_array", "SQL_query", "Array of values", "return data as string"),&MySQL::prep_fetch_array);	
+	ClassDB::bind_method(D_METHOD("prep_get_columns_names", "SQL_query", "Array of values"),&MySQL::prep_get_columns_names);	
+	ClassDB::bind_method(D_METHOD("prep_get_columns_types", "SQL_query", "Array of values"),&MySQL::prep_get_columns_types);	
+
+
+	//---  Query
+	ClassDB::bind_method(D_METHOD("query_execute", "SQL_execute"),&MySQL::query_execute);	
+	ClassDB::bind_method(D_METHOD("query_fetch_dictionary", "SQL_query", "return data as string"),&MySQL::query_fetch_dictionary);	
+	ClassDB::bind_method(D_METHOD("query_fetch_array", "SQL_query", "return data as string"),&MySQL::query_fetch_array);	
+	ClassDB::bind_method(D_METHOD("query_get_columns_names", "SQL_query"),&MySQL::query_get_columns_names);	
+	ClassDB::bind_method(D_METHOD("query_get_columns_types", "SQL_query"),&MySQL::query_get_columns_types);	
+
 }
 
-MySQL::MySQL() {
+MySQL::MySQL(){
+	connection_properties["port"] = 3306;
+	connection_properties["OPT_RECONNECT"] = true;
+	afectedrows = 0;
 }
+
+MySQL::~MySQL(){
+	connection_close();
+}
+
+
+
 
