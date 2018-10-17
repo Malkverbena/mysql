@@ -33,8 +33,7 @@ Should work fine on Mac
 
 #### Methods: 
 
-You can find a exemple project here:
-https://github.com/Malkverbena/Mysql_module_exemple
+You can find the usage exemple on file mysql_exemple.gd
 
 
 
