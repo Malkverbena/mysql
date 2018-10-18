@@ -19,10 +19,7 @@
 #include <cppconn/resultset_metadata.h>
 #include <cppconn/prepared_statement.h>
 
-
-
 #pragma once  
-
 
 class MySQL : public Reference {
 	GDCLASS(MySQL,Reference);
@@ -42,7 +39,6 @@ private:
 	//--- Database
 	std::shared_ptr<sql::Connection> connection(int what); 
 	Array make_query(String p_SQLquery, int type, Array prep_val, bool return_string = false);
-
 
 
 	//---Vars

@@ -1,7 +1,6 @@
 /*  mysql.cpp */
 
 #include "mysql.h"
-
 #include <memory>
 
 using namespace std;
@@ -15,7 +14,8 @@ bool MySQL::connection_check() { return check(ACT_CHECK); }
 
 bool MySQL::connection_close() { return check(ACT_CLOSE); } 
 
-void MySQL::set_credentials( String p_host, String p_user, String p_pass ){
+void MySQL::set_credentials( String p_host, String p_user, String p_pass )
+{
 
 	connection_properties["hostName"] = p_host.utf8().get_data(); 
 	connection_properties["userName"] = p_user.utf8().get_data(); 
@@ -23,24 +23,21 @@ void MySQL::set_credentials( String p_host, String p_user, String p_pass ){
 }
 
 
-void MySQL::set_client_options(String p_option, String p_value){
-
+void MySQL::set_client_options(String p_option, String p_value)
+{
 	shared_ptr <sql::Connection> con(connection(ACT_DO));
-	
 	sql::SQLString option = p_option.utf8().get_data();
 	sql::SQLString value = p_value.utf8().get_data();
-
 	con->setClientOption(option, value);
 }
 
 
-String MySQL::get_client_options(String p_option){
-
+String MySQL::get_client_options(String p_option)
+{
 	shared_ptr <sql::Connection> con(connection(ACT_DO));
 	sql::SQLString option = p_option.utf8().get_data();
 	return sql2String( con->getClientOption( option ) );
 }
-
 
 
 //-------------- Query
@@ -118,8 +115,12 @@ int MySQL::prep_execute(String p_SQLquery, Array prep_val)
 String MySQL::get_database()
 {
 	shared_ptr< sql::Connection > con(connection(ACT_DO));
-	if (con != NULL){
-		return sql2String( con->getSchema() ); }
+	if (con != NULL)
+	{
+		return sql2String( con->getSchema() ); 
+	}
+	else
+	{ return (String)"Invalid Connection!";}
 }
 
 
@@ -146,7 +147,6 @@ Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return
 
 	sql::SQLString SQLquery = p_SQLquery.utf8().get_data();
 	Array ret;
-	bool querystatus;
 
 	shared_ptr <sql::Connection> con(connection(ACT_DO));
 
@@ -192,14 +192,24 @@ Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return
 			//----------- NAME && TYPE
 			if ( type == FUNC_NAME || type == FUNC_TYPE || type == FUNC_NAME_PREP || type == FUNC_TYPE_PREP) 
 			{
-				for (int i = 1; i <= res_meta->getColumnCount(); i++)       	    
-				{  
+
+				
 					if ( type == FUNC_TYPE || type == FUNC_TYPE_PREP )
-						{ ret.push_back(sql2String(res_meta->getColumnTypeName(i))); }
+					{
+						for (int i = 1; i <= res_meta->getColumnCount(); i++)       	    
+						{ 
+							ret.push_back(sql2String(res_meta->getColumnTypeName(i))); 
+						}
+					}
 
 					if ( type == FUNC_NAME || type == FUNC_NAME_PREP )
-						{ ret.push_back(sql2String(res_meta->getColumnName(i))); }
-				}
+					{
+						for (int i = 1; i <= res_meta->getColumnCount(); i++)       	    
+						{ 
+							ret.push_back(sql2String(res_meta->getColumnName(i))); 
+						}
+					}
+				
 			}	
 
 			//----------- DICT && ARRAY
@@ -283,7 +293,8 @@ Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return
 	return ret;
 }
 
-shared_ptr<sql::Connection> MySQL::connection(int what){
+shared_ptr<sql::Connection> MySQL::connection(int what)
+{
 	
 	static sql::mysql::MySQL_Driver *driver; 
 	static shared_ptr <sql::Connection> con;
@@ -319,8 +330,10 @@ shared_ptr<sql::Connection> MySQL::connection(int what){
 bool MySQL::check(int what)
 {
 	shared_ptr< sql::Connection > con(connection(what));
-	if (con != NULL){ 
- 		if (!con->isClosed()){ 
+	if (con != NULL)
+	{ 
+ 		if (!con->isClosed())
+ 		{ 
 			return con->isValid();	
 		}
 	}
@@ -337,8 +350,8 @@ String MySQL::sql2String(sql::SQLString p_str)
 
 
 //**********
-void MySQL::determine_datatype( std::shared_ptr <sql::PreparedStatement> prep_stmt , Array prep_val){
-
+void MySQL::determine_datatype( std::shared_ptr <sql::PreparedStatement> prep_stmt , Array prep_val)
+{
 	for (int i = 0; i <= (prep_val.size() -1); i++) // Determine datatype      
 	{
 		int d = i+1;
@@ -366,7 +379,8 @@ void MySQL::determine_datatype( std::shared_ptr <sql::PreparedStatement> prep_st
 }
 //********
 
-Array MySQL::format_time(String str, bool return_string){
+Array MySQL::format_time(String str, bool return_string)
+{
 
 	Array datando;																		
 	string strss = 	str.utf8().get_data();				
@@ -377,7 +391,7 @@ Array MySQL::format_time(String str, bool return_string){
 	while( token != NULL )
 	{
 		if (return_string) { datando.push_back( String(token) ); }   //--As String
-		else  { datando.push_back(atoi(token)); } 
+		else  { datando.push_back(atoi(token)); } 					 //--As Data
 
 		token = strtok( NULL, seps );
 	}
@@ -386,10 +400,10 @@ Array MySQL::format_time(String str, bool return_string){
 }
 //********
 
-bool MySQL::is_mysql_time(String time){
 
+bool MySQL::is_mysql_time(String time)
+{
 	string s_time = time.utf8().get_data();    ///Impo
-
 	int len = time.length();
 
 	if (s_time.find_first_not_of( "0123456789:- " ) == string::npos)
@@ -398,13 +412,13 @@ bool MySQL::is_mysql_time(String time){
 	// - 0000
 		if ( len == 4 )			
 		{
-			return true; 
+			if (s_time.find_first_not_of( "0123456789" ) == string::npos) {	return true; }
 		}
 
 	// - 00:00:00
 		else if ( len == 8 )		
 		{
-			if ( time[2] ==  ':' && time[5] == ':' )
+			if ( time[2] ==  ':' && time[5] == ':' ) 
 			{
 				Array arr_time = format_time(time, true);
 				if ( arr_time.size() == 3 && String(arr_time[2]).length() == 2)  { return true; }
@@ -431,14 +445,13 @@ bool MySQL::is_mysql_time(String time){
 			}
 		}
 	}
-
 	return false;
 }	
 
 //********
-void MySQL::print_SQLException(sql::SQLException &e) {
-	
-	//(e.getErrorCode() == 1047) == No prepareted statement support at all.
+void MySQL::print_SQLException(sql::SQLException &e) 
+{	
+	//(e.getErrorCode() == 1047) = No prepareted statement support at all.
 
 	print_line("# EXCEPTION Caught ˇ");
 	Variant file = __FILE__;
@@ -452,8 +465,8 @@ void MySQL::print_SQLException(sql::SQLException &e) {
 } 
 
 //********
-void MySQL::print_runtime_error(runtime_error &e) {
-	
+void MySQL::print_runtime_error(runtime_error &e) 
+{	
 	cout << "ERROR: runtime_error in " << __FILE__;
 	cout << " (" << __func__ << ") on line " << __LINE__ << endl;
 	cout << "ERROR: " << e.what() << endl;
