@@ -1,15 +1,5 @@
-- Support prepared statements/transaction ??? - (SQL injection avoidation can be easily done on GDscritp).
+- Support transaction ??? 
 
-- Use a smaller scope.  Done!
-
-- Declare con only once, not at the start of each function.  Done!
-  
-- Remove the code duplication at the start and end of every function.  Done!
-
-- Keep C++98 compatible and not use C++11's smart pointers. maybe std::auto_ptr to make the code exception safe.
-
-- Delete-lines are never run if an exception is thrown... (Fix it).
-
--  Write docs.  Done!
+-  Write docs!
 
  
