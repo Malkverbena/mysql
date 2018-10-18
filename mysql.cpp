@@ -131,11 +131,10 @@ void MySQL::set_database( String p_database )
 	if(database != "")
 	{
 		shared_ptr< sql::Connection > con(connection(ACT_DO));
-		if (con != NULL){
-			con->setSchema(database);
-		}
-		else
+		if (con != NULL)
 		{
+			con->setSchema(database);	
+		}else{
 			 connection_properties["schema"] = database;
 		}
 	}
