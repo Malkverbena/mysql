@@ -225,20 +225,20 @@ Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return
 						if ( (type == FUNC_DICT || type == FUNC_DICT_PREP ) && return_string  )		// - return_string DICT
 							{ row[sql2String(res_meta->getColumnName(i))] = sql2String(res->getString(i)); }
 
-						if ( (type == FUNC_ARRAY || type == FUNC_ARRAY_PREP) && return_string)		// - return_string ARRAY
+						else if ( (type == FUNC_ARRAY || type == FUNC_ARRAY_PREP) && return_string)		// - return_string ARRAY
 							{ line.push_back( (sql2String(res->getString(i))) ); }
 
 
-						if ( !return_string )
+						else if ( !return_string )
 							{
-								int g_type = res->getType();
+								int g_type = res_meta->getColumnType(i);
 
 						//---------- INT
 								if ( g_type == sql::DataType::BIT || g_type == sql::DataType::TINYINT || g_type == sql::DataType::SMALLINT || g_type == sql::DataType::MEDIUMINT || g_type == sql::DataType::INTEGER || g_type == sql::DataType::BIGINT )
 								{
 									if ( type == FUNC_DICT || type == FUNC_DICT_PREP )
 										{ row[sql2String(res_meta->getColumnName(i))] = res->getInt(i); }
-									if ( type == FUNC_ARRAY || type == FUNC_ARRAY_PREP )
+									else
 										{ line.push_back( res->getInt(i) ); }
 								}
 						//----------  FLOAT
@@ -249,8 +249,7 @@ Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return
 
 									if ( type == FUNC_DICT || type == FUNC_DICT_PREP )
 										{row[sql2String(res_meta->getColumnName(i))] = floteando;} 
-
-									if ( type == FUNC_ARRAY || type == FUNC_ARRAY_PREP )
+									else
 										{line.push_back( floteando ); } 
 								} 
 
@@ -260,13 +259,19 @@ Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return
 								data be modified (using TIME_FORMAT or DATE_FORMAT for exemple), it will return the dictionary fields with wrong names. 
 								so I prefer return the data as an array.	*/
 								{
-									line.push_back( format_time( ((sql2String(res->getString(i))).utf8().get_data()) , false) );
+									if ( type == FUNC_DICT || type == FUNC_DICT_PREP )
+										{  row[sql2String(res_meta->getColumnName(i))] = format_time(((sql2String(res->getString(i))).utf8().get_data()) , false); }
+									else
+										{ line.push_back( format_time( ((sql2String(res->getString(i))).utf8().get_data()) , false) ); }
 								}
 
 						//----------  STRING
 								else // - ANY OTHER DATATYPE non listed above gonna be returned as STRING (Including char types, of course).
 								{
-									{ row[sql2String(res_meta->getColumnName(i))] = sql2String(res->getString(i)); }
+									if ( type == FUNC_DICT || type == FUNC_DICT_PREP )
+										{ row[sql2String(res_meta->getColumnName(i))] = sql2String(res->getString(i)); }
+									else
+										{ line.push_back( sql2String(res->getString(i))); }
 								}
 
 							}  // if  !return_string 
@@ -275,7 +280,7 @@ Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return
 
 					if ( type == FUNC_DICT || type == FUNC_DICT_PREP)
 						{ ret.push_back( row ); }
-					else if ( type == FUNC_ARRAY || type == FUNC_ARRAY_PREP)
+					else
 						{ ret.push_back( line ); }
 
 				}  /// while 
@@ -516,7 +521,3 @@ MySQL::MySQL(){
 MySQL::~MySQL(){
 	connection_close();
 }
-
-
-
-
