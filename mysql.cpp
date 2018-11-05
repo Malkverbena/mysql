@@ -8,7 +8,7 @@ using namespace std;
 
 //-------------- Connection Managers
 
-bool MySQL::connection_start() { return check(ACT_DO); }  
+bool MySQL::connection_start() { return check(ACT_NEW); }  
 
 bool MySQL::connection_check() { return check(ACT_CHECK); }  
 
@@ -300,8 +300,17 @@ Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return
 shared_ptr<sql::Connection> MySQL::connection(int what)
 {
 	
-	static sql::mysql::MySQL_Driver *driver; 
-	static shared_ptr <sql::Connection> con;
+//	static sql::mysql::MySQL_Driver *driver; 
+//	static shared_ptr <sql::Connection> con(new sql::Connection);
+
+//    std::shared_ptr<sql::Driver> driver(sql::mysql::get_driver_instance());
+//	std::shared_ptr< sql::Connection > con(driver->connect(connection_properties));
+
+
+
+
+	//static shared_ptr <sql::Connection> con;
+
 
 	if (what == ACT_CLOSE)  
 	{  if (con.get()) // != NULL
@@ -318,6 +327,7 @@ shared_ptr<sql::Connection> MySQL::connection(int what)
 			{	
 				driver = sql::mysql::get_mysql_driver_instance();
 				con.reset(driver->connect(connection_properties)); 
+			    
 			}
 
 			catch (sql::SQLException &e) {	print_SQLException(e); 	} 

@@ -39,7 +39,10 @@ private:
 	//--- Database
 	std::shared_ptr<sql::Connection> connection(int what); 
 	Array make_query(String p_SQLquery, int type, Array prep_val, bool return_string = false);
-
+	
+	sql::mysql::MySQL_Driver *driver; 
+	std::shared_ptr <sql::Connection> con;
+	
 
 	//---Vars
 	sql::ConnectOptionsMap connection_properties;
@@ -48,7 +51,7 @@ private:
 
 
 	//---Const
-	enum { ACT_DO, ACT_CHECK, ACT_CLOSE};
+	enum { ACT_DO, ACT_CHECK, ACT_CLOSE, ACT_NEW};
 
 	enum { FUNC_NAME, FUNC_TYPE, FUNC_DICT, FUNC_ARRAY, FUNC_EXEC, 
 		   FUNC_NAME_PREP, FUNC_TYPE_PREP, FUNC_DICT_PREP, FUNC_ARRAY_PREP, FUNC_EXEC_PREP
