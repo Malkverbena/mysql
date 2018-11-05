@@ -8,7 +8,7 @@ using namespace std;
 
 //-------------- Connection Managers
 
-bool MySQL::connection_start() { return check(ACT_NEW); }  
+bool MySQL::connection_start() { return check(ACT_DO); }  
 
 bool MySQL::connection_check() { return check(ACT_CHECK); }  
 
