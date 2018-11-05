@@ -496,7 +496,7 @@ void MySQL::_bind_methods()
 
 
 	//--- Prepared Query
-	ClassDB::bind_method(D_METHOD("prep_execute", "SQL_execute", "return data as string"),&MySQL::prep_execute);	
+	ClassDB::bind_method(D_METHOD("prep_execute", "SQL_execute", "Array of values"),&MySQL::prep_execute);	
 	ClassDB::bind_method(D_METHOD("prep_fetch_dictionary", "SQL_query", "Array of values", "return data as string"),&MySQL::prep_fetch_dictionary);	
 	ClassDB::bind_method(D_METHOD("prep_fetch_array", "SQL_query", "Array of values", "return data as string"),&MySQL::prep_fetch_array);	
 	ClassDB::bind_method(D_METHOD("prep_get_columns_names", "SQL_query", "Array of values"),&MySQL::prep_get_columns_names);	
