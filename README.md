@@ -1,7 +1,7 @@
 # MySQL Module 
 
-#### This module is a MySQL connector for Godot.
-#### If you use this module, let me know it. Leave a star. 
+### This module is a MySQL connector for Godot.
+### If you use this module, let me know it. Leave a star. 
 
 
 #### Requirements: 
