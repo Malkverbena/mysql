@@ -35,7 +35,7 @@ https://www.youtube.com/redirect?q=https%3A%2F%2Fwww.mysql.com%2Fproducts%2Fconn
 - Make a copy of this file and rename it to "mysqlcppconn.windows.tools.64.lib" or "mysqlcppconn.windows.tools.32.lib",         according to the target of your compilation system. 64 to 64bits systems and 32 to 32bits system.
 - Copy this file to the folder "bin", inside godot's folder. 
 
-###### - YOU MUST TO EDIT THE SCsub FILE!!
+######        YOU MUST TO EDIT THE SCsub FILE!!
 - Open the SCsub file on MySQL module folder.
 - On this file you must to set the paths to Boost libraly and the connector files. (on SCsub file is there an exemple).
 
