@@ -10,14 +10,18 @@ if env['platform'] == 'windows':
 	# Add the path to Boost and libmysqlcppconn here
 	# Install Boost library are required only for Windows
 	
-	env.Append(LIBPATH=['C:/Users/My_user_name/Downloads/mysql-connector-c++-8.0.12-winx64/include/jdbc'])  # Enter with the path to the connector here.
-	env.Append(CPPPATH=['C:/Users/My_user_name/Downloads/mysql-connector-c++-8.0.12-winx64/include/jdbc'])  # Enter with the path to the connector here.
+	#----------
+	# Enter with the path to the connector here.
+	env.Append(LIBPATH=['C:/Users/My_user_name/Downloads/mysql-connector-c++-8.0.12-winx64/include/jdbc'])  
+	env.Append(CPPPATH=['C:/Users/My_user_name/Downloads/mysql-connector-c++-8.0.12-winx64/include/jdbc'])  
 	
-	env.Append(LIBPATH=['C:/Users/My_user_name/Downloads/boost_1_68_0'])     # Enter with the path to boost library here.
-	env.Append(CPPPATH=['C:/Users/My_user_name/Downloads/boost_1_68_0'])     # Enter with the path to boost library here.
+	# Enter with the path to boost library here.
+	env.Append(LIBPATH=['C:/Users/My_user_name/Downloads/boost_1_68_0'])     
+	env.Append(CPPPATH=['C:/Users/My_user_name/Downloads/boost_1_68_0'])    
 	
-	env.Append(LIBPATH=['C:/Users/My_user_name/Downloads/mysql-connector-c++-8.0.12-winx64/lib64/vs14'])  # Enter with the path to file "libmysqlcppconn.windows.tools.64.lib" here     	
-
+	# Enter with the path to file "libmysqlcppconn.windows.tools.64.lib" here     	
+	env.Append(LIBPATH=['C:/Users/My_user_name/Downloads/mysql-connector-c++-8.0.12-winx64/lib64/vs14']) 
+	#----------
 
 env.Append(LIBS=['mysqlcppconn'])
 
