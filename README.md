@@ -35,6 +35,7 @@ https://www.mysql.com/products/connector/
 - Find the file "mysqlcppconn.lib" on connector's folder.
 - Make a copy of this file and rename the copy to "mysqlcppconn.windows.tools.64.lib" or "mysqlcppconn.windows.tools.32.lib",   according to the target of your compilation system. 64 to 64bits systems and 32 to 32bits system.
 - Copy this file to the folder of the mysql module and the folder "bin", inside godot's folder. 
+- Copy all .dll files lib64 or lib32(according with your system) inside the folder "bin" or add the directory of files to       PATH environment variable in Windows.
 
 
 ######        YOU MUST TO EDIT THE SCsub FILE!!
