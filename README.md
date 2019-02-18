@@ -31,6 +31,10 @@ https://dl.bintray.com/boostorg/master/
 Install the MySQL C++ Connector. You can get it here:
 https://www.mysql.com/products/connector/
 
+There is a video in Portuguese teaching how to compile on the Windows platform.
+English subtitle can be activated anyway.
+https://www.youtube.com/watch?v=ohGP-q_Na9g
+
 
 - Find the file "mysqlcppconn.lib" on connector's folder.
 - Make a copy of this file and rename the copy to "mysqlcppconn.windows.tools.64.lib" or "mysqlcppconn.windows.tools.32.lib",   according to the target of your compilation system. 64 to 64bits systems and 32 to 32bits system.
