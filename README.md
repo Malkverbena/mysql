@@ -11,6 +11,8 @@ C++ MySQL Connector Library.
 You can get here https://dev.mysql.com/downloads/connector/cpp/. 
 On linux you can use sudo apt-get install libmysqlcppconn-dev.
 
+This module also works fine with MariaDB.
+
    
 #### Installation: 
 
