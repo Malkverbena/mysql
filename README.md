@@ -1,6 +1,7 @@
 # MySQL Module 
 
-### This module is a MySQL connector for Godot.
+## This module is a wrapper of the Mysql C++ connector for Godot. 
+
 ### If you use this module, let me know it. Leave a star. 
 
 
@@ -11,8 +12,7 @@ C++ MySQL Connector Library.
 You can get here https://dev.mysql.com/downloads/connector/cpp/. 
 On linux you can use sudo apt-get install libmysqlcppconn-dev.
 
-This module also works fine with MariaDB.
-
+This It works online and is also compatible with MariaDB.
    
 #### Installation: 
 
