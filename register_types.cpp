@@ -2,7 +2,7 @@
 
 #include "register_types.h"
 #include "core/class_db.h"
-#include "mysql.h"
+#include "MySQL.h"
 
 #include "mysql_connection.h"
 
@@ -11,12 +11,12 @@
 #include <cppconn/resultset.h>
 #include <cppconn/statement.h>
 
-void register_mysql_types() {
+void register_MySQL_types() {
 
         ClassDB::register_class<MySQL>();
 }
 
-void unregister_mysql_types() {
+void unregister_MySQL_types() {
    //nothing to do here
 }
 

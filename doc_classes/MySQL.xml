@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MySQL" inherits="Reference" category="Core" version="3.1">
+	<brief_description>
+		A MySQL connector for Godot.
+	</brief_description>
+	<description>
+		This module is a wrapper of the Mysql connector for C ++. It works online and is also compatible with MariaDB.
+	</description>
+	<tutorials>
+		<link>https://github.com/Malkverbena/MySQL_Module/blob/master/mysql_exemple.gd</link>
+	</tutorials>
+	<demos>
+	</demos>
+	<methods>
+		<method name="connection_check">
+			<return type="bool">
+			</return>
+			<description>
+				Returns the status of connection.
+			</description>
+		</method>
+		<method name="connection_close">
+			<return type="bool">
+			</return>
+			<description>
+				Close the connection. Also returns the status of connection.
+			</description>
+		</method>
+		<method name="connection_start">
+			<return type="bool">
+			</return>
+			<description>
+				Starts the connection. Also returns the status of connection. This step is not really necessary becouse the module starts automatically the connection when a query is made.
+			</description>
+		</method>
+		<method name="get_client_options">
+			<return type="String">
+			</return>
+			<argument index="0" name="Option" type="String">
+			</argument>
+			<description>
+				Returns values of an option map (ConnectOptionsMap) that contains the connection properties to use for establishing the connection.
+				More info on https://dev.mysql.com/doc/connector-cpp/1.1/en/connector-cpp-connect-options.html.
+			</description>
+		</method>
+		<method name="get_database">
+			<return type="String">
+			</return>
+			<description>
+				Returns the currently selected database.
+			</description>
+		</method>
+		<method name="prep_execute">
+			<return type="int">
+			</return>
+			<argument index="0" name="SQL_execute" type="String">
+			</argument>
+			<argument index="1" name="Array of values" type="Array">
+			</argument>
+			<description>
+				Run queries using Prepared Statements. Returns the number of modified rows. The values ​​for Prepared Statements must be supplied within an array. Parameters in prepared statements are for data values ONLY. Do not use for object identifiers or any other part of a SQL statement. 
+				ONLY data values.
+			</description>
+		</method>
+		<method name="prep_fetch_array">
+			<return type="Array">
+			</return>
+			<argument index="0" name="SQL_query" type="String">
+			</argument>
+			<argument index="1" name="Array of values" type="Array">
+			</argument>
+			<argument index="2" name="return data as string" type="bool">
+			</argument>
+			<description>
+				Returns a two-dimensional array containing the query result. The values ​​for Prepared Statements must be supplied within an array. If return_string is FALSE, than the returned data has the same datatype of the saved data on SQL database, otherwise this will return the data as Strings.
+			</description>
+		</method>
+		<method name="prep_fetch_dictionary">
+			<return type="Array">
+			</return>
+			<argument index="0" name="SQL_query" type="String">
+			</argument>
+			<argument index="1" name="Array of values" type="Array">
+			</argument>
+			<argument index="2" name="return data as string" type="bool">
+			</argument>
+			<description>
+				Returns an array of dictionaries containing the query result. Every dictionaries represents a row in the done query. The values ​​for Prepared Statements must be supplied within an array. If return_string is FALSE, the returned data has the same datatype of the saved data on SQL database, otherwise all the data gonna be returned as Strings.
+			</description>
+		</method>
+		<method name="prep_get_columns_names">
+			<return type="Array">
+			</return>
+			<argument index="0" name="SQL_query" type="String">
+			</argument>
+			<argument index="1" name="Array of values" type="Array">
+			</argument>
+			<description>
+				Return the columns names. The values ​​for Prepared Statements must be supplied within an array.
+			</description>
+		</method>
+		<method name="prep_get_columns_types">
+			<return type="Array">
+			</return>
+			<argument index="0" name="SQL_query" type="String">
+			</argument>
+			<argument index="1" name="Array of values" type="Array">
+			</argument>
+			<description>
+				Return the columns types. The values ​​for Prepared Statements must be supplied within an array. The data is returned as Strings.
+			</description>
+		</method>
+		<method name="query_execute">
+			<return type="int">
+			</return>
+			<argument index="0" name="SQL_execute" type="String">
+			</argument>
+			<description>
+				Run simple queries. Returns the number of modified rows.
+			</description>
+		</method>
+		<method name="query_fetch_array">
+			<return type="Array">
+			</return>
+			<argument index="0" name="SQL_query" type="String">
+			</argument>
+			<argument index="1" name="return data as string" type="bool">
+			</argument>
+			<description>
+				Returns a two-dimensional array containing the query result.If return_string is FALSE, than the returned data has the same datatype of the saved data on SQL database, otherwise this will return the data as Strings.
+			</description>
+		</method>
+		<method name="query_fetch_dictionary">
+			<return type="Array">
+			</return>
+			<argument index="0" name="SQL_query" type="String">
+			</argument>
+			<argument index="1" name="return data as string" type="bool">
+			</argument>
+			<description>
+				Returns an array of dictionaries containing the query result. Every dictionaries represents a row in the done query. If return_string is FALSE, the returned data has the same datatype of the saved data on SQL database, otherwise all the data gonna be returned as Strings.
+			</description>
+		</method>
+		<method name="query_get_columns_names">
+			<return type="Array">
+			</return>
+			<argument index="0" name="SQL_query" type="String">
+			</argument>
+			<description>
+				Return the columns names.
+			</description>
+		</method>
+		<method name="query_get_columns_types">
+			<return type="Array">
+			</return>
+			<argument index="0" name="SQL_query" type="String">
+			</argument>
+			<description>
+				Return the columns types. The data is returned as Strings.
+			</description>
+		</method>
+		<method name="set_client_options">
+			<return type="void">
+			</return>
+			<argument index="0" name="Option" type="String">
+			</argument>
+			<argument index="1" name="Value" type="String">
+			</argument>
+			<description>
+				Sets the values of the option map (ConnectOptionsMap) that contains the connection properties to use for establishing the connection.		This is useful for connections that require specifying options other than the three permitted by the default connection options.
+			</description>
+		</method>
+		<method name="set_credentials">
+			<return type="void">
+			</return>
+			<argument index="0" name="Host" type="String">
+			</argument>
+			<argument index="1" name="User" type="String">
+			</argument>
+			<argument index="2" name="Password" type="String">
+			</argument>
+			<description>
+				Set login info. If your Mysql server is local, you can use the ip of your server, "localhost" or "127.0.0.1".
+			</description>
+		</method>
+		<method name="set_database">
+			<return type="void">
+			</return>
+			<argument index="0" name="Database" type="String">
+			</argument>
+			<description>
+				Select a database.
+			</description>
+		</method>
+	</methods>
+	<constants>
+	</constants>
+</class>
