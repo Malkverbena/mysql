@@ -18,7 +18,7 @@ This It works online and is also compatible with MariaDB.
 
 Copy or clone the repository into Godot_path/modules
 
-Rename the folder to mysql.
+Rename the folder to MySQL.
 
 On linux like systems there are no trouble found to compile, but in Windows systems there is some issues to compile. 
 
