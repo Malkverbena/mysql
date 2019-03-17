@@ -86,6 +86,7 @@
 			</argument>
 			<description>
 				Returns an array of dictionaries containing the query result. Every dictionaries represents a row in the done query. The values ​​for Prepared Statements must be supplied within an array. If return_string is FALSE, the returned data has the same datatype of the saved data on SQL database, otherwise all the data gonna be returned as Strings.
+				It should return time information as a dictionary when calling "fetch_dictionary", but if the sequence of the data be modified (using TIME_FORMAT or DATE_FORMAT for exemple), it will return the dictionary fields with wrong names. So I prefer return the data as an array.
 			</description>
 		</method>
 		<method name="prep_get_columns_names">
