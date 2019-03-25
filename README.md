@@ -44,7 +44,7 @@ https://www.youtube.com/watch?v=ohGP-q_Na9g
 - Copy all .dll files lib64 or lib32(according with your system) inside the folder "bin" or add the directory of files to       PATH environment variable in Windows.
 
 
-######        YOU MUST TO EDIT THE SCsub FILE!!
+######        YOU MUST EDIT THE SCsub FILE!!
 - Open the SCsub file on MySQL module folder.
 - On this file you must to set the paths to Boost libraly and the connector files. (on SCsub file is there an exemple).
 
