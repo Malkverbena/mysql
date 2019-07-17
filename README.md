@@ -35,7 +35,7 @@ https://www.mysql.com/products/connector/
 
 There is a video in Portuguese teaching how to compile on the Windows platform.
 English subtitle can be activated anyway.
-https://www.youtube.com/watch?v=ohGP-q_Na9g
+https://www.youtube.com/watch?v=ohGP-q_Na9g  -  Thank to Andrius Salgado for!
 
 
 - Find the file "mysqlcppconn.lib" on connector's folder.
