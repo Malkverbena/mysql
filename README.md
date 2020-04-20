@@ -50,7 +50,7 @@ https://www.youtube.com/watch?v=ohGP-q_Na9g - A special thanks to Andrius Salgad
 
 
 
-#### Should work fine on Desktop systems like macOS, Linux, Windows and Solaris. This module is an wrapper, as until the time I wrote these lines there are no connector for Android and IOS available, DO NOT expect this to work on mobile systems. 
+#### -Should work fine on Desktop systems like macOS, Linux, Windows and Solaris. This module is an wrapper, as until the time I wrote these lines there are no connector for Android and IOS available, DO NOT expect this to work on mobile systems. 
 
 - One last thing: Feel free to change, upgrede or add more functions to this module. ;)
 
