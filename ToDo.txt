@@ -1,6 +1,8 @@
+- Support to Godot 3 and 4  --DONE
+
+- Add double support (Now Godot supports)  --SOON 
+ 
 - Support transaction  --SOON 
 
 - Better debug - Integrated with Godot's error system  --SOON 
 
-- Support to Godot 3 and 4  --DONE
- 
