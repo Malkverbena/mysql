@@ -56,7 +56,6 @@ https://www.youtube.com/watch?v=ohGP-q_Na9g - A special thanks to Andrius Salgad
 - One last thing: Feel free to change, upgrede or add more functions to this module. ;)
 
 ####  Documentation
-You can access the documentation for this module directly from the engine.
 Here are the instructions to add it to the engine.
 https://docs.godotengine.org/en/3.1/development/cpp/custom_modules_in_cpp.html#writing-custom-documentation
 
