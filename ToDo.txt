@@ -1,6 +1,6 @@
-- Support transaction ??? 
+- Support transaction --SOON 
 
-- Better debug
+- Better debug - Integrated with Godot's error system --SOON 
 
-- Any idea?
+- Support to Godot 3 and 4
  
