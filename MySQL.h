@@ -13,13 +13,16 @@
 #include <cppconn/resultset.h>
 #include <cppconn/statement.h>
 
-
 #include <cppconn/metadata.h>
 #include <cppconn/connection.h>
 #include <cppconn/resultset_metadata.h>
 #include <cppconn/prepared_statement.h>
 
 #pragma once  
+#define CPPCONN_PUBLIC_FUNC
+
+using namespace std;
+using namespace sql::mysql;
 
 class MySQL : public Reference {
 	GDCLASS(MySQL,Reference);
