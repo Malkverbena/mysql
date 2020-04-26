@@ -49,7 +49,6 @@ https://www.youtube.com/watch?v=ohGP-q_Na9g - A special thanks to Andrius Salgad
 - On this file you must to set the paths to Boost libraly and the connector files. (on SCsub file is there an exemple).
 - You must comment this line below to enable support for Godot 3 or leave it the way it is to be able to compile for Godot 4:
 
-
 - mysql_env.Append(CPPDEFINES=["GODOT4"])
 
 #### Should work fine on Desktop systems like macOS, Linux, Windows and Solaris. This module is a wrapper, as until the time I wrote these lines there are no connector for Android and IOS available, DO NOT expect this to work on mobile systems. 
