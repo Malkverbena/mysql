@@ -2,5 +2,5 @@
 
 - Better debug - Integrated with Godot's error system  --SOON 
 
-- Support to Godot 3 and 4  --SOON 
+- Support to Godot 3 and 4  --DONE
  
