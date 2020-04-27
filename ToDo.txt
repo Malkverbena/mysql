@@ -4,5 +4,7 @@
  
 - Support transaction  --SOON 
 
+- Support double(int & float)  --SOON 
+
 - Better debug - Integrated with Godot's error system  --SOON 
 
