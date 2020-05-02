@@ -4,6 +4,12 @@
 
 ### If you use this module, let me know it. Leave a star. 
 
+#### Supported operating systems:
+MacOS
+
+Linux
+
+Windows
 
 #### Requirements: 
 
