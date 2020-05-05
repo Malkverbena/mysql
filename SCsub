@@ -4,29 +4,28 @@
 Import("env")
 mysql_env = env.Clone()
 mysql_env.add_source_files(env.modules_sources,"*.cpp")
-mysql_env.Append(CXXFLAGS=["-std=c++11"]) 
+mysql_env.Append(CXXFLAGS=["-std=c++11"])
 
 
 # Comment the line below to be able to compile this module for Godot 3
 mysql_env.Append(CPPDEFINES=["GODOT4"])
 
 
-if env["platform"] in ["linuxbsd", "linux", "bsd", "x11", "server"]: 
+if env["platform"] in ["linuxbsd", "linux", "bsd", "x11", "server"]:
 	mysql_env.Append(LIBPATH=["/usr/lib"])	# Path to libraries
 
 
 if env["platform"] in ["windows", "osx"]:   # Boost library are required.
-	
 	# Enter with the path to the connector here.
-	env.Append(LIBPATH=["C:/Users/mysql-connector-c++/include/jdbc"])  
-	env.Append(CPPPATH=["C:/Users/mysql-connector-c++/include/jdbc"])  
+	env.Append(LIBPATH=["C:/Users/mysql-connector-c++/include/jdbc"])
+	env.Append(CPPPATH=["C:/Users/mysql-connector-c++/include/jdbc"])
 	
 	# Enter with the path to boost library here.
-	env.Append(LIBPATH=["C:/Users/boost"])     
-	env.Append(CPPPATH=["C:/Users/boost"])    
+	env.Append(LIBPATH=["C:/Users/boost"])
+	env.Append(CPPPATH=["C:/Users/boost"])
 	
-	# Enter with the path to file "libmysqlcppconn.windows.tools.64.lib" here -- Not sure if it required on OSX 	
-	env.Append(LIBPATH=["C:/Users/mysql-connector-c++/lib"]) 
+	# Enter with the path to file "libmysqlcppconn.windows.tools.64.lib" here -- Not sure if it required on OSX
+	env.Append(LIBPATH=["C:/Users/mysql-connector-c++/lib"])
 
 
 env.Append(LIBS=["mysqlcppconn"])

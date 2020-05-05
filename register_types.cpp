@@ -4,7 +4,10 @@
 #include "core/class_db.h"
 #include "MySQL.h"
 
-void register_MySQL_types() { ClassDB::register_class<MySQL>(); }
+void register_MySQL_types() {
+	ClassDB::register_class<MySQL>();
+}
 
-void unregister_MySQL_types() {}
+void unregister_MySQL_types() {
+}
 
