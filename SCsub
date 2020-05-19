@@ -15,7 +15,7 @@ if env["platform"] in ["linuxbsd", "linux", "bsd", "x11", "server"]:
 	mysql_env.Append(LIBPATH=["/usr/lib"])	# Path to libraries
 
 
-if env["platform"] in ["windows", "osx"]:   # Boost library are required.
+if env["platform"] in ["windows", "osx", "UWP"]:   # Boost library are required.
 	# Enter with the path to the connector here.
 	env.Append(LIBPATH=["C:/Users/mysql-connector-c++/include/jdbc"])
 	env.Append(CPPPATH=["C:/Users/mysql-connector-c++/include/jdbc"])
