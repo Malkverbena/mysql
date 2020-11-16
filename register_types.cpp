@@ -1,7 +1,7 @@
 /* register_types.cpp */
 
 #include "register_types.h"
-
+#include "MySQL.h"
 
 #ifdef GODOT4
 	#include "core/object/class_db.h"
@@ -9,9 +9,6 @@
 	#include "core/class_db.h"
 #endif
 
-
-
-#include "MySQL.h"
 
 void register_MySQL_types() {
 	ClassDB::register_class<MySQL>();

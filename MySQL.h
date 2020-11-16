@@ -2,7 +2,6 @@
 #ifndef MYSQL_H
 #define MYSQL_H
 
-
 #include <mysql_error.h>
 #include <mysql_driver.h>
 #include <mysql_connection.h>
@@ -17,16 +16,14 @@
 #include <cppconn/resultset_metadata.h>
 #include <cppconn/prepared_statement.h>
 
+#pragma once
+#define CPPCONN_PUBLIC_FUNC
 
 #ifdef GODOT4
 	#include "core/object/reference.h"
 #else
 	#include "core/reference.h"
 #endif
-
-
-#pragma once
-#define CPPCONN_PUBLIC_FUNC
 
 
 using namespace std;
