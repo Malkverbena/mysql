@@ -4,18 +4,17 @@
 Import("env")
 mysql_env = env.Clone()
 mysql_env.add_source_files(env.modules_sources,"*.cpp")
-mysql_env.Append(CXXFLAGS=["-std=c++11"])
 
 
 # Comment the line below to be able to compile this module for Godot 3
-mysql_env.Append(CPPDEFINES=["GODOT4"])
+# mysql_env.Append(CPPDEFINES=["GODOT4"])
 
 
-if env["platform"] in ["linuxbsd", "linux", "bsd", "x11", "server"]:
+if env["platform"] in ["linuxbsd", "linux", "bsd", "X11", "Server"]:
 	mysql_env.Append(LIBPATH=["/usr/lib"])	# Path to libraries
 
 
-if env["platform"] in ["windows", "osx", "UWP"]:   # Boost library are required.
+if env["platform"] in ["Windows","windows", "OSX", "UWP"]:   # Boost library are required.
 	# Enter with the path to the connector here.
 	env.Append(LIBPATH=["C:/Users/mysql-connector-c++/include/jdbc"])
 	env.Append(CPPPATH=["C:/Users/mysql-connector-c++/include/jdbc"])

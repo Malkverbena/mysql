@@ -41,7 +41,7 @@ void MySQL::set_credentials( String p_host, String p_user, String p_pass ) {
 
 
 void MySQL::set_client_options(String p_option, String p_value) {
-	shared_ptr <sql::Connection> con(connection(ACT_DO));
+	std::shared_ptr <sql::Connection> con(connection(ACT_DO));
 	sql::SQLString option = p_option.utf8().get_data();
 	sql::SQLString value = p_value.utf8().get_data();
 	con->setClientOption(option, value);
@@ -49,7 +49,7 @@ void MySQL::set_client_options(String p_option, String p_value) {
 
 
 String MySQL::get_client_options(String p_option) {
-	shared_ptr <sql::Connection> con(connection(ACT_DO));
+	std::shared_ptr <sql::Connection> con(connection(ACT_DO));
 	sql::SQLString option = p_option.utf8().get_data();
 	return sql2String( con->getClientOption( option ) );
 }
@@ -73,7 +73,7 @@ int MySQL::prep_execute(String p_SQLquery, Array prep_val) {
 
 //-------------- Database
 String MySQL::get_database() {
-	shared_ptr< sql::Connection > con(connection(ACT_DO));
+	std::shared_ptr< sql::Connection > con(connection(ACT_DO));
 	if (con != NULL) {
 		return sql2String( con->getSchema() );
 	}
@@ -86,7 +86,7 @@ String MySQL::get_database() {
 void MySQL::set_database( String p_database ) {
 	sql::SQLString database = p_database.utf8().get_data();
 	if(database != "") {
-		shared_ptr< sql::Connection > con(connection(ACT_DO));
+		std::shared_ptr< sql::Connection > con(connection(ACT_DO));
 		if (con != NULL) {
 			con->setSchema(database);
 		}
@@ -100,10 +100,10 @@ void MySQL::set_database( String p_database ) {
 Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return_string){
 	sql::SQLString SQLquery = p_SQLquery.utf8().get_data();
 	Array ret;
-	shared_ptr <sql::Connection> con(connection(ACT_DO));
-	shared_ptr <sql::Statement> stmt;
-	shared_ptr <sql::PreparedStatement> prep_stmt;
-	shared_ptr <sql::ResultSet> res;
+	std::shared_ptr <sql::Connection> con(connection(ACT_DO));
+	std::shared_ptr <sql::Statement> stmt;
+	std::shared_ptr <sql::PreparedStatement> prep_stmt;
+	std::shared_ptr <sql::ResultSet> res;
 	sql::ResultSetMetaData *res_meta;
 
 	try {
@@ -229,13 +229,13 @@ Array MySQL::make_query(String p_SQLquery, int type, Array prep_val, bool return
 	}  //-Try
 
 	catch (sql::SQLException &e) { print_SQLException(e); } 
-	catch (runtime_error &e) { print_runtime_error(e); 	}
+	catch (std::runtime_error &e) { print_runtime_error(e); 	}
 
 	return ret;
 }
 
 
-shared_ptr<sql::Connection> MySQL::connection(int what) {
+std::shared_ptr<sql::Connection> MySQL::connection(int what) {
 	if (what == ACT_CLOSE) {
 		if (con.get()) {// != NULL
 			if (!con->isClosed()) {
@@ -247,12 +247,12 @@ shared_ptr<sql::Connection> MySQL::connection(int what) {
 	if ( what == ACT_DO  ) {
 		if ( con == NULL || (!con->isValid()) || (!con->reconnect()) ) {
 			try {
-				driver = get_mysql_driver_instance();
+				driver = sql::mysql::get_mysql_driver_instance();
 				con.reset(driver->connect(connection_properties));
 			}
 
 			catch (sql::SQLException &e) {	print_SQLException(e); 	} 
-			catch (runtime_error &e) {	print_runtime_error(e);	 }
+			catch (std::runtime_error &e) {	print_runtime_error(e);	 }
 		}
 	}
 	return con;
@@ -261,7 +261,7 @@ shared_ptr<sql::Connection> MySQL::connection(int what) {
 
 //-------------- Helpers
 bool MySQL::check(int what) {
-	shared_ptr< sql::Connection > con(connection(what));
+	std::shared_ptr< sql::Connection > con(connection(what));
 	if (con != NULL) {
 		if (!con->isClosed()) {
 			return con->isValid();
@@ -308,7 +308,7 @@ void MySQL::determine_datatype( std::shared_ptr <sql::PreparedStatement> prep_st
 
 Array MySQL::format_time(String str, bool return_string) {
 	Array datando;
-	string strss = 	str.utf8().get_data();
+	std::string strss = 	str.utf8().get_data();
 	char seps[] = ": -";
 	char *token;
 	token = strtok( &strss[0], seps );
@@ -326,13 +326,13 @@ Array MySQL::format_time(String str, bool return_string) {
 
 
 bool MySQL::is_mysql_time(String time) {
-	string s_time = time.utf8().get_data();    ///Impo
+	std::string s_time = time.utf8().get_data();    ///Impo
 	int len = time.length();
-	if (s_time.find_first_not_of( "0123456789:- " ) == string::npos) {
+	if (s_time.find_first_not_of( "0123456789:- " ) == std::string::npos) {
 
 	// - 0000
 		if ( len == 4 ) {
-			if (s_time.find_first_not_of( "0123456789" ) == string::npos) {
+			if (s_time.find_first_not_of( "0123456789" ) == std::string::npos) {
 				return true;
 			}
 		}
@@ -386,10 +386,10 @@ void MySQL::print_SQLException(sql::SQLException &e) {
 }
 
 
-void MySQL::print_runtime_error(runtime_error &e) {
-	cout << "ERROR: runtime_error in " << __FILE__;
-	cout << " (" << __func__ << ") on line " << __LINE__ << endl;
-	cout << "ERROR: " << e.what() << endl;
+void MySQL::print_runtime_error(std::runtime_error &e) {
+	std::cout << "ERROR: runtime_error in " << __FILE__;
+	std::cout << " (" << __func__ << ") on line " << __LINE__ << std::endl;
+	std::cout << "ERROR: " << e.what() << std::endl;
 }
 
 

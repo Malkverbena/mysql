@@ -2,6 +2,8 @@
 #ifndef MYSQL_H
 #define MYSQL_H
 
+#include "core/reference.h"
+
 #include <mysql_error.h>
 #include <mysql_driver.h>
 #include <mysql_connection.h>
@@ -18,16 +20,6 @@
 
 #pragma once
 #define CPPCONN_PUBLIC_FUNC
-
-#ifdef GODOT4
-	#include "core/object/reference.h"
-#else
-	#include "core/reference.h"
-#endif
-
-
-using namespace std;
-using namespace sql::mysql;
 
 
 class MySQL : public Reference{
