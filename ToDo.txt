@@ -1,6 +1,6 @@
 - Support to Godot 3 and 4  --DONE
 
-- Add double support (Now Godot supports)  --SOON 
+- Add supportfor doubles  (Now Godot supports)  --SOON 
  
 - Support transaction  --SOON 
 
