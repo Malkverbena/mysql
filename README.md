@@ -1,4 +1,4 @@
-# This module will be completely rewritten.
+# This module will be rewritten. This branch is WIP at moment. PLease use the 1.x branch.
 
 # MySQL Module 
 
