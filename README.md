@@ -16,9 +16,10 @@ Windows
 C++ MySQL Connector Library. 
 
 You can get here https://dev.mysql.com/downloads/connector/cpp/. 
-On linux you can use sudo apt-get install libmysqlcppconn-dev.
 
-This It works online and is also compatible with MariaDB.
+On linux you can use the command: sudo apt-get install libmysqlcppconn-dev.
+
+This wrapper works online and is also compatible with MariaDB.
    
 #### Installation: 
 
@@ -28,7 +29,7 @@ Rename the folder to MySQL.
 
 On linux like systems there are no trouble found to compile, but in Windows systems there is some issues to compile. 
 
-Edit the SCsub file before you start the compilation to Windows. (You must edit this file with the path of Boost libraries.)
+Edit the SCsub file before you start the compilation on Windows. (You must edit this file with the path of Boost libraries.)
 
 #### Compilling on windows:
 
