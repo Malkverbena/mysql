@@ -1,3 +1,5 @@
+# This module will be completely rewritten.
+
 # MySQL Module 
 
 ## This module is an wrapper of the Mysql C++ connector for Godot. 
