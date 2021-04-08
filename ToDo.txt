@@ -1,8 +1,14 @@
-- Support to Godot 3 and 4  --DONE
+- Support Godot 3 and 4 
 
-- Add supportfor doubles  (Now Godot supports)  --SOON 
+- Rewrite functions
+
+- Support for more datatypes (Array / Dictionary) 
+
+- Support for doubles (now Godot 4 supports it)
+
+- Support for JSON
  
-- Support transaction  --SOON 
+- Support transaction 
 
-- Better debug - Integrated with Godot's error system  --SOON 
+- Better debug - Integrated with Godot's error system 
 
