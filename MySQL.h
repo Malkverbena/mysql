@@ -13,8 +13,6 @@
 #include <vector>
 
 
-//#include "MySQL.hpp"
-
 #include <mysql_error.h>
 #include <mysql_driver.h>
 #include <mysql_connection.h>
@@ -25,6 +23,7 @@
 #include <cppconn/statement.h>
 
 #include <cppconn/metadata.h>
+#include <cppconn/datatype.h>
 #include <cppconn/connection.h>
 #include <cppconn/resultset_metadata.h>
 #include <cppconn/prepared_statement.h>
@@ -40,17 +39,67 @@ class MySQL : public Reference{
 protected:
 	static void _bind_methods();
 
-	enum SQL_TIME { 
-		NON_TIME,	// - Non sqltime
-		DATETIME,	// - 0000-00-00 00:00:00
-		DATE,		// - 0000-00-00
-		TIME,		// - 00:00:00
-		YEAR,		// - 0000
+
+public:
+
+	typedef Dictionary MySQLException;
+	MySQLException sqlError;
+	std::string sqlstate ;
+
+	enum ConnectionStatus {
+		NO_CONNECTION, 
+		CLOSED, 
+		CONNECTED, 
+		DISCONNECTED
+	};
+	
+	enum SQLDataTypes {
+		NIL,
+		// Atomic types	
+		BOOLEAN,
+		INT,
+		FLOAT,
+		STRING,
+		// Meta types
+		JSON,			//String or blob. Depends on system (MariaDB Vs Mysql)
+		BLOB,			//PoolByteArray
+		DATATIME,
+		TYPE_MAX	
+	};
+	
+	enum Template {	
+		COLUMNS_NAMES,	// returns an array with only one element (names of columns)
+		COLUMNS_TYPES,	// returns an array with only one element (types of the columns)
+		SIMPLE_ARRAY,	// only values on a bidimensional: array[rows][lines]
+		NAMED_ARRAY,	// array[0] has columns names
+		TYPED_ARRAY,	// array[0] has columns types
+		FULL_ARRAY,		// array[0] has columns names & array[1] has columns types
+		DICTIONARY,		// {column_name:value}
+		
+		// Recuperar como dados fornecidos à parte?
+		METADATA,		// return a dictionary only with metadata 
+		INFO			// return the fields info (is...)
 	};
 
 
 
 private:
+
+	class StreamBufferData : public std::streambuf {
+	public:
+		StreamBufferData(char *in_data, int in_size) {setg(in_data, in_data, in_data + in_size);}
+	};
+
+
+
+	struct membuf : std::streambuf{
+	public:
+		membuf(char* begin, char* end) { this->setg(begin, begin, end); }
+	};
+	
+	
+	
+
 	sql::ConnectOptionsMap connection_properties;
 	sql::mysql::MySQL_Driver *driver;
 	std::unique_ptr<sql::Connection> conn;
@@ -128,6 +177,8 @@ private:
 	
 	void set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Array prep_val );
 
+	Array query(String p_sqlquery, Array prep_values = Array(), Template data_model = DICTIONARY,  bool return_string = false, bool _prep = false);
+
 
 
 	//ERRORS
@@ -138,83 +189,62 @@ private:
 	//CHECKERS
 	std::string	get_prop_type( std::string p_prop );
 	bool is_json( Variant p_arg );
-	
-
 	bool is_mysql_time(String time);
 	
 	
 	//HELPERS
 	Array format_time(String str, bool return_string);
-	MySQL::SQL_TIME get_time_format(String time);
-	String SQLstr2GDstr( const sql::SQLString *p_str );
-	String SQLstr2GDstr( sql::SQLString &p_string );
+	int get_time_format(String time);
+	
+	String SQLstr2GDstrP( const sql::SQLString *p_str );
+	String SQLstr2GDstrS( sql::SQLString &p_string );
 //	String SQLstr2GDstr( sql::SQLString p_string );
 	
 	sql::SQLString GDstr2SQLstr(String &p_str); 
 
 
+
 public:
-
-	typedef Dictionary MySQLException;
-	MySQLException sqlError;
-	std::string sqlstate ;
-
-	enum ConnectionStatus {
-		NO_CONNECTION, 
-		CLOSED, 
-		CONNECTED, 
-		DISCONNECTED
-	};
-	
-	enum SQLDataTypes {
-		NIL,
-		// Atomic types	
-		BOOLEAN,
-		INT,
-		FLOAT,
-		STRING,
-		// Meta types
-		JSON,
-		BLOB,
-		DATATIME,
-		TYPE_MAX	
-	};
-	
-	enum recover_data_like {	
-		COLUMNS_NAMES,	// returns an array with only one element (names of columns)
-		COLUMNS_TYPES,	// returns an array with only one element (types of the columns)
-		SIMPLE_ARRAY,	// only values
-		NAMED_ARRAY,	// array[0] has columns names
-		TYPED_ARRAY,	// array[0] has columns types
-		FULL_ARRAY,		// array[0] has columns names & array[1] has columns types
-		DICTIONARY,		// {column_name:value}
-	};
 
 
 	Variant test(PoolByteArray p_args);
+	
+	//std::istream stream_in(PoolByteArray p_args);
 
 
 	//CONNECTION
 	ConnectionStatus get_connection_status();
 	ConnectionStatus stop_connection();
 	MySQLException start_connection();
+	void set_credentials( String p_host, String p_user, String p_pass ); // For quickly connections
+
 	
 	
 	//PROPERTIES
 	Variant get_property(String p_property);
 	void set_property(String p_property, Variant p_value);
+	Dictionary get_properties_kit(Array p_properties);
+	//void set_properties_kit(Dictionary p_properties);
 
 
 	//EXECUTE
 	int execute(String p_sqlquery);
 	int execute_prepared(String p_sqlquery, Array p_values);
+	
+	
+	//QUERY
+	Array fetch_query(String p_sqlquery, Template data_model = DICTIONARY,  bool return_string = false);
+	Array fetch_prepared_query(String p_sqlquery, Array prep_values, Template data_model = DICTIONARY,  bool return_string = false); 
+
+
 
 /*
-	
-	int execute_prepared_query(String p_SQLquery, Array p_values);
+	Array get_metadata(String p_sqlquery)
 
-	Array fetch_query(String p_sqlquery, int return_like = DICTIONARY,  bool return_string = false);	
-	Array fetch_prepared_query(String p_sqlquery, Array p_values, int return_what = DICTIONARY,  bool return_string = false);	
+	
+	std::string MySQL_Connection::getSessionVariable(const std::string & varname)
+	void MySQL_Connection::setSessionVariable(const std::string & varname, const std::string & value)
+
 
 	Variant transaction( [] );
 	Variant transaction_prepared( {} );
@@ -228,7 +258,7 @@ public:
 };
 
 
-VARIANT_ENUM_CAST(MySQL::recover_data_like);
+VARIANT_ENUM_CAST(MySQL::Template);
 VARIANT_ENUM_CAST(MySQL::ConnectionStatus);
 
 
@@ -240,8 +270,7 @@ VARIANT_ENUM_CAST(MySQL::ConnectionStatus);
 //TODO:
 
 /*
-std::string MySQL_Connection::getSessionVariable(const std::string & varname)
-void MySQL_Connection::setSessionVariable(const std::string & varname, const std::string & value)
+
 */
 
 
