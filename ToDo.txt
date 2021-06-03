@@ -2,7 +2,7 @@
 
 - Rewrite functions
 
-- Support for more datatypes (Array / Dictionary) 
+- Support for more datatypes (Variant) 
 
 - Support for doubles (now Godot 4 supports it)
 
