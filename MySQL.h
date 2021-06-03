@@ -9,9 +9,9 @@
 	#include "core/reference.h"
 #endif
 
-#include <memory>
-#include <vector>
+#include <sstream>
 
+#include "core/io/marshalls.h"
 
 #include <mysql_error.h>
 #include <mysql_driver.h>
@@ -67,16 +67,14 @@ public:
 		TYPE_MAX	
 	};
 	
-	enum Template {	
+	enum DataFormat {
+		ARRAY,
+		DICTIONARY
+	};
+	
+	enum MetaCollection {	
 		COLUMNS_NAMES,	// returns an array with only one element (names of columns)
 		COLUMNS_TYPES,	// returns an array with only one element (types of the columns)
-		SIMPLE_ARRAY,	// only values on a bidimensional: array[rows][lines]
-		NAMED_ARRAY,	// array[0] has columns names
-		TYPED_ARRAY,	// array[0] has columns types
-		FULL_ARRAY,		// array[0] has columns names & array[1] has columns types
-		DICTIONARY,		// {column_name:value}
-		
-		// Recuperar como dados fornecidos à parte?
 		METADATA,		// return a dictionary only with metadata 
 		INFO			// return the fields info (is...)
 	};
@@ -84,21 +82,6 @@ public:
 
 
 private:
-
-	class StreamBufferData : public std::streambuf {
-	public:
-		StreamBufferData(char *in_data, int in_size) {setg(in_data, in_data, in_data + in_size);}
-	};
-
-
-
-	struct membuf : std::streambuf{
-	public:
-		membuf(char* begin, char* end) { this->setg(begin, begin, end); }
-	};
-	
-	
-	
 
 	sql::ConnectOptionsMap connection_properties;
 	sql::mysql::MySQL_Driver *driver;
@@ -173,11 +156,10 @@ private:
 	};
 
 	//QUERTY
-	int _execute( String p_sqlquery, Array p_values, bool _prep);
-	
+	int _execute( String p_sqlquery, Array p_values, bool prep_st);
 	void set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Array prep_val );
-
-	Array query(String p_sqlquery, Array prep_values = Array(), Template data_model = DICTIONARY,  bool return_string = false, bool _prep = false);
+	
+	Array query(String p_sqlquery, Array prep_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray(), bool _prep = false);
 
 
 
@@ -207,10 +189,8 @@ private:
 public:
 
 
-	Variant test(PoolByteArray p_args);
+	PoolByteArray test(PoolByteArray arg );
 	
-	//std::istream stream_in(PoolByteArray p_args);
-
 
 	//CONNECTION
 	ConnectionStatus get_connection_status();
@@ -232,16 +212,17 @@ public:
 	int execute_prepared(String p_sqlquery, Array p_values);
 	
 	
+	
 	//QUERY
-	Array fetch_query(String p_sqlquery, Template data_model = DICTIONARY,  bool return_string = false);
-	Array fetch_prepared_query(String p_sqlquery, Array prep_values, Template data_model = DICTIONARY,  bool return_string = false); 
+	//FIXME  o VALOR AUTOMATICO NÃO ESTÁ CONTANDO 
+
+	
+	Array fetch_query(String p_sqlquery, DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray());  
+	Array fetch_prepared_query(String p_sqlquery, Array prep_values, DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray()); 
 
 
 
 /*
-	Array get_metadata(String p_sqlquery)
-
-	
 	std::string MySQL_Connection::getSessionVariable(const std::string & varname)
 	void MySQL_Connection::setSessionVariable(const std::string & varname, const std::string & value)
 
@@ -257,8 +238,8 @@ public:
 
 };
 
-
-VARIANT_ENUM_CAST(MySQL::Template);
+VARIANT_ENUM_CAST(MySQL::DataFormat);
+VARIANT_ENUM_CAST(MySQL::MetaCollection);
 VARIANT_ENUM_CAST(MySQL::ConnectionStatus);
 
 

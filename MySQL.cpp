@@ -5,166 +5,196 @@
 #include "core/io/json.h"
 
 
-#include <iostream>
-#include <istream>
-#include <streambuf>
-#include <string>
-#include <sstream>
 
-/*
-std::istream MySQL::stream_in(PoolByteArray p_args){
+PoolByteArray MySQL::test(PoolByteArray arg){
 
-  	PoolVector<uint8_t>::Read r = p_args.read();
-	int r_size = p_args.size();
+	sql::SQLString WHITE = "INSERT INTO test (blo) VALUES (?)";
+	sql::SQLString READ = "SELECT blo FROM test";
 	
-	char buffer[r_size];
+	
+	
+	std::shared_ptr <sql::PreparedStatement> prep_stmt;
+	
+	std::unique_ptr <sql::Statement> stmt;
+	std::unique_ptr <sql::ResultSet> res;
+	
+	
+
+	int poolArray_length = arg.size();
+	
+	std::stringstream blob_input_stream;
+
+	PoolVector<uint8_t>::Read buf = arg.read();
+	
+	//char c;  //DEBUG
+
+	for ( int y = 0; y < poolArray_length; y++){
+		blob_input_stream << (char)buf[y];  //real
+		//blob_input_stream << (char)arg[y];
+
+		// DEBUG
+		//blob_input_stream.get(c);
+		//std::cout << " - String -> BUF: " << (char)buf[y] << " C: " << c << " IDX: " << y 
+		//<< " Match: " << std::boolalpha << ( (char)buf[y] == c ) 
+		//<< "  - stream POS: " << blob_input_stream.tellg() <<std::endl;
+	}
+	
+	// DEBUG
+	blob_input_stream.seekg(0, blob_input_stream.end);
+	int stream_length = blob_input_stream.tellg();
+	std::cout << "\npoolArray_length: " << poolArray_length << "\nstream_length: " << stream_length << std::endl;
+
+	
+	
+	blob_input_stream.seekg(std::ios::beg);
+	try {
+		// WHITE CHAR - READY FOR USE
+		prep_stmt.reset(conn->prepareStatement( WHITE ));	
+		prep_stmt->setBlob(1, &blob_input_stream);  ///----------
+		int afectedrows = prep_stmt->execute();
+		std::cout << "afectedrows: " << afectedrows << std::endl << std::endl;
+	}
+
+
+	catch (sql::SQLException &e) { print_SQLException(e); } 
+	catch (std::runtime_error &e) { print_runtime_error(e); }
+	
+	
+
+	PoolByteArray ret;
+	
+	try {
 			
-	for (int i = 0; i < r_size; i++){
-		buffer[i] = (char)r[i];
-	} 
- 
-	membuf sbuf(buffer, buffer + sizeof(buffer));
-	std::istream in(&sbuf);
+		// READ CHAR
+		stmt.reset(conn->createStatement());
+		res.reset( stmt->executeQuery( READ ));
+			
+		while (res->next()) {
 
-	//std::istream * blob;
-	//&in
-	return in;
-}
-*/
+			std::unique_ptr< std::istream > blob_output_stream(res->getBlob(1));
+			char _buff;
 
+			//Get output length
+			blob_output_stream->seekg(std::ios::beg);
+			blob_output_stream->seekg(0, blob_output_stream->end);
+			int out_stream_length = blob_output_stream->tellg();
+			blob_output_stream->seekg(std::ios::beg);
 
-Variant MySQL::test(PoolByteArray p_args){
+			for (int w =0; w < out_stream_length; w++){
+				blob_output_stream->get(_buff);
+				ret.append((uint8_t)_buff);
+			}
+		}
+	}
+	
+	catch (sql::SQLException &e) { print_SQLException(e); } 
+	catch (std::runtime_error &e) { print_runtime_error(e); }
 
+	return ret;
+}	
 
-
-
-
-	return Variant();
-}
 
 
 
 //--------FETCH QUERY-------------------
-Array MySQL::fetch_query(String p_sqlquery, Template data_model,  bool return_string){
-	return query(p_sqlquery, Array(), data_model, return_string, false);
+Array MySQL::fetch_query(String p_sqlquery, DataFormat data_model, bool return_string, PoolIntArray meta_col){
+	return query(p_sqlquery, Array(), data_model, return_string, meta_col, false);
 }
 
 
-Array MySQL::fetch_prepared_query(String p_sqlquery, Array prep_values, Template data_model,  bool return_string){
-	return query(p_sqlquery, prep_values, data_model, return_string, true);
+Array MySQL::fetch_prepared_query(String p_sqlquery, Array prep_values, DataFormat data_model, bool return_string, PoolIntArray meta_col){
+	return query(p_sqlquery, prep_values, data_model, return_string, meta_col, true);
 }
 
 
-Array MySQL::query(String p_sqlquery, Array prep_values, Template data_model,  bool return_string, bool _prep){
+Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, bool return_string, PoolIntArray meta_col, bool _prep){
 
-	// if conn == null: ERR_FAIL -> Start your connection 
+	// TODO: Testar conexão antes de prosseguir -> if conn == null: ERR_FAIL -> Start your connection 
 
+	sql::SQLString query = GDstr2SQLstr( p_sqlquery );
+	Array ret;
 
 	std::unique_ptr <sql::Statement> stmt;
 	std::shared_ptr <sql::PreparedStatement> prep_stmt;
 	std::unique_ptr <sql::ResultSet> res;
-	//std::unique_ptr <sql::ResultSetMetaData> res_meta;
 	sql::ResultSetMetaData *res_meta;
-	
-	
-	sql::SQLString query = GDstr2SQLstr( p_sqlquery );
-	
-	Array ret;
 
-	try {
-	
-		// Prep statement
-		if (  _prep ) {	
+	try {		
+
+		if (  _prep ) {	// Prep statement
 			prep_stmt.reset(conn->prepareStatement(query));
 			set_datatype( prep_stmt,  prep_values);
 			res.reset( prep_stmt->executeQuery());	
 			res_meta = res->getMetaData();
 		}
-
-		// Non prep statement
-		else {
+		
+		else { // Non prep statement
 			stmt.reset(conn->createStatement());
 			res.reset( stmt->executeQuery(query));
 			res_meta = res->getMetaData();
 		}
 
-
-
-		//--------
+		//--------------------------------------
+	
 		Array columnname;
-		for (uint8_t i = 0; i < res_meta->getColumnCount(); i++) {
-			sql::SQLString _stri = res_meta->getColumnName(i);
-			columnname.push_back( SQLstr2GDstrS( _stri ));
-		}
-		if ( data_model == COLUMNS_NAMES){
-			return columnname;
-		}
+		Array columntypes;
+		Array columninfo;
+		Array columnmeta;
 
+		for (int m = 0; m < meta_col.size(); m++){
 
-		//--------
-		Array typenames;
-		for (uint8_t i = 0; i < res_meta->getColumnCount(); i++) {
-			sql::SQLString _stri = res_meta->getColumnTypeName(i);
-			typenames.push_back( SQLstr2GDstrS( _stri ));
-		}
-		if ( data_model == COLUMNS_TYPES){
-			return typenames;
-		}
+		//----------------------------------------------------------------------
+			if ( meta_col[m] == COLUMNS_NAMES and columnname.empty()){
+				for (uint8_t i = 1; i <= res_meta->getColumnCount(); i++) {
+					sql::SQLString _stri = res_meta->getColumnName(i);
+					columnname.push_back( SQLstr2GDstrS( _stri ));
+				}
+				ret.push_back(columnname);
+			}
 
+		//----------------------------------------------------------------------
+			if (meta_col[m] == COLUMNS_TYPES and columntypes.empty()){
+				for (uint8_t i = 1; i <= res_meta->getColumnCount(); i++) {
+					sql::SQLString _stri = res_meta->getColumnTypeName(i);
+					columntypes.push_back( SQLstr2GDstrS( _stri ));
+				}
+				ret.push_back(columntypes);
+			}
 
-
-		//-------- NAMED && TYPED ARRAYS
-		if ( data_model == NAMED_ARRAY or data_model == FULL_ARRAY){
-			ret.push_back(columnname);
-		}
-		if ( data_model == TYPED_ARRAY or data_model == FULL_ARRAY){
-			ret.push_back(typenames);
-		}
+		//----------------------------------------------------------------------			
+			if (meta_col[m] == METADATA and columninfo.empty()){
 			
-
-		//-------- METADATA
-		/*if ( data_model == METADATA ){
-			return
-		}
-		*/
-
-		//-------- INFO
-		/*if ( data_model == INFO ){
-			return
-		}*/
-
+	
 			
-/*
-setBlob std::istream * blob
-setBoolean bool value
-setDateTime const sql::SQLString& value
-setDouble double value
-setInt64 int64_t value
-setNull int sqlType
-setString const sql::SQLString& value
-setJson ??????	
-*/
+				ret.push_back(columninfo);
+			}
 
+
+		//----------------------------------------------------------------------			
+			if (meta_col[m] == INFO and columnmeta.empty()){
+			
+				ret.push_back(columnmeta);
+			}
+
+	
 		
-		//--Start arrays or dictionary confection
+		}
+					
 
-			
-		Array rows;
-
-
-		//--------FETCH MAIN ARRAY		
+		//--------FETCH DATA
 		while (res->next()) {
 			
 			Array line;
 			Dictionary row;
 				
-			for (unsigned int i = 0; i < res_meta->getColumnCount(); i++) {
+			for ( unsigned int i = 1; i <= res_meta->getColumnCount(); i++) { 
 				sql::SQLString _col_name = res_meta->getColumnName(i);
 				String column_name = SQLstr2GDstrS( _col_name );
 				int d_type = res_meta->getColumnType(i);
 
 
-				//--------RETURN STRING
+				//--------RETURN STRING       
+				//FIXME: RETURN AS STRING NAO ESTÁ FUNCIONANDO
 				if ( return_string ) {
 					sql::SQLString _val = res->getString(i);
 					String _value = SQLstr2GDstrS( _val );
@@ -177,18 +207,18 @@ setJson ??????
 					}
 				}
 
-
-
-				//--------RETURN DATA WITH IT'S SELF TYPES
-				else{
+				
+				else{  //--------RETURN DATA WITH IT'S SELF TYPES
 					
 					//	NULL
+					//FIXME:  Achar um valor nulo apropriado
+					
 					if ( res->isNull(i) ){
 						if ( data_model == DICTIONARY ){
-							row[ column_name ] = NIL; 
+							row[ column_name ] = Variant::NIL;
 						}
 						else{
-							line.push_back( NIL ); 
+							line.push_back( Variant::NIL ); 
 						}
 					}
 
@@ -271,29 +301,31 @@ setJson ??????
 					//  BINARY - PoolByteArray
 					else if (d_type == sql::DataType::BINARY or d_type == sql::DataType::VARBINARY or d_type == sql::DataType::LONGVARBINARY ){
 
-						boost::scoped_ptr<std::istream> inStr(res->getBlob(i));
-						unsigned int blob_size = inStr->tellg();					
-						char _buffer[ blob_size ];
+						PoolByteArray bin_out;
+						std::unique_ptr< std::istream > blob_output_stream(res->getBlob(i));
+						char buffer;
 						
-						while (!inStr->eof()){
-							inStr->read(_buffer, blob_size);
-						}
 						
-						PoolByteArray bin_obj;
-						for (unsigned int t = 0; t < sizeof(_buffer); i++) {
-							bin_obj.push_back((uint8_t)_buffer[t]);
+						//Get output length
+						std::cout << "teste de cumprimento do blob_output_stream->end: " << blob_output_stream->end << std::endl;
+						
+						blob_output_stream->seekg(0, blob_output_stream->end);
+						int out_stream_length = blob_output_stream->tellg();
+						blob_output_stream->seekg(0, blob_output_stream->beg);
+						
+						
+						for (int w =0; w < out_stream_length; w++){
+							blob_output_stream->get(buffer);
+							bin_out.append((uint8_t)buffer);
 						}
-
 
 						if  ( data_model == DICTIONARY ){ 
-							row[ column_name ] = bin_obj; 
+							row[ column_name ] = bin_out; 
 						}
 						else { 
-							line.push_back( bin_obj ); 
+							line.push_back( bin_out ); 
 						}			
-						
-						
-						
+	
 					}
 					
 					/*
@@ -307,48 +339,22 @@ setJson ??????
 						line.push_back( SQLstr2GDstrS( blobString ) );	
 					}
 					*/
-						
-						
-						
-						// BLOB FIXME TODO FIXME TODO FIXME TODO FIXME TODO FIXME TODO FIXME TODO
-						/*
-						else if ( d_type == sql::DataType::BINARY or d_type == sql::DataType::VARBINARY or d_type == sql::DataType::LONGVARBINARY ){
-						
-							std::unique_ptr<std::istream> blob_data(rs->getBlob(i));
-							
-							for(int i = 0; !inStr->eof(); i++){
-							
-							
-							}
-							
-							
-							//https://stackoverflow.com/questions/21157244/how-to-get-blob-data-from-mysql-in-c
-							
-							
-							
-						}
-						*/
-										
-					}
-				
-				}
-				ret.push_back(line);
-				
-				
-				
-			
-			}
-		
-	
-	
-	}
+					
+				} // ELSE -> RETURN DATA
+			} // FOR
+
+			if ( data_model == DICTIONARY ) { ret.push_back( row ); }
+			else { ret.push_back( line ); }		
+
+		}  // WHILE
+	} // try
 	
 	catch (sql::SQLException &e) { print_SQLException(e); } 
 	catch (std::runtime_error &e) { print_runtime_error(e); }
 
-	return Array();
+	return ret;
 
-}
+} 
 
 
 
@@ -398,25 +404,24 @@ int MySQL::execute_prepared( String p_sqlquery, Array p_values){
 }
 
 
-int MySQL::_execute( String p_sqlquery, Array p_values, bool _prep){
+int MySQL::_execute( String p_sqlquery, Array p_values, bool prep_st){
 
 	sql::SQLString query = GDstr2SQLstr( p_sqlquery );
 	int afectedrows;
 
 	try {
-		if (_prep){
+		if (!prep_st){
+			std::unique_ptr <sql::Statement> stmt;
+			stmt.reset(conn->createStatement());
+			afectedrows = stmt->executeUpdate(query);
+		}
+		
+		else{
 			std::shared_ptr <sql::PreparedStatement> prep_stmt;
 			prep_stmt.reset(conn->prepareStatement(query));	
 			set_datatype( prep_stmt,  p_values );
 			afectedrows = prep_stmt->executeUpdate();
 		}
-		
-		else{
-			std::unique_ptr <sql::Statement> stmt;
-			stmt.reset(conn->createStatement());
-			afectedrows = stmt->executeUpdate(query);
-		}
-
 	}
 		
 	catch (sql::SQLException &e) { print_SQLException(e); } 
@@ -437,7 +442,7 @@ setDouble double value
 setInt64 int64_t value
 setNull int sqlType
 setString const sql::SQLString& value
-setJson ??????	
+setJson stream	
 */
 
 
@@ -448,53 +453,110 @@ INTEGER -> setInt64
 FLOAT -> setDouble
 
 STRING -> setString
-	JSON?
+	JSON -> setBlob (stringstream)
 	DATATIME -> setDateTime
 	
 	
-POOL_BYTE_ARRAY -> setBlob
+POOL_BYTE_ARRAY -> setBlob(istream)
 
-VARIANT GERAL/OBJECT -> setBlob
-	To binary
+VARIANT GERAL/OBJECT (encode to binary)-> setBlob setBlob(istream)
+	
 
 
 	
 
 */
 
-void MySQL::set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Array prep_values ){
+void MySQL::set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Array p_values ){
 
-	//for (int i = 1; i <= 5; ++i) 
-	for (int i = 0; i < prep_values.size() ; i++){
-	
-		//NULL
-		if (prep_values[i].get_type() == Variant::Variant::NIL){
-			prep_stmt->setNull(i+1, sql::DataType::SQLNULL);
+
+	for (int i = 0; i < p_values.size() ; i++){
+			
+	//NULL  //TODO Testar o null pra saber se o valor entregue no godot é realmente nulo
+		if (p_values[i].get_type() == Variant::Variant::NIL){ 
+			prep_stmt->setNull(i+1, sql::DataType::SQLNULL); 
+		}  
+
+	//BOOL
+		else if (p_values[i].get_type() == Variant::Variant::BOOL){ 
+			prep_stmt->setBoolean(i+1, bool(p_values[i])); 
+		}
+				
+	//INT
+		else if (p_values[i].get_type() == Variant::Variant::INT){ 
+			prep_stmt->setInt64(i+1, int64_t(p_values[i])); 
 		}
 
-		//BOOL
-		else if (prep_values[i].get_type() == Variant::Variant::BOOL){
-			prep_stmt->setBoolean(i+1, bool(prep_values[i]));
-		}
-		
-		//INT
-		else if (prep_values[i].get_type() == Variant::Variant::INT){
-			prep_stmt->setInt64(i+1, int64_t(prep_values[i]));
-		}
-
-		// FLOAT
+	// FLOAT
 #ifdef GODOT4		
-		else if (prep_values[i].get_type() == Variant::Variant::FLOAT){
-			prep_stmt->setDouble(i+1, double(prep_values[i]));
+		else if (p_values[i].get_type() == Variant::Variant::FLOAT){ 
+			prep_stmt->setDouble(i+1, double(p_values[i])); 
 		}
 #else
-		else if (prep_values[i].get_type() == Variant::Variant::REAL){
-			prep_stmt->setDouble(i+1, double(prep_values[i]));
+		else if (p_values[i].get_type() == Variant::Variant::REAL){ 
+			prep_stmt->setDouble(i+1, double(p_values[i])); 
 		}
 #endif
 
+	// STRING - DATATIME - JSON
+		else if (p_values[i].get_type() == Variant::Variant::STRING){
+
+			String str_data = String(p_values[i]);
+			sql::SQLString sql_data = GDstr2SQLstr(str_data);
+			std::string std_string = str_data.utf8().get_data();
+
+			if ( is_mysql_time( str_data )) {
+				prep_stmt->setDateTime(i+1, sql_data );
+			}
+
+			else if ( is_json( str_data ) ) {	
+				std::istringstream iss(sql_data);
+				prep_stmt->setBlob(i+1, &iss );			
+			}
+
+			else{
+				prep_stmt->setString(i+1, sql_data );
+			}
+		}
 
 
+	// BINARY
+		else if (p_values[i].get_type() == Variant::Variant::POOL_BYTE_ARRAY){	
+	
+			PoolByteArray data = p_values[i];
+			int length = data.size();
+			std::stringstream blob_input_stream;
+
+			for ( int y = 0; y < length; y++){
+				blob_input_stream << (char)data[y];
+			}
+
+			blob_input_stream.seekg(std::ios::beg);
+			prep_stmt->setBlob(i+1, &blob_input_stream);
+	
+		}
+		
+	// VARIANT
+		// TODO:  
+			// fazer o encoder da variant
+			// 
+//		else{}
+
+
+
+	} // FOR 
+}
+	
+
+
+
+
+
+
+
+
+
+//---------------------------------------------------------------------------------------------
 
 //	https://gist.github.com/FlorianWolters/be839c84991a789df1c6
 //	https://stackoverflow.com/questions/45722747/how-can-i-create-a-istream-from-a-uint8-t-vector
@@ -505,7 +567,7 @@ void MySQL::set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Arr
 	//blob = PoolArray
 	//TEXT = Variant or JSON or String
 
-
+/*
 
 		//BINARY
 		else if (prep_values[i].get_type() == Variant::Variant::POOL_BYTE_ARRAY){	
@@ -514,44 +576,48 @@ void MySQL::set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Arr
 			
 			PoolByteArray data = prep_values[i];
 
-
-			int len = data.size();
-			char _buffer[len];
+			char buffer[35];
+			int length = data.size();
 			
 			
-			for (int t = 0; t < len; t++) {
-				_buffer[t] = (char)data[t];
-				//_buffer[t] = static_cast<char>(data[t]);
+			for (int t = 0; t < length; t++) {
+				//buffer[t] = (char)data[t];
+				buffer[t] = static_cast<char>(data[t]);
 				//std::cout << "buffer: " << buffer[t] << std::endl;
-			}	
-
-
-			membuf sbuf(buffer, buffer + sizeof(buffer));
-			std::istream in(&sbuf);
-			prep_stmt->setBlob(i+1, &in);
-
-
-		//	std::stringstream blob_input_stream;
-		//	blob_input_stream << _buffer;
-		//	prep_stmt->setBlob(i+1, &blob_input_stream);
-
-
+			}			
 			
+			
+			std::stringstream blob_input_stream;
+			blob_input_stream << buffer;
+			prep_stmt->setBlob(i+1, &blob_input_stream); 
+			
+
+		
 		}
-
-
-
-
-
-
 
 		//STRING
 		else if (prep_values[i].get_type() == Variant::Variant::STRING){
+
+			String str_data = String(prep_values[i]);
+			sql::SQLString sql_data = GDstr2SQLstr(str_data);
+			std::string std_string = str_data.utf8().get_data();
 			
-		
-			String stri = String(prep_values[i]);
-			sql::SQLString caracteres = stri.utf8().get_data();
-			prep_stmt->setString(i+1, caracteres );
+			
+			if ( is_mysql_time( str_data )) {
+				prep_stmt->setDateTime(i+1, sql_data );
+			}
+			
+			else if ( is_json( str_data ) ) {	
+				std::istringstream iss(std_string);
+				//std::istream& stream = iss;
+				prep_stmt->setBlob(i+1, &iss );			
+			}
+
+			else{
+				prep_stmt->setString(i+1, sql_data );
+			}
+			
+			
 			
 			
 			
@@ -562,7 +628,7 @@ void MySQL::set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Arr
 		//	}
 			
 		// JSON
-			/*
+			
 			else if ( is_json( str_val ) ) {
 				std::string s = str_val.utf8().get_data();
 				std::istringstream iss(s);
@@ -570,23 +636,18 @@ void MySQL::set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Arr
 				iss << id;
 				prep_stmt->setBlob(i, &stream );
 			}
-			*/
+			
 			//TEXT & CHAR
 			//else{
 		//		prep_stmt->setString(i, sql_str );	
 		//	}
 			
 			
-		}
+*/
 
-
-
-
-	}
-
-
+//=================================================================================================================
 	
-}
+
 
 
 
@@ -977,7 +1038,7 @@ void MySQL::_bind_methods() {
 		}
 */	
 	
-	ClassDB::bind_method(D_METHOD("test", "argumentos"),&MySQL::test);
+	ClassDB::bind_method(D_METHOD("test"),&MySQL::test);
 	//ClassDB::bind_method(D_METHOD("stream_in", "PoolArray"),&MySQL::test);
 
 
@@ -998,8 +1059,8 @@ void MySQL::_bind_methods() {
 	//--- Execute/Query
 	ClassDB::bind_method(D_METHOD("execute", "sql_statement"),&MySQL::execute);
 	ClassDB::bind_method(D_METHOD("execute_prepared", "sql_statement", "Values"),&MySQL::execute_prepared);
-	ClassDB::bind_method(D_METHOD("fetch_query", "sql_statement", "template", "return_string"),&MySQL::fetch_query);
-	ClassDB::bind_method(D_METHOD("fetch_prepared_query", "sql_statement", "Values", "template", "return_string"),&MySQL::fetch_prepared_query);
+	ClassDB::bind_method(D_METHOD("fetch_query", "sql_statement", "DataFormat", "meta_data", "return_string"),&MySQL::fetch_query);
+	ClassDB::bind_method(D_METHOD("fetch_prepared_query", "sql_statement", "Values", "DataFormat", "meta_data", "return_string"),&MySQL::fetch_prepared_query);
 		
 
 
@@ -1008,16 +1069,19 @@ void MySQL::_bind_methods() {
 	BIND_ENUM_CONSTANT(CONNECTED);
 	BIND_ENUM_CONSTANT(DISCONNECTED);
 
+	BIND_ENUM_CONSTANT(DICTIONARY);
+	BIND_ENUM_CONSTANT(ARRAY);	
+
 	BIND_ENUM_CONSTANT(COLUMNS_NAMES);
 	BIND_ENUM_CONSTANT(COLUMNS_TYPES);
-	BIND_ENUM_CONSTANT(SIMPLE_ARRAY);
-	BIND_ENUM_CONSTANT(NAMED_ARRAY);
-	BIND_ENUM_CONSTANT(TYPED_ARRAY);
-	BIND_ENUM_CONSTANT(FULL_ARRAY);	
-	BIND_ENUM_CONSTANT(DICTIONARY);
-	BIND_ENUM_CONSTANT(METADATA);	
-	BIND_ENUM_CONSTANT(INFO);	
+	BIND_ENUM_CONSTANT(METADATA);
+	BIND_ENUM_CONSTANT(INFO);
 
+
+
+
+
+	
 		
 }
 
