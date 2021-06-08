@@ -2,7 +2,11 @@
 #ifndef MYSQL_H
 #define MYSQL_H
 
-#include "core/reference.h"
+#ifdef GODOT4
+	#include "core/object/reference.h"
+#else
+	#include "core/reference.h"
+#endif
 
 #include <mysql_error.h>
 #include <mysql_driver.h>
@@ -19,7 +23,6 @@
 #include <cppconn/prepared_statement.h>
 
 #pragma once
-#define CPPCONN_PUBLIC_FUNC
 
 
 class MySQL : public Reference{
