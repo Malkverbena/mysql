@@ -2,10 +2,8 @@
 #SCsub
 
 Import("env")
+env.add_source_files(env.modules_sources,"*.cpp")
 mysql_env = env.Clone()
-mysql_env.add_source_files(env.modules_sources,"*.cpp")
-
-
 
 # Get Godot Version
 version_file = open('../../version.py', 'r')
