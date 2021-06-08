@@ -6,8 +6,12 @@ env.add_source_files(env.modules_sources,"*.cpp")
 mysql_env = env.Clone()
 
 
-# Comment the line below to be able to compile this module for Godot 3
-# mysql_env.Append(CPPDEFINES=["GODOT4"])
+version_file = open('../../version.py', 'r')
+for ver in version_file:
+	if ver.startswith("major"):
+		if ver.count("4") > 0:
+			mysql_env.Append(CPPDEFINES=["GODOT4"])	
+version_file.close()
 
 
 if env["platform"] in ["linuxbsd", "linux", "bsd", "X11", "Server"]:
