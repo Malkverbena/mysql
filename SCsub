@@ -2,8 +2,8 @@
 #SCsub
 
 Import("env")
+env.add_source_files(env.modules_sources,"*.cpp")
 mysql_env = env.Clone()
-mysql_env.add_source_files(env.modules_sources,"*.cpp")
 
 
 # Comment the line below to be able to compile this module for Godot 3
