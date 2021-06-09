@@ -1,4 +1,5 @@
 /* mysql.h */
+
 #ifndef MYSQL_H
 #define MYSQL_H
 
@@ -8,7 +9,9 @@
 	#include "core/reference.h"
 #endif
 
-#include <mysql_error.h>
+#include <sstream>
+#include "core/io/marshalls.h"
+
 #include <mysql_driver.h>
 #include <mysql_connection.h>
 
@@ -18,6 +21,7 @@
 #include <cppconn/statement.h>
 
 #include <cppconn/metadata.h>
+#include <cppconn/datatype.h>
 #include <cppconn/connection.h>
 #include <cppconn/resultset_metadata.h>
 #include <cppconn/prepared_statement.h>
