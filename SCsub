@@ -25,13 +25,15 @@ if env["platform"] in ["windows", "osx", "UWP", "uwp"]:   # Boost library are re
 	
 	# Enter with the path to file "libmysqlcppconn.windows.tools.64.lib" here -- Not sure if it required on OSX
 	env.Append(LIBPATH=["C:/MY/PATH/TO/mysql-connector-c++/lib"])
+	env.Append(LIBS=["mysqlcppconn"])
+
 
 
 else:
 	mysql_env.Append(LIBPATH=["/usr/lib"])	# Path to libraries
+	env.Append(LIBS=["libmysqlcppconn"])
 
 
-env.Append(LIBS=["mysqlcppconn"])
 
 
 
