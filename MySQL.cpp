@@ -11,19 +11,15 @@ PoolByteArray MySQL::test(PoolByteArray arg){
 	sql::SQLString WHITE = "INSERT INTO test (blo) VALUES (?)";
 	sql::SQLString READ = "SELECT blo FROM test";
 	
-	
-	
+
 	std::shared_ptr <sql::PreparedStatement> prep_stmt;
-	
 	std::unique_ptr <sql::Statement> stmt;
 	std::unique_ptr <sql::ResultSet> res;
 	
 	
 
 	int poolArray_length = arg.size();
-	
 	std::stringstream blob_input_stream;
-
 	PoolVector<uint8_t>::Read buf = arg.read();
 	
 	//char c;  //DEBUG
@@ -44,8 +40,6 @@ PoolByteArray MySQL::test(PoolByteArray arg){
 	int stream_length = blob_input_stream.tellg();
 	std::cout << "\npoolArray_length: " << poolArray_length << "\nstream_length: " << stream_length << std::endl;
 
-	
-	
 	blob_input_stream.seekg(std::ios::beg);
 	try {
 		// WHITE CHAR - READY FOR USE
@@ -55,12 +49,9 @@ PoolByteArray MySQL::test(PoolByteArray arg){
 		std::cout << "afectedrows: " << afectedrows << std::endl << std::endl;
 	}
 
-
 	catch (sql::SQLException &e) { print_SQLException(e); } 
 	catch (std::runtime_error &e) { print_runtime_error(e); }
 	
-	
-
 	PoolByteArray ret;
 	
 	try {
@@ -121,6 +112,8 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 
 	try {		
 
+		//DatabaseMetaData *dbcon_meta = con->getMetaData();
+
 		if (  _prep ) {	// Prep statement
 			prep_stmt.reset(conn->prepareStatement(query));
 			set_datatype( prep_stmt,  prep_values);
@@ -144,7 +137,7 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 		for (int m = 0; m < meta_col.size(); m++){
 
 		//----------------------------------------------------------------------
-			if ( meta_col[m] == COLUMNS_NAMES and columnname.empty()){
+			if ( meta_col[m] == COLUMNS_NAMES && columnname.empty()){
 				for (uint8_t i = 1; i <= res_meta->getColumnCount(); i++) {
 					sql::SQLString _stri = res_meta->getColumnName(i);
 					columnname.push_back( SQLstr2GDstrS( _stri ));
@@ -153,7 +146,7 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 			}
 
 		//----------------------------------------------------------------------
-			if (meta_col[m] == COLUMNS_TYPES and columntypes.empty()){
+			if (meta_col[m] == COLUMNS_TYPES && columntypes.empty()){
 				for (uint8_t i = 1; i <= res_meta->getColumnCount(); i++) {
 					sql::SQLString _stri = res_meta->getColumnTypeName(i);
 					columntypes.push_back( SQLstr2GDstrS( _stri ));
@@ -162,22 +155,19 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 			}
 
 		//----------------------------------------------------------------------			
-			if (meta_col[m] == METADATA and columninfo.empty()){
-			
-	
-			
+			if (meta_col[m] == METADATA && columninfo.empty()){
+			//TODO
 				ret.push_back(columninfo);
 			}
 
 
 		//----------------------------------------------------------------------			
-			if (meta_col[m] == INFO and columnmeta.empty()){
-			
+			if (meta_col[m] == INFO && columnmeta.empty()){
+			//TODO
 				ret.push_back(columnmeta);
 			}
 
-	
-		
+
 		}
 					
 
@@ -206,7 +196,6 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 						line.push_back( _value );					
 					}
 				}
-
 				
 				else{  //--------RETURN DATA WITH IT'S SELF TYPES
 					
@@ -234,7 +223,7 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 					}
 											
 					//	INT
-					else if ( d_type == sql::DataType::ENUM or d_type == sql::DataType::TINYINT or d_type == sql::DataType::SMALLINT or d_type == sql::DataType::MEDIUMINT) {
+					else if ( d_type == sql::DataType::ENUM || d_type == sql::DataType::TINYINT || d_type == sql::DataType::SMALLINT || d_type == sql::DataType::MEDIUMINT) {
 						if  ( data_model == DICTIONARY ){ 
 							row[ column_name ] = res->getInt(i); 
 						}
@@ -245,7 +234,7 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 
 
 					//	BIG INT
-					else if ( d_type == sql::DataType::INTEGER or d_type == sql::DataType::BIGINT ) {
+					else if ( d_type == sql::DataType::INTEGER || d_type == sql::DataType::BIGINT ) {
 						if  ( data_model == DICTIONARY ){ 
 							row[ column_name ] = res->getInt64(i); 
 						}
@@ -257,7 +246,7 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 
 					//	FLOAT 
 					//FIXME use double on GODOT 4 and float on GODOT 3?
-					else if ( d_type == sql::DataType::REAL or d_type == sql::DataType::DOUBLE or d_type == sql::DataType::DECIMAL or d_type == sql::DataType::NUMERIC ) {
+					else if ( d_type == sql::DataType::REAL || d_type == sql::DataType::DOUBLE || d_type == sql::DataType::DECIMAL || d_type == sql::DataType::NUMERIC ) {
 						double my_float = res->getDouble(i);
 						if  ( data_model == DICTIONARY ){ 
 							row[ column_name ] = my_float; 
@@ -271,7 +260,7 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 					//	TIME
 					// It should return time information as a dictionary but if the sequence of the data be modified (using TIME_FORMAT or DATE_FORMAT for exemple), 
 					// it will return the dictionary fields with wrong names. So I prefer return the data as an array.	
-					else if ( d_type == sql::DataType::DATE or d_type == sql::DataType::TIME or d_type == sql::DataType::TIMESTAMP or d_type == sql::DataType::YEAR ) {
+					else if ( d_type == sql::DataType::DATE || d_type == sql::DataType::TIME || d_type == sql::DataType::TIMESTAMP || d_type == sql::DataType::YEAR ) {
 						sql::SQLString _stri = res->getString(i);
 						Array time = format_time( SQLstr2GDstrS( _stri ) , false );
 					
@@ -286,7 +275,7 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 					
 					
 					//	STRING
-					else if (d_type == sql::DataType::CHAR or d_type == sql::DataType::VARCHAR or d_type == sql::DataType::LONGVARCHAR ){
+					else if (d_type == sql::DataType::CHAR || d_type == sql::DataType::VARCHAR || d_type == sql::DataType::LONGVARCHAR ){
 						sql::SQLString _stri = res->getString(i);
 						String s = SQLstr2GDstrS( _stri );
 						if  ( data_model == DICTIONARY ){ 
@@ -299,7 +288,7 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 					
 					
 					//  BINARY - PoolByteArray
-					else if (d_type == sql::DataType::BINARY or d_type == sql::DataType::VARBINARY or d_type == sql::DataType::LONGVARBINARY ){
+					else if (d_type == sql::DataType::BINARY || d_type == sql::DataType::VARBINARY || d_type == sql::DataType::LONGVARBINARY ){
 
 						PoolByteArray bin_out;
 						std::unique_ptr< std::istream > blob_output_stream(res->getBlob(i));
@@ -355,42 +344,6 @@ Array MySQL::query(String p_sqlquery, Array prep_values, DataFormat data_model, 
 	return ret;
 
 } 
-
-
-
-
-
-
-/*
-    UNKNOWN = 0,
-
-
-blob
-    BINARY,
-    VARBINARY,
-    LONGVARBINARY,
-    
-    
-    
-    GEOMETRY,
-
-
-
-    SET,
-    SQLNULL,
-    JSON
-    
-*/
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -473,23 +426,23 @@ void MySQL::set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Arr
 	for (int i = 0; i < p_values.size() ; i++){
 			
 	//NULL  //TODO Testar o null pra saber se o valor entregue no godot é realmente nulo
-		if (p_values[i].get_type() == Variant::Variant::NIL){ 
+		if (p_values[i].get_type() == Variant::NIL){ 
 			prep_stmt->setNull(i+1, sql::DataType::SQLNULL); 
 		}  
 
 	//BOOL
-		else if (p_values[i].get_type() == Variant::Variant::BOOL){ 
+		else if (p_values[i].get_type() == Variant::BOOL){ 
 			prep_stmt->setBoolean(i+1, bool(p_values[i])); 
 		}
 				
 	//INT
-		else if (p_values[i].get_type() == Variant::Variant::INT){ 
+		else if (p_values[i].get_type() == Variant::INT){ 
 			prep_stmt->setInt64(i+1, int64_t(p_values[i])); 
 		}
 
 	// FLOAT
 #ifdef GODOT4		
-		else if (p_values[i].get_type() == Variant::Variant::FLOAT){ 
+		else if (p_values[i].get_type() == Variant::FLOAT){ 
 			prep_stmt->setDouble(i+1, double(p_values[i])); 
 		}
 #else
@@ -499,7 +452,7 @@ void MySQL::set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Arr
 #endif
 
 	// STRING - DATATIME - JSON
-		else if (p_values[i].get_type() == Variant::Variant::STRING){
+		else if (p_values[i].get_type() == Variant::STRING){
 
 			String str_data = String(p_values[i]);
 			sql::SQLString sql_data = GDstr2SQLstr(str_data);
@@ -521,7 +474,7 @@ void MySQL::set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Arr
 
 
 	// BINARY
-		else if (p_values[i].get_type() == Variant::Variant::POOL_BYTE_ARRAY){	
+		else if (p_values[i].get_type() == Variant::POOL_BYTE_ARRAY){	
 	
 			PoolByteArray data = p_values[i];
 			int length = data.size();
@@ -563,6 +516,7 @@ void MySQL::set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Arr
 //	https://stackoverflow.com/questions/1121142/set-binary-data-using-setblob-in-mysql-connector-c-causes-crash
 //	https://dev.mysql.com/doc/refman/8.0/en/blob.html  NOTE: Afeta o desempenho
 //	https://mariadb.com/kb/en/json-data-type/
+//  https://zh.wikibooks.org/zh-hk/MySQL_Connector/C%2B%2B
 
 	//blob = PoolArray
 	//TEXT = Variant or JSON or String
@@ -684,7 +638,7 @@ MySQL::ConnectionStatus MySQL::get_connection_status(){
 MySQL::MySQLException MySQL::start_connection(){
 	sqlError.clear();
 	try {
-		driver = sql::mysql::get_mysql_driver_instance();
+		std::unique_ptr<sql::mysql::MySQL_Driver> driver;
 		conn.reset(driver->connect(connection_properties));
 	}
 
@@ -730,17 +684,16 @@ MySQL::ConnectionStatus MySQL::stop_connection(){
 /*
 void MySQL::set_properties_kit(Dictionary p_properties){
 
-	int a;
-	int b;
+
 }
-*/
+
 
 Dictionary MySQL::get_properties_kit(Array p_properties){
 
 	return Dictionary();
 }
 
-
+*/
 
 	
 	
@@ -761,7 +714,7 @@ void MySQL::set_property(String p_property, Variant p_value){
 	
 	if (value_type == "string" ) { connection_properties[property] = (sql::SQLString)value; }
 	
-	else if (value_type == "void") { connection_properties[property] =  (std::string)value; }
+	else if (value_type == "void") { connection_properties[property] = (std::string)value; }
 	
 	else if (value_type == "bool") { connection_properties[property] = (bool)p_value; }
 
@@ -801,7 +754,7 @@ Variant MySQL::get_property(String p_property){
 	}
 
 
-	if (value_type == "string" or value_type == "void") { 
+	if (value_type == "string" || value_type == "void") { 
 		const sql::SQLString * p_s;
 		p_s = connection_properties[ property ].get<sql::SQLString>();
 		return SQLstr2GDstrP( p_s ); 
@@ -903,10 +856,6 @@ std::string	MySQL::get_prop_type( std::string p_prop ) {
 
 
 
-
-
-
-
 bool MySQL::is_mysql_time(String time) {
 	if (get_time_format( time ) == sql::DataType::UNKNOWN){
 		return false;
@@ -920,18 +869,16 @@ bool MySQL::is_mysql_time(String time) {
 
 int MySQL::get_time_format(String time) {
 
-	std::string s_time = time.utf8().get_data();    ///Impo
+	std::string s_time = time.utf8().get_data();
 	int len = time.length();
 
 	if (s_time.find_first_not_of( "0123456789:- " ) == std::string::npos) {
-
 		// - 0000
 		if ( len == 4 ) {
 			if (s_time.find_first_not_of( "0123456789" ) == std::string::npos) {
 				return sql::DataType::YEAR;
 			}
 		}
-
 		// - 00:00:00
 		else if ( len == 8 ) {
 			if ( time[2] ==  ':' && time[5] == ':' ) {
@@ -941,7 +888,6 @@ int MySQL::get_time_format(String time) {
 				}
 			}
 		}
-
 		// - 0000-00-00
 		else if ( len == 10 ) {
 			if ( time[4] ==  '-' && time[7] == '-') {
@@ -951,7 +897,6 @@ int MySQL::get_time_format(String time) {
 				}
 			}
 		}
-
 		// - 0000-00-00 00:00:00
 		else if ( len == 19 ) {
 			if ( time[4] ==  '-' && time[7] == '-' && time[13] ==  ':' && time[16] == ':' && time[10] == ' ' ) {
@@ -992,7 +937,7 @@ Array MySQL::format_time(String str, bool return_string) {
 
 //--------ERRORS-------------------
 
-void MySQL::print_SQLException(sql::SQLException &e) {
+void MySQL::print_SQLException(sql::SQLException &e) {  //FIXME 
 	//If (e.getErrorCode() == 1047) = Your server does not seem to support Prepared Statements at all. Perhaps MYSQL < 4.1?.
 		
 	Variant file = __FILE__;
@@ -1026,20 +971,14 @@ void MySQL::print_runtime_error(std::runtime_error &e) {
 }
 
 
-//TODO: REMOVE p
+
 //--------GODOT STUFF-------------------
 
 void MySQL::_bind_methods() {
 
 	//ADD_PROPERTY(PropertyInfo(Variant::BOOL, "reconnect"), "set_reconnect", "can_reconnect");
 	
-/*		ADD_PROPERTY ( metadata template)
-		{ 
-		}
-*/	
-	
 	ClassDB::bind_method(D_METHOD("test"),&MySQL::test);
-	//ClassDB::bind_method(D_METHOD("stream_in", "PoolArray"),&MySQL::test);
 
 
 	//--- Connection Managers
@@ -1052,17 +991,19 @@ void MySQL::_bind_methods() {
 	//--- Properties Managers
 	ClassDB::bind_method(D_METHOD("set_property", "property", "p_value"),&MySQL::set_property);
 	ClassDB::bind_method(D_METHOD("get_property", "property"),&MySQL::get_property);
+	
+	
 	//ClassDB::bind_method(D_METHOD("set_properties_kit", "properties"),&MySQL::set_properties_kit);
-	ClassDB::bind_method(D_METHOD("get_properties_kit", "properties"),&MySQL::get_properties_kit);
+	//ClassDB::bind_method(D_METHOD("get_properties_kit", "properties"),&MySQL::get_properties_kit);
 
 
 	//--- Execute/Query
 	ClassDB::bind_method(D_METHOD("execute", "sql_statement"),&MySQL::execute);
 	ClassDB::bind_method(D_METHOD("execute_prepared", "sql_statement", "Values"),&MySQL::execute_prepared);
-	ClassDB::bind_method(D_METHOD("fetch_query", "sql_statement", "DataFormat", "meta_data", "return_string"),&MySQL::fetch_query);
-	ClassDB::bind_method(D_METHOD("fetch_prepared_query", "sql_statement", "Values", "DataFormat", "meta_data", "return_string"),&MySQL::fetch_prepared_query);
+	
+	ClassDB::bind_method(D_METHOD("fetch_query", "sql_statement", "DataFormat", "return_string", "meta_data"),&MySQL::fetch_query);  //FIXME
+	ClassDB::bind_method(D_METHOD("fetch_prepared_query", "sql_statement", "Values", "DataFormat", "return_string", "meta_data"),&MySQL::fetch_prepared_query); //FIXME
 		
-
 
 	BIND_ENUM_CONSTANT(NO_CONNECTION);
 	BIND_ENUM_CONSTANT(CLOSED);
@@ -1077,12 +1018,6 @@ void MySQL::_bind_methods() {
 	BIND_ENUM_CONSTANT(METADATA);
 	BIND_ENUM_CONSTANT(INFO);
 
-
-
-
-
-	
-		
 }
 
 
@@ -1102,22 +1037,6 @@ MySQL::~MySQL(){
 
 /*
 
-
-Variant MySQL::set_properties(Dictionary p_options){
-}
-Dictionary MySQL::get_properties(Array p_options = []){
-}
-
-
-
-Array MySQL::fetch_query(String p_sqlquery, int return_like = DICTIONARY,  bool return_string = false){
-}
-
-
-Array MySQL::fetch_prepared_query(String p_sqlquery, Array p_values, int return_what = DICTIONARY,  bool return_string = false){
-}
-
-
 Variant MySQL::transaction( [] ){
 }
 
@@ -1125,24 +1044,4 @@ Variant MySQL::transaction( [] ){
 Variant MySQL::transaction_prepared( {} ){
 }
 
-	Ref(const Variant &p_variant) {
-		reference = nullptr;
-		Object *refb = T::___get_from_variant(p_variant);
-		if (refb == nullptr) {
-			unref();
-			return;
-		}
-		Ref r;
-		r.reference = Object::cast_to<T>(refb);
-		ref(r);
-		r.reference = nullptr;
-	}
-
-
-	inline static Ref<T> __internal_constructor(Object *obj) {
-		Ref<T> r;
-		r.reference = (T *)obj;
-		return r;
-	}	
-	
-	*/
+*/

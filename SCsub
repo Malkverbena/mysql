@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 #SCsub
 
+# 
+
+
 # Enter with path to Boost library here
 boost_path= "C:/boost_1_76_0"
 
@@ -47,6 +50,7 @@ if env["platform"] in ["windows", "UWP"]:
 		destination = lib_path + "/" + i + sufix + "lib"
 		shutil.copy2(source, destination)
 
+
 	env.Append(LIBS=target_lib_arr)
 
 
@@ -57,3 +61,12 @@ elif env["platform"] in ["linuxbsd", "linux", "bsd", "X11", "Server"]:
 	env.Append(LIBPATH=['/usr/lib'])
 	env.Append(LIBS=['mysqlcppconn'])
 
+
+
+
+#env.Append(LIBPATH=["#C:/mysql/mysql-connector-c++-8.0.25-winx64/lib64/vs14"])
+# Prepend
+# env["platform"]
+# env["bits"]
+# env["target"]
+# mysqlcppconn.windows.tools.64.lib

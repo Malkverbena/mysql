@@ -1,7 +1,7 @@
 /* mysql.h */
+
 #ifndef MYSQL_H
 #define MYSQL_H
-
 
 #ifdef GODOT4
 	#include "core/object/reference.h"
@@ -10,26 +10,30 @@
 #endif
 
 #include <sstream>
-
 #include "core/io/marshalls.h"
 
-#include <mysql_error.h>
-#include <mysql_driver.h>
 #include <mysql_connection.h>
+#include <mysql_driver.h>
+#include <mysql_error.h>
 
+#include <cppconn/build_config.h>
+#include <cppconn/config.h>
+#include <cppconn/connection.h>
+#include <cppconn/datatype.h>
 #include <cppconn/driver.h>
 #include <cppconn/exception.h>
-#include <cppconn/resultset.h>
-#include <cppconn/statement.h>
-
 #include <cppconn/metadata.h>
-#include <cppconn/datatype.h>
-#include <cppconn/connection.h>
-#include <cppconn/resultset_metadata.h>
+#include <cppconn/parameter_metadata.h>
 #include <cppconn/prepared_statement.h>
+#include <cppconn/resultset.h>
+#include <cppconn/resultset_metadata.h>
+#include <cppconn/statement.h>
+#include <cppconn/sqlstring.h>
+#include <cppconn/warning.h>
+#include <cppconn/version_info.h>
+#include <cppconn/variant.h>
 
 #pragma once
-#define CPPCONN_PUBLIC_FUNC
 
 
 class MySQL : public Reference{
@@ -84,7 +88,10 @@ public:
 private:
 
 	sql::ConnectOptionsMap connection_properties;
-	sql::mysql::MySQL_Driver *driver;
+	
+	//sql::mysql::MySQL_Driver *driver;
+	std::unique_ptr<sql::mysql::MySQL_Driver> driver;
+	
 	std::unique_ptr<sql::Connection> conn;
 
 
@@ -188,47 +195,42 @@ private:
 
 public:
 
-
 	PoolByteArray test(PoolByteArray arg );
 	
 
-	//CONNECTION
+	// CONNECTION
 	ConnectionStatus get_connection_status();
 	ConnectionStatus stop_connection();
 	MySQLException start_connection();
 	void set_credentials( String p_host, String p_user, String p_pass ); // For quickly connections
-
 	
 	
-	//PROPERTIES
+	// PROPERTIES
 	Variant get_property(String p_property);
 	void set_property(String p_property, Variant p_value);
-	Dictionary get_properties_kit(Array p_properties);
+	
+	//Dictionary get_properties_kit(Array p_properties);
 	//void set_properties_kit(Dictionary p_properties);
 
 
-	//EXECUTE
+	// EXECUTE
 	int execute(String p_sqlquery);
 	int execute_prepared(String p_sqlquery, Array p_values);
 	
 	
-	
-	//QUERY
+	// QUERY
 	//FIXME  o VALOR AUTOMATICO NÃO ESTÁ CONTANDO 
-
-	
 	Array fetch_query(String p_sqlquery, DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray());  
 	Array fetch_prepared_query(String p_sqlquery, Array prep_values, DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray()); 
 
-
+	// TRANSACTION
+	//Variant transaction( [] );
+	//Variant transaction_prepared( {} );
 
 /*
 	std::string MySQL_Connection::getSessionVariable(const std::string & varname)
 	void MySQL_Connection::setSessionVariable(const std::string & varname, const std::string & value)
 
-
-	Variant transaction( [] );
-	Variant transaction_prepared( {} );
 */
 
 
@@ -243,20 +245,15 @@ VARIANT_ENUM_CAST(MySQL::MetaCollection);
 VARIANT_ENUM_CAST(MySQL::ConnectionStatus);
 
 
-
-
-
 #endif	// MYSQL_H
 
 //TODO:
 
-/*
-
-*/
-
-
-
 	//Savepoint *savept;
 	//int tipo = p_value.get_type();
 	//tipo == Variant::INT
-	//if (pstmt->getMoreResults())
+
+	
+
+
+
