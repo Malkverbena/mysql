@@ -5,9 +5,15 @@
 
 #ifdef GODOT4
 	#include "core/object/reference.h"
+	#include "core/core_bind.h"
 #else
 	#include "core/reference.h"
+	#include "core/bind/core_bind.h"
+	#include "core/crypto/crypto_core.h"
 #endif
+
+
+
 
 #include <sstream>
 #include "core/io/marshalls.h"
@@ -57,20 +63,6 @@ public:
 		DISCONNECTED
 	};
 	
-	enum SQLDataTypes {
-		NIL,
-		// Atomic types	
-		BOOLEAN,
-		INT,
-		FLOAT,
-		STRING,
-		// Meta types
-		JSON,			//String or blob. Depends on system (MariaDB Vs Mysql)
-		BLOB,			//PoolByteArray
-		DATATIME,
-		TYPE_MAX	
-	};
-	
 	enum DataFormat {
 		ARRAY,
 		DICTIONARY
@@ -88,10 +80,7 @@ public:
 private:
 
 	sql::ConnectOptionsMap connection_properties;
-	
-	//sql::mysql::MySQL_Driver *driver;
-	std::unique_ptr<sql::mysql::MySQL_Driver> driver;
-	
+	sql::mysql::MySQL_Driver *driver;
 	std::unique_ptr<sql::Connection> conn;
 
 
@@ -164,9 +153,11 @@ private:
 
 	//QUERTY
 	int _execute( String p_sqlquery, Array p_values, bool prep_st);
-	void set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Array prep_val );
+	//void set_datatype(std::shared_ptr <sql::PreparedStatement>prep_stmt, Array prep_val, Vector<std::__cxx11::basic_stringstream<char>*> *multiBlob );
 	
-	Array query(String p_sqlquery, Array prep_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray(), bool _prep = false);
+	int set_datatype( sql::SQLString query, Array p_values);
+	
+	Array _query(String p_sqlquery, Array p_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray(), bool _prep = false);
 
 
 
@@ -195,8 +186,8 @@ private:
 
 public:
 
-	PoolByteArray test(PoolByteArray arg );
-	
+
+	String test(String arg);
 
 	// CONNECTION
 	ConnectionStatus get_connection_status();
@@ -219,13 +210,26 @@ public:
 	
 	
 	// QUERY
-	//FIXME  o VALOR AUTOMATICO NÃO ESTÁ CONTANDO 
-	Array fetch_query(String p_sqlquery, DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray());  
-	Array fetch_prepared_query(String p_sqlquery, Array prep_values, DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray()); 
+	Array query(String p_sqlquery, DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray());  
+	Array query_prepared(String p_sqlquery, Array prep_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray()); 
 
+
+/*
 	// TRANSACTION
+	
+	commit();
+	rollback();
+	getAutoCommit();
+	setAutoCommit(bool autoCommit);
+	getTransactionIsolation();
+
 	//Variant transaction( [] );
 	//Variant transaction_prepared( {} );
+
+
+*/
+
+
 
 /*
 	std::string MySQL_Connection::getSessionVariable(const std::string & varname)
@@ -248,10 +252,9 @@ VARIANT_ENUM_CAST(MySQL::ConnectionStatus);
 #endif	// MYSQL_H
 
 //TODO:
-
 	//Savepoint *savept;
-	//int tipo = p_value.get_type();
-	//tipo == Variant::INT
+
+
 
 	
 
