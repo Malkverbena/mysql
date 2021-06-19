@@ -121,7 +121,7 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 		//DatabaseMetaData *dbcon_meta = con->getMetaData();
 
 		if (  _prep ) {	
-			// Prep statement
+			// Prepared statement
 			prep_stmt.reset(conn->prepareStatement(query));
 			std::vector<std::stringstream> multiBlob (data_size);
 
@@ -132,9 +132,9 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 			res.reset( prep_stmt->executeQuery());	
 			res_meta = res->getMetaData();
 		}
-		
+
 		else { 
-			// Non prep statement
+			// Non Prepared statement
 			stmt.reset(conn->createStatement());
 			res.reset( stmt->executeQuery(query));
 			res_meta = res->getMetaData();
@@ -145,7 +145,6 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 		Array columntypes;
 		Array columninfo;
 		Array columnmeta;
-
 
 		for (int m = 0; m < meta_col.size(); m++){
 
@@ -173,33 +172,30 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 				ret.push_back(columninfo);
 			}
 
-
 		//----------------------------------------------------------------------			
 			if (meta_col[m] == INFO && columnmeta.empty()){
 			//TODO
 				ret.push_back(columnmeta);
 			}
-
-
 		}
-					
+
 
 		//--------FETCH DATA
 		while (res->next()) {
-			
+
 			Array line;
 			Dictionary row;
-				
+
 			for ( unsigned int i = 1; i <= res_meta->getColumnCount(); i++) { 
 				sql::SQLString _col_name = res_meta->getColumnName(i);
 				String column_name = SQLstr2GDstrS( _col_name );
 				int d_type = res_meta->getColumnType(i);
-				
+
 				//--------RETURN STRING       
 				if ( return_string ) {
 					sql::SQLString _val = res->getString(i);
 					String _value = SQLstr2GDstrS( _val );
-					
+
 					if ( data_model == DICTIONARY ){
 						row[ column_name ] = _value; 			
 					}
@@ -229,7 +225,7 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 							line.push_back( res->getBoolean(i) ); 
 						}
 					}
-											
+
 					//	INT
 					else if ( d_type == sql::DataType::ENUM || d_type == sql::DataType::TINYINT || d_type == sql::DataType::SMALLINT || d_type == sql::DataType::MEDIUMINT) {
 						if  ( data_model == DICTIONARY ){ 
@@ -239,7 +235,6 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 							line.push_back( res->getInt(i) ); 
 						}
 					}
-
 
 					//	BIG INT
 					else if ( d_type == sql::DataType::INTEGER || d_type == sql::DataType::BIGINT ) {
@@ -251,7 +246,6 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 						}
 					}
 
-
 					//	FLOAT 
 					else if ( d_type == sql::DataType::REAL || d_type == sql::DataType::DOUBLE || d_type == sql::DataType::DECIMAL || d_type == sql::DataType::NUMERIC ) {
 						double my_float = res->getDouble(i);
@@ -262,8 +256,7 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 						line.push_back( my_float ); 
 						}							
 					}
-			
-						
+
 					//	TIME
 					// It should return time information as a dictionary but if the sequence of the data be modified (using TIME_FORMAT or DATE_FORMAT for exemple), 
 					// it will return the dictionary fields with wrong names. So I prefer return the data as an array.	
@@ -279,11 +272,10 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 						}
 					}
 
-
 					//	STRING - VARIANT - JSON
+					// Why not getString instead getBlob? Becouse it has size limit and can't be used properly with JSON statements!
 					else if (d_type == sql::DataType::CHAR || d_type == sql::DataType::VARCHAR || d_type == sql::DataType::LONGVARCHAR || d_type == sql::DataType::JSON ){
-						// Why not getString instead getBlob? Becouse it has size limit and can't be used properly with JSON statements!
-						
+
 						std::unique_ptr< std::istream > raw(res->getBlob(i));
 
 						raw->seekg (0, raw->end);
@@ -373,9 +365,14 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 
 
 
-int MySQL::execute( String p_sqlquery ){ return _execute( p_sqlquery, Array(), false ); }
+int MySQL::execute( String p_sqlquery ){ 
+	return _execute( p_sqlquery, Array(), false ); 
+}
 
-int MySQL::execute_prepared( String p_sqlquery, Array p_values){ return _execute( p_sqlquery, p_values, true ); }
+int MySQL::execute_prepared( String p_sqlquery, Array p_values){ 
+	return _execute( p_sqlquery, p_values, true ); 
+}
+
 
 int MySQL::_execute( String p_sqlquery, Array p_values, bool prep_st){
 
@@ -490,9 +487,8 @@ void MySQL::set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std:
 
 //---------------------------------------------------------------------------------------------
 
-//	https://gist.github.com/FlorianWolters/be839c84991a789df1c6
-//	https://stackoverflow.com/questions/45722747/how-can-i-create-a-istream-from-a-uint8-t-vector
-//	https://stackoverflow.com/questions/1121142/set-binary-data-using-setblob-in-mysql-connector-c-causes-crash
+
+
 //	https://dev.mysql.com/doc/refman/8.0/en/blob.html  NOTE: Afeta o desempenho
 //	https://mariadb.com/kb/en/json-data-type/
 //  https://zh.wikibooks.org/zh-hk/MySQL_Connector/C%2B%2B
