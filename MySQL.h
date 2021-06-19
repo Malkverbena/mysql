@@ -4,7 +4,7 @@
 #define MYSQL_H
 
 #ifdef GODOT4
-	#include "core/object/reference.h"
+	#include "core/object/ref_counted.h"  //Subistituto para reference.h
 	#include "core/core_bind.h"
 #else
 	#include "core/reference.h"
@@ -14,7 +14,7 @@
 
 
 
-
+#include <vector>
 #include <sstream>
 #include "core/io/marshalls.h"
 
@@ -153,9 +153,13 @@ private:
 
 	//QUERTY
 	int _execute( String p_sqlquery, Array p_values, bool prep_st);
-	//void set_datatype(std::shared_ptr <sql::PreparedStatement>prep_stmt, Array prep_val, Vector<std::__cxx11::basic_stringstream<char>*> *multiBlob );
-	
-	int set_datatype( sql::SQLString query, Array p_values);
+
+//	int set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Array p_values, bool query );
+
+//	int set_datatype( sql::SQLString query, Array p_values);
+
+
+	void set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std::stringstream * blob, Variant arg, int index);
 	
 	Array _query(String p_sqlquery, Array p_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray(), bool _prep = false);
 
@@ -187,7 +191,7 @@ private:
 public:
 
 
-	String test(String arg);
+	PoolByteArray test(PoolByteArray arg1, Array arg2);
 
 	// CONNECTION
 	ConnectionStatus get_connection_status();
