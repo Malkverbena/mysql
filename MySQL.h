@@ -4,7 +4,7 @@
 #define MYSQL_H
 
 #ifdef GODOT4
-	#include "core/object/reference.h"
+	#include "core/object/ref_counted.h"
 #else
 	#include "core/reference.h"
 #endif
@@ -29,8 +29,13 @@
 #pragma once
 
 
+#ifdef GODOT4
+class MySQL : public RefCounted{
+	GDCLASS(MySQL,RefCounted);
+#else
 class MySQL : public Reference{
 	GDCLASS(MySQL,Reference);
+#endif
 
 
 private:
