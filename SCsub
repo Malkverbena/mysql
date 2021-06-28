@@ -10,30 +10,29 @@ include_path= "C:/mysql/mysql-connector-c++-8.0.25-winx64/include/jdbc"
 # Enter with the path to mysql libs here (mysqlcppconn.lib)
 lib_path= "C:/mysql/mysql-connector-c++-8.0.25-winx64/lib64/vs14"
 
+import shutil
+Import("env")
 
 
-#--------------------------------------------------------------------------
 version_file = open('../../version.py', 'r')
 for ver in version_file:
 	if ver.startswith("major"):
 		if ver.count("4") > 0:
-			mysql_env.Append(CPPDEFINES=["GODOT4"])	
+			env.Append(CPPDEFINES=["GODOT4"])	
 version_file.close()
-#--------------------------------------------------------------------------
 
 
-import shutil
-Import("env")
 env.add_source_files(env.modules_sources,"*.cpp")
+mysql_env = env.Clone()
+mysql_env['LIBS'] = []
 
+	
 
 if env["platform"] in ["windows", "UWP"]:
 	target_lib = ""
 	target_lib_arr = []
 	env.Append(CPPPATH=[include_path, boost_path])
 	env.Append(LIBPATH=[lib_path])
-	mysql_env = env.Clone()
-	mysql_env['LIBS'] = []
     
 	sufix = env["PROGSUFFIX"]
 	target_lib="mysqlcppconn"
@@ -50,13 +49,10 @@ if env["platform"] in ["windows", "UWP"]:
 	env.Append(LIBS=target_lib_arr)
 
 
-elif env["platform"] in ["linuxbsd", "linux", "bsd", "X11", "Server"]:
-	module_env = env.Clone()
-	mysql_env['LIBS'] = []
-	module_env.Append(CXXFLAGS=['-O2', '-std=c++11'])
+
+elif env["platform"] in ["x11", "linux", "bsd", "linuxbsd", "Server"]:
 	env.Append(LIBPATH=['/usr/lib'])
 	env.Append(LIBS=['mysqlcppconn'])
 
 
-
-
+#elif env["platform"] in ["osx"]:
