@@ -41,9 +41,13 @@
 
 #pragma once
 
-
+#ifdef GODOT4
+class MySQL : public RefCounted{
+	GDCLASS(MySQL,RefCounted);
+#else
 class MySQL : public Reference{
 	GDCLASS(MySQL,Reference);
+#endif
 
 
 protected:
@@ -56,6 +60,16 @@ public:
 	MySQLException sqlError;
 	std::string sqlstate ;
 
+
+	enum Isolation {		// aka sql::enum_transaction_isolation
+		TRANSACTION_NONE= 0,
+		TRANSACTION_READ_COMMITTED,
+		TRANSACTION_READ_UNCOMMITTED,
+		TRANSACTION_REPEATABLE_READ,
+		TRANSACTION_SERIALIZABLE
+	};
+
+
 	enum ConnectionStatus {
 		NO_CONNECTION, 
 		CLOSED, 
@@ -64,21 +78,19 @@ public:
 	};
 	
 	enum DataFormat {
-		ARRAY,
-		DICTIONARY
+		ARRAY,		// returns data as an array
+		DICTIONARY	// returns data as an dictionary
 	};
 	
 	enum MetaCollection {	
 		COLUMNS_NAMES,	// returns an array with only one element (names of columns)
 		COLUMNS_TYPES,	// returns an array with only one element (types of the columns)
-		METADATA,		// return a dictionary only with metadata 
 		INFO			// return the fields info (is...)
 	};
 
 
 
 private:
-
 	sql::ConnectOptionsMap connection_properties;
 	sql::mysql::MySQL_Driver *driver;
 	std::unique_ptr<sql::Connection> conn;
@@ -94,7 +106,7 @@ private:
 		"OPT_CONNECT_ATTR_DELETE",
 	};
 	
-	const std::string int_properties [5] = { //int
+	const std::string int_properties [5] = { 	//int
 		"port",
 		"OPT_CONNECT_TIMEOUT",
 		"OPT_LOCAL_INFILE",
@@ -152,17 +164,9 @@ private:
 	};
 
 	//QUERTY
-	int _execute( String p_sqlquery, Array p_values, bool prep_st);
-
-//	int set_datatype(std::shared_ptr <sql::PreparedStatement> prep_stmt, Array p_values, bool query );
-
-//	int set_datatype( sql::SQLString query, Array p_values);
-
-
+	int _execute( String p_sqlquery, Array p_values, bool prep_st, bool update);
 	void set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std::stringstream * blob, Variant arg, int index);
-	
 	Array _query(String p_sqlquery, Array p_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray(), bool _prep = false);
-
 
 
 	//ERRORS
@@ -179,21 +183,15 @@ private:
 	//HELPERS
 	Array format_time(String str, bool return_string);
 	int get_time_format(String time);
-	
-	String SQLstr2GDstrP( const sql::SQLString *p_str );
-	String SQLstr2GDstrS( sql::SQLString &p_string );
-//	String SQLstr2GDstr( sql::SQLString p_string );
-	
-	sql::SQLString GDstr2SQLstr(String &p_str); 
-
+	String SQLstr2GDstr( sql::SQLString &p_string );
 
 
 public:
 
-
-	PoolByteArray test(PoolByteArray arg1, Array arg2);
+	Variant test(Array arg);
 
 	// CONNECTION
+	Dictionary get_metadata();
 	ConnectionStatus get_connection_status();
 	ConnectionStatus stop_connection();
 	MySQLException start_connection();
@@ -204,18 +202,67 @@ public:
 	Variant get_property(String p_property);
 	void set_property(String p_property, Variant p_value);
 	
-	//Dictionary get_properties_kit(Array p_properties);
-	//void set_properties_kit(Dictionary p_properties);
+	Dictionary get_properties_set(Array p_properties);
+	void set_properties_set(Dictionary p_properties);
 
 
 	// EXECUTE
-	int execute(String p_sqlquery);
-	int execute_prepared(String p_sqlquery, Array p_values);
+	bool execute(String p_sqlquery);
+	bool execute_prepared(String p_sqlquery, Array p_values);
+	
+	// EXECUTE UPDATE
+	int update(String p_sqlquery);
+	int update_prepared(String p_sqlquery, Array p_values);
 	
 	
 	// QUERY
 	Array query(String p_sqlquery, DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray());  
 	Array query_prepared(String p_sqlquery, Array prep_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray()); 
+
+
+
+
+
+	// TRANSACTION
+	
+	void setAutoCommit(bool autoCommit){conn->setAutoCommit(autoCommit);}
+
+	bool getAutoCommit(){return conn->getAutoCommit();}
+
+	void commit(){conn->commit();}
+	
+	void rollback(){conn->rollback();}
+	
+	
+//	Isolation getTransactionIsolation(){ return static_cast <Isolation> ( conn->getTransactionIsolation() ); }
+//	void setTransactionIsolation( Isolation level) {conn->setTransactionIsolation( static_cast <sql::enum_transaction_isolation>(level) );}	
+
+	Isolation getTransactionIsolation(){ return (Isolation)(conn->getTransactionIsolation()); }
+	void setTransactionIsolation( Isolation level) {conn->setTransactionIsolation( (sql::enum_transaction_isolation)(level));}	
+
+//	void rollback_savepoint(String savepoint){conn->rollback(savept);}
+
+
+
+
+
+
+/*
+Create savepoint
+Delete savepoint
+get savepoints
+*/
+
+  /*
+    Create a savepoint with given id. If a savepoint with the same id was
+    created earlier in the same transaction, then it is replaced by the new one.
+    It is an error to create savepoint with id 0, which is reserved for
+    the beginning of the current transaction.
+  */
+
+
+
+	
 
 
 /*
@@ -251,7 +298,7 @@ public:
 VARIANT_ENUM_CAST(MySQL::DataFormat);
 VARIANT_ENUM_CAST(MySQL::MetaCollection);
 VARIANT_ENUM_CAST(MySQL::ConnectionStatus);
-
+VARIANT_ENUM_CAST(MySQL::Isolation);
 
 #endif	// MYSQL_H
 
