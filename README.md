@@ -34,7 +34,7 @@ Edit the SCsub file before you start the compilation on Windows. (You must edit 
 #### Compilling on windows:
 
 Install Boost library. You get it on:
-https://dl.bintray.com/boostorg/master/
+https://www.boost.org/users/download/
 
 
 Install the MySQL C++ Connector. You can get it here:
