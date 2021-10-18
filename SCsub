@@ -50,8 +50,8 @@ if env["platform"] in ["windows", "UWP"]:
 
 
 
-elif env["platform"] in ["x11", "linux", "bsd", "linuxbsd", "Server"]:
-	env.Append(LIBPATH=['/usr/lib'])
+elif env["platform"] in ["x11", "linux", "bsd", "linuxbsd", "server"]:
+	mysql_env.Append(LIBPATH=['/usr/lib'])
 	env.Append(LIBS=['mysqlcppconn'])
 
 
