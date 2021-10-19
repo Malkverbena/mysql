@@ -18,7 +18,6 @@ Variant MySQL::test(Array arg){
 	
 	setAutoCommit(false);
 
-
 	try {
 		print_line("");
 	}
@@ -32,12 +31,8 @@ Variant MySQL::test(Array arg){
 		print_runtime_error(e); 
 	}
 
-
-
 	Variant ret;
 	return ret;
-	
-
 }	
 
 
@@ -56,8 +51,8 @@ Array MySQL::query_prepared(String p_sqlquery, Array p_values, DataFormat data_m
 Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bool return_string, PoolIntArray meta_col, bool _prep){
 
 	// TODO: Testar conexão antes de prosseguir -> if conn == null: ERR_FAIL -> Start your connection 
-	
-	
+
+
 //	if (get_connection_status() != CONNECTED) {
 //			throw std::runtime_error("DatabaseMetaData FAILURE - database connection closed");
 //	}
@@ -73,10 +68,8 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 	int data_size = p_values.size();
 
 	try {		
-
 		//DatabaseMetaData *dbcon_meta = con->getMetaData();
-
-		if (  _prep ) {	
+		if ( _prep ) {	
 			// Prepared statement
 			prep_stmt.reset(conn->prepareStatement(query));
 			std::vector<std::stringstream> multiBlob (data_size);
@@ -87,7 +80,8 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 
 			res.reset( prep_stmt->executeQuery());	
 			res_meta = res->getMetaData();
-		} else { 
+		}
+		else{ 
 			// Non Prepared statement
 			stmt.reset(conn->createStatement());
 			res.reset( stmt->executeQuery(query));
@@ -126,7 +120,6 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 
 		//--------FETCH DATA
 		while (res->next()) {
-
 			Array line;
 			Dictionary row;
 
@@ -136,13 +129,14 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 				int d_type = res_meta->getColumnType(i);
 
 				//--------RETURN STRING       
-				if ( return_string ) {
+				if ( return_string ){
 					sql::SQLString _val = res->getString(i);
 					String _value = SQLstr2GDstr( _val );
 
 					if ( data_model == DICTIONARY ){
 						row[ column_name ] = _value; 			
-					} else {
+					}
+					else{
 						line.push_back( _value );					
 					}
 				}
@@ -153,25 +147,28 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 					if ( res->isNull(i) ){
 						if ( data_model == DICTIONARY ){
 							row[ column_name ] = Variant();
-						} else {
+						}
+						else{
 							line.push_back( Variant() ); 
 						}
 					}
 
 					//	BOOL
 					else if ( d_type == sql::DataType::BIT ){
-						if  ( data_model == DICTIONARY ){
+						if ( data_model == DICTIONARY ){
 							row[ column_name ] = res->getBoolean(i); 
-						} else {
+						}
+						else{
 							line.push_back( res->getBoolean(i) ); 
 						}
 					}
 
 					//	INT
 					else if ( d_type == sql::DataType::ENUM || d_type == sql::DataType::TINYINT || d_type == sql::DataType::SMALLINT || d_type == sql::DataType::MEDIUMINT) {
-						if  ( data_model == DICTIONARY ){ 
+						if ( data_model == DICTIONARY ){ 
 							row[ column_name ] = res->getInt(i); 
-						} else { 
+						}
+						else{ 
 							line.push_back( res->getInt(i) ); 
 						}
 					}
@@ -180,7 +177,8 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 					else if ( d_type == sql::DataType::INTEGER || d_type == sql::DataType::BIGINT ) {
 						if  ( data_model == DICTIONARY ){ 
 							row[ column_name ] = res->getInt64(i); 
-						} else { 
+						}
+						else{ 
 							line.push_back( res->getInt64(i) ); 
 						}
 					}
@@ -190,7 +188,8 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 						double my_float = res->getDouble(i);
 						if  ( data_model == DICTIONARY ){ 
 							row[ column_name ] = my_float; 
-						} else { 
+						}
+						else{ 
 						line.push_back( my_float ); 
 						}							
 					}
@@ -202,12 +201,14 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 						sql::SQLString _stri = res->getString(i);
 						Array time = format_time( SQLstr2GDstr( _stri ) , false );
 					
-						if  ( data_model == DICTIONARY ){ 
+						if ( data_model == DICTIONARY ){ 
 							row[ column_name ] = time;
-						} else {
+						}
+						else{
 							line.push_back( time );	
 						}
 					}
+
 
 					//	STRING - VARIANT - JSON
 					// Why not getString instead getBlob? Becouse it has size limit and can't be used properly with JSON statements!
@@ -228,16 +229,19 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 				   		_Marshalls *marshalls = memnew(_Marshalls);
 				   		Variant _data = marshalls->base64_to_variant(str, p_full_objects);
 
-						if  ( data_model == DICTIONARY ){ 
+						if ( data_model == DICTIONARY ){ 
 							if (_data.get_type() == Variant::NIL){
 								row[ column_name ] = str;
-							} else{ 
+							}
+							else{ 
 								row[ column_name ] = _data;
 							}
-						} else { 
+						}
+						else{ 
 							if (_data.get_type() == Variant::NIL){ 
 								line.push_back( str ); 
-							} else {
+							}
+							else{
 								line.push_back( _data );
 							}							
 						}
@@ -267,10 +271,12 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 
 						if  ( data_model == DICTIONARY ){ 
 							row[ column_name ] = ret_data; 
-						} else { 
+						}
+						else{ 
 							line.push_back( ret_data ); 
 						}			
-					} else {
+					}
+					else{
 						//TODO
 						print_line("Format not supoeted!!");
 					}
@@ -280,14 +286,19 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 
 			if ( data_model == DICTIONARY ) 
 				{ ret.push_back( row ); 
-			} else { 
+			}
+			else{ 
 				ret.push_back( line ); 
 			}		
 		}  // WHILE
 	} // try
 	
-	catch (sql::SQLException &e) { print_SQLException(e); } 
-	catch (std::runtime_error &e) { print_runtime_error(e); }
+	catch (sql::SQLException &e) { 
+		print_SQLException(e); 
+	} 
+	catch (std::runtime_error &e) { 
+		print_runtime_error(e); 
+	}
 
 	return ret;
 
@@ -316,7 +327,7 @@ int MySQL::update_prepared( String p_sqlquery, Array p_values){
 int MySQL::_execute( String p_sqlquery, Array p_values, bool prep_st, bool update){
 
 	if (get_connection_status() != CONNECTED) {
-			throw std::runtime_error("DatabaseMetaData FAILURE - database connection closed");
+		throw std::runtime_error("DatabaseMetaData FAILURE - database connection closed");
 	}
 	
 	sql::SQLString query = p_sqlquery.utf8().get_data();
@@ -335,19 +346,25 @@ int MySQL::_execute( String p_sqlquery, Array p_values, bool prep_st, bool updat
 			
 			if (update){
 				afectedrows = prep_stmt->executeUpdate();
-			}else{
+			}
+			else{
 				afectedrows = int (prep_stmt->execute());
 			}
 			
-		}else{
+		}
+		else{
 			std::unique_ptr <sql::Statement> stmt;
 			stmt.reset(conn->createStatement());
 			afectedrows = stmt->executeUpdate(query);
 		}
 	}
 		
-	catch (sql::SQLException &e) { print_SQLException(e); } 
-	catch (std::runtime_error &e) { print_runtime_error(e); }
+	catch (sql::SQLException &e) { 
+		print_SQLException(e); 
+	} 
+	catch (std::runtime_error &e) { 
+		print_runtime_error(e); 
+	}
 
 	return afectedrows;
 }
@@ -384,7 +401,7 @@ void MySQL::set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std:
 #else
 		else if (value_type == Variant::Variant::REAL){ 
 			prep_stmt->setDouble(index+1, double(arg)); 
-			}
+		}
 #endif
 
 	// STRING - DATATIME - JSON
@@ -396,10 +413,12 @@ void MySQL::set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std:
 
 			if ( is_mysql_time( gdt_data )) {
 				prep_stmt->setDateTime(index+1, sql_data );
-			} else if ( is_json( gdt_data ) ) {
+			}
+			else if ( is_json( gdt_data ) ) {
 				*blob << std_string;
 				prep_stmt->setBlob(index+1, blob );		
-			} else {
+			}
+			else{
 				prep_stmt->setString(index+1, sql_data );
 			}
 		}
@@ -476,13 +495,16 @@ MySQL::ConnectionStatus MySQL::get_connection_status(){
 		if (!conn-> isClosed()) {
 			if (conn-> isValid()){
 				ret = CONNECTED;
-			}else{
+			}
+			else{
 				ret = DISCONNECTED;
 			}
-		}else{
+		}
+		else{
 			ret = CLOSED;
 		}
-	}else{
+	}
+	else{
 		ret = NO_CONNECTION; 
 	}
 	return ret;
@@ -506,7 +528,6 @@ MySQL::MySQLException MySQL::start_connection(){
 		print_runtime_error(e);
 	}
 #endif
-
 	sqlError.clear();
 	return sqlError;
 }
@@ -520,7 +541,8 @@ MySQL::ConnectionStatus MySQL::stop_connection(){
 		if (!conn->isClosed()) {
 			conn->close();
 		}
-	}else{
+	}
+	else{
 		ret = ConnectionStatus::NO_CONNECTION; 
 	}
 	return ret;  	
@@ -578,11 +600,18 @@ void MySQL::set_property(String p_property, Variant p_value){
 	String _val = p_value;
 	sql::SQLString value = _val.utf8().get_data();
 	
-	
-	if (value_type == "string" ) { connection_properties[property] = (sql::SQLString)value; }
-	else if (value_type == "void") { connection_properties[property] = (std::string)value; }
-	else if (value_type == "bool") { connection_properties[property] = (bool)p_value; }
-	else if (value_type == "int" ) { connection_properties[property] = (int)p_value; }
+	if (value_type == "string" ) { 
+		connection_properties[property] = (sql::SQLString)value; 
+	}
+	else if (value_type == "void") { 
+		connection_properties[property] = (std::string)value; 
+	}
+	else if (value_type == "bool") { 
+		connection_properties[property] = (bool)p_value; 
+	}
+	else if (value_type == "int" ) { 
+		connection_properties[property] = (int)p_value; 
+	}
 
 	
 //	TODO suporte para MAP(dictionary) 
@@ -597,7 +626,8 @@ void MySQL::set_property(String p_property, Variant p_value){
 	if (conn != NULL) {
 		if (property == "schema"){
 			conn->setSchema( value );
-		} else {
+		}
+		else{
 			conn->setClientOption(property, value );
 		}
 	}
@@ -618,9 +648,13 @@ Variant MySQL::get_property(String p_property){
 
 	if (value_type == "string" || value_type == "void") { return SQLstr2GDstr( *connection_properties[ property ].get<sql::SQLString>() ); }
 
-	else if (value_type == "int" ) {return *connection_properties[ property ].get< int >();}
+	else if (value_type == "int" ) {
+		return *connection_properties[ property ].get< int >();
+	}
 
-	else if (value_type == "bool") {return *connection_properties[ property ].get< bool >();}
+	else if (value_type == "bool") {
+		return *connection_properties[ property ].get< bool >();
+	}
 
 
 	//	TODO suporte para MAP(dictionary) 
@@ -634,7 +668,6 @@ Variant MySQL::get_property(String p_property){
 	*/
 
 	return Variant();
-	
 }
 
 
@@ -655,11 +688,31 @@ bool MySQL::is_json( Variant p_arg ) {
 
 
 std::string	MySQL::get_prop_type( std::string p_prop ) { 
-	for (int i = 0; i < (int)sizeof(string_properties)/32; i++){ if (string_properties[i] == p_prop) {return "string"; } }
-	for (int i = 0; i < (int)sizeof(sqlmap_properties)/32; i++){ if (sqlmap_properties[i] == p_prop) {return "map"; } }
-	for (int i = 0; i < (int)sizeof(bool_properties)/32; i++){ if (bool_properties[i] == p_prop) {return "bool"; } }
-	for (int i = 0; i < (int)sizeof(void_properties)/32; i++){ if (void_properties[i] == p_prop) {return "void"; } }
-	for (int i = 0; i < (int)sizeof(int_properties)/32; i++){ if (int_properties[i] == p_prop) {return "int"; } }
+	for (int i = 0; i < (int)sizeof(string_properties)/32; i++){ 
+		if (string_properties[i] == p_prop) {
+			return "string"; 
+		} 
+	}
+	for (int i = 0; i < (int)sizeof(sqlmap_properties)/32; i++){ 
+		if (sqlmap_properties[i] == p_prop) {
+			return "map"; 
+		} 
+	}
+	for (int i = 0; i < (int)sizeof(bool_properties)/32; i++){ 
+		if (bool_properties[i] == p_prop) {
+			return "bool"; 
+		} 
+	}
+	for (int i = 0; i < (int)sizeof(void_properties)/32; i++){ 
+		if (void_properties[i] == p_prop) {
+			return "void"; 
+		} 
+	}
+	for (int i = 0; i < (int)sizeof(int_properties)/32; i++){ 
+		if (int_properties[i] == p_prop) {
+			return "int"; 
+		} 
+	}
 	return "invalid";
 }
 
@@ -667,7 +720,8 @@ std::string	MySQL::get_prop_type( std::string p_prop ) {
 bool MySQL::is_mysql_time(String time) {
 	if (get_time_format( time ) == sql::DataType::UNKNOWN){
 		return false;
-	} else {
+	}
+	else{
 		return true;
 	}
 }
@@ -729,7 +783,8 @@ Array MySQL::format_time(String str, bool return_string) {
 	while( token != NULL ) {
 		if (return_string) {
 			datando.push_back( String(token) );   //--As String
-		} else {
+		}
+		else{
 			datando.push_back( atoi(token) ); //--As Data (int)
 		}
 		token = strtok( NULL, seps );

@@ -55,11 +55,9 @@ protected:
 
 
 public:
-
 	typedef Dictionary MySQLException;
 	MySQLException sqlError;
 	std::string sqlstate ;
-
 
 	enum Isolation {		// aka sql::enum_transaction_isolation
 		TRANSACTION_NONE= 0,
@@ -68,7 +66,6 @@ public:
 		TRANSACTION_REPEATABLE_READ,
 		TRANSACTION_SERIALIZABLE
 	};
-
 
 	enum ConnectionStatus {
 		NO_CONNECTION, 
@@ -220,74 +217,17 @@ public:
 	Array query_prepared(String p_sqlquery, Array prep_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray()); 
 
 
-
-
-
 	// TRANSACTION
-	
 	void setAutoCommit(bool autoCommit){conn->setAutoCommit(autoCommit);}
-
 	bool getAutoCommit(){return conn->getAutoCommit();}
-
 	void commit(){conn->commit();}
-	
 	void rollback(){conn->rollback();}
-	
-	
-//	Isolation getTransactionIsolation(){ return static_cast <Isolation> ( conn->getTransactionIsolation() ); }
-//	void setTransactionIsolation( Isolation level) {conn->setTransactionIsolation( static_cast <sql::enum_transaction_isolation>(level) );}	
 
 	Isolation getTransactionIsolation(){ return (Isolation)(conn->getTransactionIsolation()); }
 	void setTransactionIsolation( Isolation level) {conn->setTransactionIsolation( (sql::enum_transaction_isolation)(level));}	
 
+
 //	void rollback_savepoint(String savepoint){conn->rollback(savept);}
-
-
-
-
-
-
-/*
-Create savepoint
-Delete savepoint
-get savepoints
-*/
-
-  /*
-    Create a savepoint with given id. If a savepoint with the same id was
-    created earlier in the same transaction, then it is replaced by the new one.
-    It is an error to create savepoint with id 0, which is reserved for
-    the beginning of the current transaction.
-  */
-
-
-
-	
-
-
-/*
-	// TRANSACTION
-	
-	commit();
-	rollback();
-	getAutoCommit();
-	setAutoCommit(bool autoCommit);
-	getTransactionIsolation();
-
-	//Variant transaction( [] );
-	//Variant transaction_prepared( {} );
-
-
-*/
-
-
-
-/*
-	std::string MySQL_Connection::getSessionVariable(const std::string & varname)
-	void MySQL_Connection::setSessionVariable(const std::string & varname, const std::string & value)
-
-*/
-
 
 
 	MySQL();
@@ -302,10 +242,43 @@ VARIANT_ENUM_CAST(MySQL::Isolation);
 
 #endif	// MYSQL_H
 
-//TODO:
-	//Savepoint *savept;
 
 
+/*TODO
+
+    Create a savepoint with given id. If a savepoint with the same id was
+    created earlier in the same transaction, then it is replaced by the new one.
+    It is an error to create savepoint with id 0, which is reserved for
+    the beginning of the current transaction.
+
+	// TRANSACTION
+	
+	commit();	*********DONE
+	rollback();	*********DONE
+	getAutoCommit();	*********DONE
+	setAutoCommit(bool autoCommit);	*********DONE
+	getTransactionIsolation();	*********DONE
+
+	Create_savepoint (savepoint)
+	Delete_savepoint (savepoint)
+	get_savepoints()
+
+
+	Variant transaction( [] );
+	Variant transaction_prepared( {} );
+
+
+	std::string MySQL_Connection::getSessionVariable(const std::string & varname)
+	void MySQL_Connection::setSessionVariable(const std::string & varname, const std::string & value)
+
+
+//	Isolation getTransactionIsolation(){ return static_cast <Isolation> ( conn->getTransactionIsolation() ); }
+//	void setTransactionIsolation( Isolation level) {conn->setTransactionIsolation( static_cast <sql::enum_transaction_isolation>(level) );}	
+
+
+
+
+*/
 
 	
 
