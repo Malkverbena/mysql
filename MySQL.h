@@ -16,11 +16,12 @@
 
 #include <vector>
 #include <sstream>
+//#include <map>
 #include "core/io/marshalls.h"
 
 #include <mysql_connection.h>
 #include <mysql_driver.h>
-#include <mysql_error.h>
+#include <mysql_error.h> 
 
 #include <cppconn/build_config.h>
 #include <cppconn/config.h>
@@ -39,7 +40,10 @@
 #include <cppconn/version_info.h>
 #include <cppconn/variant.h>
 
+
 #pragma once
+//#define CPPCONN_PUBLIC_FUNC=
+
 
 #ifdef GODOT4
 class MySQL : public RefCounted{
@@ -90,8 +94,10 @@ public:
 private:
 	sql::ConnectOptionsMap connection_properties;
 	sql::mysql::MySQL_Driver *driver;
-	std::unique_ptr<sql::Connection> conn;
-
+	std::shared_ptr<sql::Connection> conn;
+	
+	//Map<String, std::unique_ptr<sql::Savepoint>> savepoint_map;
+	std::map<String, sql::Savepoint*> savepoint_map;
 
 	const std::string void_properties [2] = {  //void
 		"OPT_CONNECT_ATTR_RESET", 
@@ -218,16 +224,18 @@ public:
 
 
 	// TRANSACTION
+	void rollback_savepoint(String savepoint){conn->rollback( savepoint_map[savepoint] );}
 	void setAutoCommit(bool autoCommit){conn->setAutoCommit(autoCommit);}
 	bool getAutoCommit(){return conn->getAutoCommit();}
 	void commit(){conn->commit();}
-	void rollback(){conn->rollback();}
-
-	Isolation getTransactionIsolation(){ return (Isolation)(conn->getTransactionIsolation()); }
+	
+	Isolation getTransactionIsolation(){return (Isolation)(conn->getTransactionIsolation()); }
 	void setTransactionIsolation( Isolation level) {conn->setTransactionIsolation( (sql::enum_transaction_isolation)(level));}	
 
-
-//	void rollback_savepoint(String savepoint){conn->rollback(savept);}
+	Error create_savepoint(String p_savept);
+	Error delete_savepoint(String p_savept);
+	
+	PoolStringArray get_savepoints();
 
 
 	MySQL();
@@ -246,11 +254,6 @@ VARIANT_ENUM_CAST(MySQL::Isolation);
 
 /*TODO
 
-    Create a savepoint with given id. If a savepoint with the same id was
-    created earlier in the same transaction, then it is replaced by the new one.
-    It is an error to create savepoint with id 0, which is reserved for
-    the beginning of the current transaction.
-
 	// TRANSACTION
 	
 	commit();	*********DONE
@@ -259,17 +262,13 @@ VARIANT_ENUM_CAST(MySQL::Isolation);
 	setAutoCommit(bool autoCommit);	*********DONE
 	getTransactionIsolation();	*********DONE
 
-	Create_savepoint (savepoint)
-	Delete_savepoint (savepoint)
-	get_savepoints()
+	Create_savepoint (savepoint)	*********DONE
+	Delete_savepoint (savepoint)	*********DONE
+	get_savepoints()	*********DONE
 
 
 	Variant transaction( [] );
 	Variant transaction_prepared( {} );
-
-
-	std::string MySQL_Connection::getSessionVariable(const std::string & varname)
-	void MySQL_Connection::setSessionVariable(const std::string & varname, const std::string & value)
 
 
 //	Isolation getTransactionIsolation(){ return static_cast <Isolation> ( conn->getTransactionIsolation() ); }

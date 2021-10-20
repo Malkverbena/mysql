@@ -3,12 +3,10 @@
 
 #include "MySQL.h"
 #include "core/io/json.h"
-#include <vector>
 
 
 bool p_full_objects = true; //TODO: colocar o p_full_objects como propriedade ao lado do reconnect
 bool use_json = false;
-
 
 
 Variant MySQL::test(Array arg){
@@ -631,9 +629,44 @@ void MySQL::set_property(String p_property, Variant p_value){
 			conn->setClientOption(property, value );
 		}
 	}
-
 }
 
+
+Error MySQL::create_savepoint(String p_savept){
+
+	if (savepoint_map.count(p_savept) != 0){
+		return ERR_ALREADY_EXISTS;
+	}
+
+	sql::Savepoint *savept;
+	savept = conn->setSavepoint( p_savept.utf8().get_data() );
+	savepoint_map.insert( std::pair<String, sql::Savepoint *> (p_savept, savept) );
+	return OK;
+}
+
+
+
+Error MySQL::delete_savepoint(String p_savept){
+
+	if (savepoint_map.count(p_savept) == 0){
+		return ERR_DOES_NOT_EXIST;
+	}
+
+	conn->releaseSavepoint( savepoint_map[p_savept] ); 
+	delete savepoint_map[p_savept];
+	savepoint_map.erase(p_savept);
+	return OK;
+}
+
+
+PoolStringArray MySQL::get_savepoints(){
+	PoolStringArray ret;
+	std::map<String, sql::Savepoint*>::iterator it;
+	for(auto x:savepoint_map){
+		ret.append(x.first);
+	}
+	return ret;
+}
 
 
 Variant MySQL::get_property(String p_property){
@@ -669,7 +702,6 @@ Variant MySQL::get_property(String p_property){
 
 	return Variant();
 }
-
 
 
 //--------HELPERS-------------------
@@ -838,6 +870,7 @@ void MySQL::print_runtime_error(std::runtime_error &e) {
 //--------GODOT STUFF-------------------
 
 void MySQL::_bind_methods() {
+//TODO Add Properties
 /*
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_reconnect"), "set_reconnect", "can_reconnect");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "encode objects"), "set_reconnect", "can_reconnect");
@@ -847,7 +880,6 @@ void MySQL::_bind_methods() {
 */
 
 	ClassDB::bind_method(D_METHOD("test", "argument"),&MySQL::test);
-
 
 
 	//--- Connection Managers
@@ -884,7 +916,13 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("setAutoCommit", "bool"),&MySQL::setAutoCommit);
 	ClassDB::bind_method(D_METHOD("getAutoCommit"),&MySQL::getAutoCommit);
 	ClassDB::bind_method(D_METHOD("commit"),&MySQL::commit);
-	ClassDB::bind_method(D_METHOD("rollback", "sql_statement"),&MySQL::rollback);
+	ClassDB::bind_method(D_METHOD("rollback_savepoint", "savepoint"),&MySQL::rollback_savepoint);
+
+
+	ClassDB::bind_method(D_METHOD("create_savepoint", "savepoint"),&MySQL::create_savepoint);
+	ClassDB::bind_method(D_METHOD("delete_savepoint", "savepoint"),&MySQL::delete_savepoint);
+	ClassDB::bind_method(D_METHOD("get_savepoints"),&MySQL::get_savepoints);	
+
 
 
 	//---
