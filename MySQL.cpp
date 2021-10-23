@@ -9,52 +9,44 @@ bool p_full_objects = true; //TODO: colocar o p_full_objects como propriedade ao
 bool use_json = false;
 
 
-Variant MySQL::test(Array arg){
-
-	sql::SQLString WHITE = "INSERT INTO TRANSACTION (data) VALUES (?)";
-	sql::SQLString READ = "SELECT data FROM TRANSACTION ";
-	
-	setAutoCommit(false);
-
-	try {
-		print_line("");
-	}
-
-	catch (sql::SQLException &e) { 
-		print_SQLException(e); 
-		conn->rollback();
-	}
-	
-	catch (std::runtime_error &e) { 
-		print_runtime_error(e); 
-	}
-
-	Variant ret;
-	return ret;
-}	
+//FIXME TESTAR A CONNEXÃO ANTES DE EXECUTAR OS METODOS
 
 
 
-//--------FETCH QUERY-------------------
+//--------FETCH QUERY / EXECUTE / UPDADE-------------------
 Array MySQL::query(String p_sqlquery, DataFormat data_model, bool return_string, PoolIntArray meta_col){
 	return _query(p_sqlquery, Array(), data_model, return_string, meta_col, false); 
 }
-
 
 Array MySQL::query_prepared(String p_sqlquery, Array p_values, DataFormat data_model, bool return_string, PoolIntArray meta_col){ 
 	return _query(p_sqlquery, p_values, data_model, return_string, meta_col, true); 
 }
 
+bool MySQL::execute(String p_sqlquery){
+	return bool(_execute( p_sqlquery, Array(), false, false ));
+}
+
+bool MySQL::execute_prepared(String p_sqlquery, Array p_values){
+	return bool(_execute( p_sqlquery, p_values, true, false ));
+}
+
+int MySQL::update( String p_sqlquery ){ 
+	return _execute( p_sqlquery, Array(), false, true ); 
+}
+
+int MySQL::update_prepared( String p_sqlquery, Array p_values){ 
+	return _execute( p_sqlquery, p_values, true, true); 
+}
+
+
+
+//--------HEAVY DUTY-------------------
 
 Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bool return_string, PoolIntArray meta_col, bool _prep){
 
-	// TODO: Testar conexão antes de prosseguir -> if conn == null: ERR_FAIL -> Start your connection 
-
-
-//	if (get_connection_status() != CONNECTED) {
-//			throw std::runtime_error("DatabaseMetaData FAILURE - database connection closed");
-//	}
-//	
+	if (get_connection_status() != CONNECTED) {
+		throw std::runtime_error("DatabaseMetaData FAILURE - database not connected!");
+	}
 
 	sql::SQLString query = p_sqlquery.utf8().get_data();
 	Array ret;
@@ -294,6 +286,7 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 	catch (sql::SQLException &e) { 
 		print_SQLException(e); 
 	} 
+
 	catch (std::runtime_error &e) { 
 		print_runtime_error(e); 
 	}
@@ -304,28 +297,10 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 
 
 
-bool MySQL::execute(String p_sqlquery){
-	return bool(_execute( p_sqlquery, Array(), false, false ));
-}
-
-bool MySQL::execute_prepared(String p_sqlquery, Array p_values){
-	return bool(_execute( p_sqlquery, p_values, true, false ));
-}
-
-
-int MySQL::update( String p_sqlquery ){ 
-	return _execute( p_sqlquery, Array(), false, true ); 
-}
-
-int MySQL::update_prepared( String p_sqlquery, Array p_values){ 
-	return _execute( p_sqlquery, p_values, true, true); 
-}
-
-
 int MySQL::_execute( String p_sqlquery, Array p_values, bool prep_st, bool update){
 
 	if (get_connection_status() != CONNECTED) {
-		throw std::runtime_error("DatabaseMetaData FAILURE - database connection closed");
+		throw std::runtime_error("DatabaseMetaData FAILURE - database not connected!");
 	}
 	
 	sql::SQLString query = p_sqlquery.utf8().get_data();
@@ -345,6 +320,7 @@ int MySQL::_execute( String p_sqlquery, Array p_values, bool prep_st, bool updat
 			if (update){
 				afectedrows = prep_stmt->executeUpdate();
 			}
+
 			else{
 				afectedrows = int (prep_stmt->execute());
 			}
@@ -360,6 +336,7 @@ int MySQL::_execute( String p_sqlquery, Array p_values, bool prep_st, bool updat
 	catch (sql::SQLException &e) { 
 		print_SQLException(e); 
 	} 
+
 	catch (std::runtime_error &e) { 
 		print_runtime_error(e); 
 	}
@@ -438,7 +415,6 @@ void MySQL::set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std:
 			*blob << buff.utf8().get_data();
 			prep_stmt->setBlob(index+1, blob);
 		}
-
 }
 	
 
@@ -456,8 +432,158 @@ https://zh.wikibooks.org/zh-hk/MySQL_Connector/C%2B%2B
 
 //--------CONNECTION-------------------
 
+MySQL::ConnectionStatus MySQL::get_connection_status(){
+	MySQL::ConnectionStatus ret;	
+	if (conn.get()) {// != NULL
+		if (!conn-> isClosed()) {
+			if (conn-> isValid()){
+				ret = CONNECTED;
+			}
+			else{
+				ret = DISCONNECTED;
+			}
+		}
+		else{
+			ret = CLOSED;
+		}
+	}
+	else{
+		ret = NO_CONNECTION; 
+	}
+	return ret;
+}
+
+//TODO : set reconnection
+
+MySQL::MySQLException MySQL::start_connection(){
+
+	try {
+		driver = sql::mysql::get_mysql_driver_instance();
+		conn.reset(driver->connect(connection_properties));
+	}
+
+	catch (sql::SQLException &e) {
+		print_SQLException(e);
+	} 
+						
+#ifdef DEBUG_ENABLED
+	catch (std::runtime_error &e) {
+		print_runtime_error(e);
+	}
+#endif
+	MySQLException Err_Except = sqlError.duplicate();
+	sqlError.clear();
+	return Err_Except;
+
+}
+
+
+
+MySQL::ConnectionStatus MySQL::stop_connection(){
+
+	ConnectionStatus ret;
+	if (conn.get()) {// != NULL
+		ret = ConnectionStatus::CLOSED; 
+		if (!conn->isClosed()) {
+			conn->close();
+		}
+	}
+
+	else{
+		ret = ConnectionStatus::NO_CONNECTION; 
+	}
+	return ret;  	
+}
+
+
+//--------PROPERTIES-------------------
+
+void MySQL::set_properties_set(Dictionary p_properties){
+
+	if (get_connection_status() != CONNECTED) {
+		throw std::runtime_error("DatabaseMetaData FAILURE - database not connected!");
+	}
+
+	for ( int i = 0; i < p_properties.size(); i++){
+		set_property( p_properties.keys()[i], p_properties.values()[i] );
+	}
+}
+
+
+Dictionary MySQL::get_properties_set(Array p_properties){
+
+	if (get_connection_status() != CONNECTED) {
+		throw std::runtime_error("DatabaseMetaData FAILURE - database not connected!");
+	}
+
+	Dictionary ret;
+	for ( int i = 0; i < p_properties.size(); i++){
+		ret[ p_properties[i] ] = get_property( p_properties[i] );
+	}
+
+	return ret;
+}
+
+
+
+void MySQL::set_credentials( String p_host, String p_user, String p_pass ) {
+	connection_properties["hostName"] = p_host.utf8().get_data();
+	connection_properties["userName"] = p_user.utf8().get_data();
+	connection_properties["password"] = p_pass.utf8().get_data();
+}	
+
+
+void MySQL::set_property(String p_property, Variant p_value){
+
+	sql::SQLString property = p_property.utf8().get_data();
+	std::string value_type = get_prop_type( property );
+	String _val = p_value;
+	sql::SQLString value = _val.utf8().get_data();
+	
+	if (value_type == "string" ) { 
+		connection_properties[property] = (sql::SQLString)value; 
+	}
+
+	else if (value_type == "void") { 
+		connection_properties[property] = (std::string)value; 
+	}
+
+	else if (value_type == "bool") { 
+		connection_properties[property] = (bool)p_value; 
+	}
+
+	else if (value_type == "int" ) { 
+		connection_properties[property] = (int)p_value; 
+	}
+
+	
+//	TODO suporte para MAP(dictionary) 
+//	else if (value_type == "map" ) {}
+
+
+	else{
+		//Precisa apenas imprimir a mesagem de erro (no debug?)
+		ERR_FAIL_MSG("Invalid data type. For more information visit: https://dev.mysql.com/doc/connector-cpp/1.1/en/connector-cpp-connect-options.html");
+	}
+
+	if (conn != NULL) {
+		if (property == "schema"){
+			conn->setSchema( value );
+		}
+
+		else{
+			conn->setClientOption(property, value );
+		}
+	}
+}
+
 
 Dictionary MySQL::get_metadata(){
+
+	if (get_connection_status() != CONNECTED) {
+		throw std::runtime_error("DatabaseMetaData FAILURE - database not connected!");
+	}
+
 	Dictionary ret;
 	sql::DatabaseMetaData *dbcon_meta = conn->getMetaData();
 	std::unique_ptr < sql::ResultSet > res(dbcon_meta->getSchemas());
@@ -487,152 +613,15 @@ Dictionary MySQL::get_metadata(){
 }
 
 
-MySQL::ConnectionStatus MySQL::get_connection_status(){
-	MySQL::ConnectionStatus ret;	
-	if (conn.get()) {// != NULL
-		if (!conn-> isClosed()) {
-			if (conn-> isValid()){
-				ret = CONNECTED;
-			}
-			else{
-				ret = DISCONNECTED;
-			}
-		}
-		else{
-			ret = CLOSED;
-		}
-	}
-	else{
-		ret = NO_CONNECTION; 
-	}
-	return ret;
-}
 
-//TODO : set reconnection
-
-MySQL::MySQLException MySQL::start_connection(){
-	sqlError.clear();
-	try {
-		driver = sql::mysql::get_mysql_driver_instance();
-		conn.reset(driver->connect(connection_properties));
-	}
-
-	catch (sql::SQLException &e) {
-		print_SQLException(e);
-	} 
-						
-#ifdef DEBUG_ENABLED
-	catch (std::runtime_error &e) {
-		print_runtime_error(e);
-	}
-#endif
-	sqlError.clear();
-	return sqlError;
-}
-
-
-
-MySQL::ConnectionStatus MySQL::stop_connection(){
-	ConnectionStatus ret;
-	if (conn.get()) {// != NULL
-		ret = ConnectionStatus::CLOSED; 
-		if (!conn->isClosed()) {
-			conn->close();
-		}
-	}
-	else{
-		ret = ConnectionStatus::NO_CONNECTION; 
-	}
-	return ret;  	
-}
-
-
-/*
 //--------TRANSACTION-------------------
-bool MySQL::getAutoCommit(){return conn->getAutoCommit();}
-void MySQL::setAutoCommit(bool autoCommit){}
-void MySQL::rollback(){}
-void MySQL::rollback(Savepoint * savepoint){}
-void MySQL::commit(){}
-void MySQL::setTransactionIsolation(enum_transaction_isolation level)
-void MySQL::releaseSavepoint(Savepoint * savepoint){}
-Savepoint * setSavepoint(const sql::SQLString& name){}
-Savepoint * setSavepoint(){}
-*/
-
-
-//--------PROPERTIES-------------------
-
-void MySQL::set_properties_set(Dictionary p_properties){
-
-	for ( int i = 0; i < p_properties.size(); i++){
-		set_property( p_properties.keys()[i], p_properties.values()[i] );
-	}
-}
-
-
-Dictionary MySQL::get_properties_set(Array p_properties){
-
-	Dictionary ret;
-	for ( int i = 0; i < p_properties.size(); i++){
-		ret[ p_properties[i] ] = get_property( p_properties[i] );
-	}
-
-	return ret;
-}
-
-
-	
-	
-void MySQL::set_credentials( String p_host, String p_user, String p_pass ) {
-	connection_properties["hostName"] = p_host.utf8().get_data();
-	connection_properties["userName"] = p_user.utf8().get_data();
-	connection_properties["password"] = p_pass.utf8().get_data();
-}	
-
-
-void MySQL::set_property(String p_property, Variant p_value){
-
-	sql::SQLString property = p_property.utf8().get_data();
-	std::string value_type = get_prop_type( property );
-	String _val = p_value;
-	sql::SQLString value = _val.utf8().get_data();
-	
-	if (value_type == "string" ) { 
-		connection_properties[property] = (sql::SQLString)value; 
-	}
-	else if (value_type == "void") { 
-		connection_properties[property] = (std::string)value; 
-	}
-	else if (value_type == "bool") { 
-		connection_properties[property] = (bool)p_value; 
-	}
-	else if (value_type == "int" ) { 
-		connection_properties[property] = (int)p_value; 
-	}
-
-	
-//	TODO suporte para MAP(dictionary) 
-//	else if (value_type == "map" ) {}
-
-
-	else{
-		//Precisa apenas imprimir a mesagem de erro (no debug?)
-		ERR_FAIL_MSG("Invalid data type. For more information visit: https://dev.mysql.com/doc/connector-cpp/1.1/en/connector-cpp-connect-options.html");
-	}
-
-	if (conn != NULL) {
-		if (property == "schema"){
-			conn->setSchema( value );
-		}
-		else{
-			conn->setClientOption(property, value );
-		}
-	}
-}
 
 
 Error MySQL::create_savepoint(String p_savept){
+
+	if (get_connection_status() != CONNECTED) {
+		throw std::runtime_error("DatabaseMetaData FAILURE - database not connected!");
+	}
 
 	if (savepoint_map.count(p_savept) != 0){
 		return ERR_ALREADY_EXISTS;
@@ -648,6 +637,10 @@ Error MySQL::create_savepoint(String p_savept){
 
 Error MySQL::delete_savepoint(String p_savept){
 
+	if (get_connection_status() != CONNECTED) {
+		throw std::runtime_error("DatabaseMetaData FAILURE - database not connected!");
+	}
+
 	if (savepoint_map.count(p_savept) == 0){
 		return ERR_DOES_NOT_EXIST;
 	}
@@ -660,11 +653,17 @@ Error MySQL::delete_savepoint(String p_savept){
 
 
 PoolStringArray MySQL::get_savepoints(){
+
+	if (get_connection_status() != CONNECTED) {
+		throw std::runtime_error("DatabaseMetaData FAILURE - database not connected!");
+	}
+
 	PoolStringArray ret;
 	std::map<String, sql::Savepoint*>::iterator it;
 	for(auto x:savepoint_map){
 		ret.append(x.first);
 	}
+
 	return ret;
 }
 
@@ -679,7 +678,9 @@ Variant MySQL::get_property(String p_property){
 		return SQLstr2GDstr( _p_s ); 
 	}
 
-	if (value_type == "string" || value_type == "void") { return SQLstr2GDstr( *connection_properties[ property ].get<sql::SQLString>() ); }
+	if (value_type == "string" || value_type == "void") { 
+		return SQLstr2GDstr( *connection_properties[ property ].get<sql::SQLString>() ); 
+	}
 
 	else if (value_type == "int" ) {
 		return *connection_properties[ property ].get< int >();
@@ -704,8 +705,11 @@ Variant MySQL::get_property(String p_property){
 }
 
 
+
 //--------HELPERS-------------------
+
 String MySQL::SQLstr2GDstr( sql::SQLString &p_string ) {
+
 	const char * _str_ = p_string.c_str();
 	String str = String::utf8( (char *) _str_ );
 	return str;
@@ -713,6 +717,7 @@ String MySQL::SQLstr2GDstr( sql::SQLString &p_string ) {
 
 
 bool MySQL::is_json( Variant p_arg ) {
+
 	String errs; int errl; Variant r_ret;
 	Error err = JSON::parse(p_arg, r_ret, errs, errl);
 	return (err == OK); 
@@ -720,39 +725,47 @@ bool MySQL::is_json( Variant p_arg ) {
 
 
 std::string	MySQL::get_prop_type( std::string p_prop ) { 
+
 	for (int i = 0; i < (int)sizeof(string_properties)/32; i++){ 
 		if (string_properties[i] == p_prop) {
 			return "string"; 
 		} 
 	}
+
 	for (int i = 0; i < (int)sizeof(sqlmap_properties)/32; i++){ 
 		if (sqlmap_properties[i] == p_prop) {
 			return "map"; 
 		} 
 	}
+
 	for (int i = 0; i < (int)sizeof(bool_properties)/32; i++){ 
 		if (bool_properties[i] == p_prop) {
 			return "bool"; 
 		} 
 	}
+
 	for (int i = 0; i < (int)sizeof(void_properties)/32; i++){ 
 		if (void_properties[i] == p_prop) {
 			return "void"; 
 		} 
 	}
+
 	for (int i = 0; i < (int)sizeof(int_properties)/32; i++){ 
 		if (int_properties[i] == p_prop) {
 			return "int"; 
 		} 
 	}
+
 	return "invalid";
 }
 
 
 bool MySQL::is_mysql_time(String time) {
+
 	if (get_time_format( time ) == sql::DataType::UNKNOWN){
 		return false;
 	}
+
 	else{
 		return true;
 	}
@@ -771,6 +784,7 @@ int MySQL::get_time_format(String time) {
 				return sql::DataType::YEAR;
 			}
 		}
+
 		// - 00:00:00
 		else if ( len == 8 ) {
 			if ( time[2] ==  ':' && time[5] == ':' ) {
@@ -780,6 +794,7 @@ int MySQL::get_time_format(String time) {
 				}
 			}
 		}
+
 		// - 0000-00-00
 		else if ( len == 10 ) {
 			if ( time[4] ==  '-' && time[7] == '-') {
@@ -789,6 +804,7 @@ int MySQL::get_time_format(String time) {
 				}
 			}
 		}
+
 		// - 0000-00-00 00:00:00
 		else if ( len == 19 ) {
 			if ( time[4] ==  '-' && time[7] == '-' && time[13] ==  ':' && time[16] == ':' && time[10] == ' ' ) {
@@ -799,6 +815,7 @@ int MySQL::get_time_format(String time) {
 			}
 		}
 	}
+
 	return sql::DataType::UNKNOWN;
 }
 
@@ -856,10 +873,12 @@ void MySQL::print_SQLException(sql::SQLException &e) {  //FIXME
 	//print_line("SQLState: " + _error);
 #endif
 
+
 }
 
 //--------
 void MySQL::print_runtime_error(std::runtime_error &e) {
+
 	std::cout << "ERROR: runtime_error in " << __FILE__;
 	std::cout << " (" << __func__ << ") on line " << __LINE__ << std::endl;
 	std::cout << "ERROR: " << e.what() << std::endl;
@@ -878,9 +897,6 @@ void MySQL::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "encode object"), "set_reconnect", "can_reconnect");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use json"), "set_reconnect", "can_reconnect");
 */
-
-	ClassDB::bind_method(D_METHOD("test", "argument"),&MySQL::test);
-
 
 	//--- Connection Managers
 	ClassDB::bind_method(D_METHOD("set_credentials", "HostName", "UserName", "Password"),&MySQL::set_credentials);
@@ -907,25 +923,19 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("update_prepared", "sql_statement", "Values"),&MySQL::update_prepared);
 	
 	ClassDB::bind_method(D_METHOD("query", "sql_statement", "DataFormat", "return_string", "meta"),&MySQL::query, DEFVAL(DICTIONARY), DEFVAL(false), DEFVAL(PoolIntArray()) );
-	ClassDB::bind_method(D_METHOD("query_prepared", "sql_statement", "Values", "DataFormat", "return_string", "meta"), &MySQL::query_prepared, 
-	DEFVAL(Array()), DEFVAL(DICTIONARY), DEFVAL(false), DEFVAL(PoolIntArray()));
+	ClassDB::bind_method(D_METHOD("query_prepared", "sql_statement", "Values", "DataFormat", "return_string", "meta"), &MySQL::query_prepared, DEFVAL(Array()), 
+	DEFVAL(DICTIONARY), DEFVAL(false), DEFVAL(PoolIntArray()));
 
 	
 	//--- Transaction
-
 	ClassDB::bind_method(D_METHOD("setAutoCommit", "bool"),&MySQL::setAutoCommit);
 	ClassDB::bind_method(D_METHOD("getAutoCommit"),&MySQL::getAutoCommit);
 	ClassDB::bind_method(D_METHOD("commit"),&MySQL::commit);
 	ClassDB::bind_method(D_METHOD("rollback_savepoint", "savepoint"),&MySQL::rollback_savepoint);
 
-
 	ClassDB::bind_method(D_METHOD("create_savepoint", "savepoint"),&MySQL::create_savepoint);
 	ClassDB::bind_method(D_METHOD("delete_savepoint", "savepoint"),&MySQL::delete_savepoint);
 	ClassDB::bind_method(D_METHOD("get_savepoints"),&MySQL::get_savepoints);	
-
-
-
-	//---
 
 	ClassDB::bind_method(D_METHOD("getTransactionIsolation"),&MySQL::getTransactionIsolation);
 	ClassDB::bind_method(D_METHOD("setTransactionIsolation", "level"),&MySQL::setTransactionIsolation);
@@ -953,9 +963,8 @@ void MySQL::_bind_methods() {
 }
 
 
-
-
 MySQL::MySQL(){
+
 	connection_properties["port"] = 3306;
 	connection_properties["OPT_RECONNECT"] = true;
 	connection_properties["CLIENT_MULTI_STATEMENTS"] = false;

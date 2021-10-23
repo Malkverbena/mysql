@@ -12,11 +12,8 @@
 	#include "core/crypto/crypto_core.h"
 #endif
 
-
-
 #include <vector>
 #include <sstream>
-//#include <map>
 #include "core/io/marshalls.h"
 
 #include <mysql_connection.h>
@@ -42,8 +39,6 @@
 
 
 #pragma once
-//#define CPPCONN_PUBLIC_FUNC=
-
 
 #ifdef GODOT4
 class MySQL : public RefCounted{
@@ -90,12 +85,12 @@ public:
 	};
 
 
-
 private:
 	sql::ConnectOptionsMap connection_properties;
 	sql::mysql::MySQL_Driver *driver;
 	std::shared_ptr<sql::Connection> conn;
 	
+	//FIXME  Use smart points here - conn->setSavepoint(avepoint) return a sql::Savepoint*
 	//Map<String, std::unique_ptr<sql::Savepoint>> savepoint_map;
 	std::map<String, sql::Savepoint*> savepoint_map;
 
@@ -190,58 +185,51 @@ private:
 
 
 public:
-
-	Variant test(Array arg);
-
 	// CONNECTION
 	Dictionary get_metadata();
 	ConnectionStatus get_connection_status();
 	ConnectionStatus stop_connection();
 	MySQLException start_connection();
 	void set_credentials( String p_host, String p_user, String p_pass ); // For quickly connections
-	
-	
+
 	// PROPERTIES
 	Variant get_property(String p_property);
 	void set_property(String p_property, Variant p_value);
-	
+
 	Dictionary get_properties_set(Array p_properties);
 	void set_properties_set(Dictionary p_properties);
-
 
 	// EXECUTE
 	bool execute(String p_sqlquery);
 	bool execute_prepared(String p_sqlquery, Array p_values);
-	
+
 	// EXECUTE UPDATE
 	int update(String p_sqlquery);
 	int update_prepared(String p_sqlquery, Array p_values);
-	
-	
+
 	// QUERY
 	Array query(String p_sqlquery, DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray());  
 	Array query_prepared(String p_sqlquery, Array prep_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray()); 
-
 
 	// TRANSACTION
 	void rollback_savepoint(String savepoint){conn->rollback( savepoint_map[savepoint] );}
 	void setAutoCommit(bool autoCommit){conn->setAutoCommit(autoCommit);}
 	bool getAutoCommit(){return conn->getAutoCommit();}
 	void commit(){conn->commit();}
-	
+
 	Isolation getTransactionIsolation(){return (Isolation)(conn->getTransactionIsolation()); }
 	void setTransactionIsolation( Isolation level) {conn->setTransactionIsolation( (sql::enum_transaction_isolation)(level));}	
 
 	Error create_savepoint(String p_savept);
 	Error delete_savepoint(String p_savept);
-	
-	PoolStringArray get_savepoints();
 
+	PoolStringArray get_savepoints();
 
 	MySQL();
 	~MySQL();
 
 };
+
 
 VARIANT_ENUM_CAST(MySQL::DataFormat);
 VARIANT_ENUM_CAST(MySQL::MetaCollection);
