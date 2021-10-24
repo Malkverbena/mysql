@@ -10,6 +10,7 @@
 	#include "core/reference.h"
 	#include "core/bind/core_bind.h"
 	#include "core/crypto/crypto_core.h"
+	#include "core/error_macros.h"
 #endif
 
 #include <vector>
@@ -164,7 +165,14 @@ private:
 	//QUERTY
 	int _execute( String p_sqlquery, Array p_values, bool prep_st, bool update);
 	void set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std::stringstream * blob, Variant arg, int index);
+	
+
+#ifdef GODOT4
+	Array _query(String p_sqlquery, Array p_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PackedInt64Array meta_col = PackedInt64Array(), bool _prep = false);
+#else	
 	Array _query(String p_sqlquery, Array p_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray(), bool _prep = false);
+#endif
+
 
 
 	//ERRORS
@@ -208,8 +216,14 @@ public:
 	int update_prepared(String p_sqlquery, Array p_values);
 
 	// QUERY
+#ifdef GODOT4
+	Array query(String p_sqlquery, DataFormat data_model = DICTIONARY, bool return_string = false, PackedInt64Array meta_col = PackedInt64Array());  
+	Array query_prepared(String p_sqlquery, Array prep_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PackedInt64Array meta_col = PackedInt64Array()); 
+#else	
 	Array query(String p_sqlquery, DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray());  
 	Array query_prepared(String p_sqlquery, Array prep_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray()); 
+#endif
+
 
 	// TRANSACTION
 	void rollback_savepoint(String savepoint){conn->rollback( savepoint_map[savepoint] );}
@@ -223,7 +237,12 @@ public:
 	Error create_savepoint(String p_savept);
 	Error delete_savepoint(String p_savept);
 
+#ifdef GODOT4
+	PackedStringArray get_savepoints();
+#else	
 	PoolStringArray get_savepoints();
+#endif
+
 
 	MySQL();
 	~MySQL();
@@ -239,24 +258,19 @@ VARIANT_ENUM_CAST(MySQL::Isolation);
 #endif	// MYSQL_H
 
 
+/*
+#ifdef GODOT4
 
-/*TODO
+#else	
+
+#endif
+*/
+
+	//TODO
 
 	// TRANSACTION
-	
-	commit();	*********DONE
-	rollback();	*********DONE
-	getAutoCommit();	*********DONE
-	setAutoCommit(bool autoCommit);	*********DONE
-	getTransactionIsolation();	*********DONE
-
-	Create_savepoint (savepoint)	*********DONE
-	Delete_savepoint (savepoint)	*********DONE
-	get_savepoints()	*********DONE
-
-
-	Variant transaction( [] );
-	Variant transaction_prepared( {} );
+	//Variant transaction( [] );
+	//Variant transaction_prepared( {} );
 
 
 //	Isolation getTransactionIsolation(){ return static_cast <Isolation> ( conn->getTransactionIsolation() ); }
@@ -265,7 +279,7 @@ VARIANT_ENUM_CAST(MySQL::Isolation);
 
 
 
-*/
+
 
 	
 
