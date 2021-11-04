@@ -1,14 +1,14 @@
-- Support Godot 3 and 4 
+- Support Godot 3 and 4   ***ON THE WAY
 
-- Rewrite functions
+- Rewrite functions  ***DONE
 
-- Support for more datatypes (Variant) 
+- Support for more datatypes (Variant)   ***DONE
 
-- Support for doubles (now Godot 4 supports it)
+- Support for doubles (now Godot 4 supports it)  ***DONE
 
-- Support for JSON
+- Support for JSON  ***DONE
  
-- Support transaction 
+- Support transaction   ***DONE
 
-- Better debug - Integrated with Godot's error system 
+- Better debug - Integrated with Godot's error system   ***DONE
 
