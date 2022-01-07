@@ -1,4 +1,4 @@
-- Support Godot 3 and 4   ***ON THE WAY
+- Support Godot 3 and 4   ***DONE
 
 - Rewrite functions  ***DONE
 
