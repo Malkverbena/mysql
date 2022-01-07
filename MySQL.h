@@ -4,18 +4,19 @@
 #define MYSQL_H
 
 #ifdef GODOT4
-	#include "core/object/ref_counted.h"  //Subistituto para reference.h
+	#include "core/object/ref_counted.h"  
 	#include "core/core_bind.h"
 #else
 	#include "core/reference.h"
-	#include "core/bind/core_bind.h"
+	#include "core/bind/core_bind.h"  
 	#include "core/crypto/crypto_core.h"
-	#include "core/error_macros.h"
+	//#include "core/error_macros.h"
 #endif
 
+#include "core/io/json.h"
 #include <vector>
 #include <sstream>
-#include "core/io/marshalls.h"
+
 
 #include <mysql_connection.h>
 #include <mysql_driver.h>
@@ -55,6 +56,15 @@ protected:
 
 
 public:
+
+
+#ifdef GODOT4
+	typedef PackedInt64Array PoolIntArray;
+	typedef PackedStringArray PoolStringArray;
+	typedef PackedByteArray PoolByteArray;
+#endif
+
+
 	typedef Dictionary MySQLException;
 	MySQLException sqlError;
 	std::string sqlstate ;
@@ -90,6 +100,13 @@ private:
 	sql::ConnectOptionsMap connection_properties;
 	sql::mysql::MySQL_Driver *driver;
 	std::shared_ptr<sql::Connection> conn;
+
+#ifdef GODOT4
+	core_bind::Marshalls *_marshalls = memnew(core_bind::Marshalls);
+#else	
+	_Marshalls *_marshalls = memnew(_Marshalls);
+	//static _Marshalls *get_singleton();
+#endif
 	
 	//FIXME  Use smart points here - conn->setSavepoint(avepoint) return a sql::Savepoint*
 	//Map<String, std::unique_ptr<sql::Savepoint>> savepoint_map;
@@ -165,14 +182,7 @@ private:
 	//QUERTY
 	int _execute( String p_sqlquery, Array p_values, bool prep_st, bool update);
 	void set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std::stringstream * blob, Variant arg, int index);
-	
-
-#ifdef GODOT4
-	Array _query(String p_sqlquery, Array p_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PackedInt64Array meta_col = PackedInt64Array(), bool _prep = false);
-#else	
 	Array _query(String p_sqlquery, Array p_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray(), bool _prep = false);
-#endif
-
 
 
 	//ERRORS
@@ -193,6 +203,26 @@ private:
 
 
 public:
+	//FIXME: Deixar todas as propriedades em false. Está true apenas para proposito de testes
+	bool can_reconnect = true;
+	bool encode_objects = true;
+	bool multi_statement = true;
+	bool use_json = true;
+
+
+	void set_multi_statement(bool _multi_statement) {multi_statement = _multi_statement;}
+	bool get_multi_statement() const{ return multi_statement;}
+
+	void set_allow_objects(bool _encode_objects) {encode_objects = _encode_objects;}
+	bool get_allow_objects() const {return encode_objects;}
+
+	void set_reconnection(bool _can_reconnect) {can_reconnect = _can_reconnect;}
+	bool get_reconnection() const {return can_reconnect;}
+
+	void set_json_use(bool _use_json) {use_json = _use_json;}
+	bool get_json_use() const {return use_json;}
+
+
 	// CONNECTION
 	Dictionary get_metadata();
 	ConnectionStatus get_connection_status();
@@ -203,9 +233,11 @@ public:
 	// PROPERTIES
 	Variant get_property(String p_property);
 	void set_property(String p_property, Variant p_value);
+	Dictionary get_properties_array(Array p_properties);
+	void set_properties_array(Dictionary p_properties);
+	void set_database( String p_database );
+	String get_database();
 
-	Dictionary get_properties_set(Array p_properties);
-	void set_properties_set(Dictionary p_properties);
 
 	// EXECUTE
 	bool execute(String p_sqlquery);
@@ -216,13 +248,8 @@ public:
 	int update_prepared(String p_sqlquery, Array p_values);
 
 	// QUERY
-#ifdef GODOT4
-	Array query(String p_sqlquery, DataFormat data_model = DICTIONARY, bool return_string = false, PackedInt64Array meta_col = PackedInt64Array());  
-	Array query_prepared(String p_sqlquery, Array prep_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PackedInt64Array meta_col = PackedInt64Array()); 
-#else	
 	Array query(String p_sqlquery, DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray());  
 	Array query_prepared(String p_sqlquery, Array prep_values = Array(), DataFormat data_model = DICTIONARY, bool return_string = false, PoolIntArray meta_col = PoolIntArray()); 
-#endif
 
 
 	// TRANSACTION
@@ -230,18 +257,20 @@ public:
 	void setAutoCommit(bool autoCommit){conn->setAutoCommit(autoCommit);}
 	bool getAutoCommit(){return conn->getAutoCommit();}
 	void commit(){conn->commit();}
-
-	Isolation getTransactionIsolation(){return (Isolation)(conn->getTransactionIsolation()); }
-	void setTransactionIsolation( Isolation level) {conn->setTransactionIsolation( (sql::enum_transaction_isolation)(level));}	
+	void set_transaction_isolation( Isolation level) {conn->setTransactionIsolation( (sql::enum_transaction_isolation)(level));}	
+	Isolation get_transaction_isolation(){return (Isolation)(conn->getTransactionIsolation()); }
 
 	Error create_savepoint(String p_savept);
 	Error delete_savepoint(String p_savept);
+
 
 #ifdef GODOT4
 	PackedStringArray get_savepoints();
 #else	
 	PoolStringArray get_savepoints();
 #endif
+
+
 
 
 	MySQL();
