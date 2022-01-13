@@ -1,8 +1,6 @@
 //*  MySQL.cpp */
 
-
 #include "MySQL.h"
-
 
 //--------FETCH QUERY / EXECUTE / UPDADE-------------------
 
@@ -206,7 +204,7 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 
 					// STRING - JSON_STRING - VARIANT
 					// Why not getString instead getBlob? Becouse it has size limit and can't be used properly with JSON statements!
-					else if (d_type == sql::DataType::CHAR || d_type == sql::DataType::VARCHAR || d_type == sql::DataType::LONGVARCHAR || sql::DataType::JSON){
+					else if (d_type == sql::DataType::CHAR || d_type == sql::DataType::VARCHAR || d_type == sql::DataType::LONGVARCHAR || d_type == sql::DataType::JSON){
 
 						std::unique_ptr< std::istream > raw(res->getBlob(i));
 
@@ -382,12 +380,10 @@ void MySQL::set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std:
 
 			if ( is_mysql_time( gdt_data )) {
 				prep_stmt->setDateTime(index+1, sql_data );
-			}
-			else if ( is_json( gdt_data ) ) {
+			}else if ( is_json( gdt_data ) ) {
 				*blob << std_string;
 				prep_stmt->setBlob(index+1, blob );		
-			}
-			else{
+			}else{
 				prep_stmt->setString(index+1, sql_data );
 			}
 		}
@@ -436,6 +432,7 @@ https://mariadb.com/kb/en/json-data-type/
 //--------CONNECTION-------------------
 
 MySQL::ConnectionStatus MySQL::get_connection_status(){
+
 	MySQL::ConnectionStatus ret;	
 
 	// != NULL
@@ -443,16 +440,13 @@ MySQL::ConnectionStatus MySQL::get_connection_status(){
 		if (!conn-> isClosed()) {
 			if (conn-> isValid()){
 				ret = CONNECTED;
-			}
-			else{
+			}else{
 				ret = DISCONNECTED;
 			}
-		}
-		else{
+		}else{
 			ret = CLOSED;
 		}
-	}
-	else{
+	}else{
 		ret = NO_CONNECTION; 
 	}
 	return ret;
@@ -480,7 +474,6 @@ MySQL::MySQLException MySQL::start_connection(){
 	MySQLException Err_Except = sqlError.duplicate();
 	sqlError.clear();
 	return Err_Except;
-
 }
 
 
@@ -493,9 +486,7 @@ MySQL::ConnectionStatus MySQL::stop_connection(){
 		if (!conn->isClosed()) {
 			conn->close();
 		}
-	}
-
-	else{
+	}else{
 		ret = ConnectionStatus::NO_CONNECTION; 
 	}
 	return ret;  	
@@ -503,6 +494,19 @@ MySQL::ConnectionStatus MySQL::stop_connection(){
 
 
 //--------PROPERTIES-------------------
+
+
+void MySQL::set_multi_statement(bool _multi_statement) {
+	connection_properties["CLIENT_MULTI_STATEMENTS"] = _multi_statement;
+	set_property("CLIENT_MULTI_STATEMENTS", _multi_statement); 
+}
+
+
+void MySQL::set_reconnection(bool _can_reconnect) {
+	connection_properties["OPT_RECONNECT"] =_can_reconnect;
+	set_property("OPT_RECONNECT", _can_reconnect); 
+}
+
 
 void MySQL::set_properties_array(Dictionary p_properties){
 
@@ -558,22 +562,17 @@ void MySQL::set_property(String p_property, Variant p_value){
 		connection_properties[property] = (int)p_value; 
 	}
 
-	
 //	TODO suporte para MAP(dictionary) 
 //	else if (value_type == "map" ) {}
 
-
 	else{
-		//Precisa apenas imprimir a mesagem de erro (no debug?)
 		ERR_FAIL_MSG("Invalid data type. For more information visit: https://dev.mysql.com/doc/connector-cpp/1.1/en/connector-cpp-connect-options.html");
 	}
 
 	if (conn != NULL) {
 		if (property == "schema"){
 			conn->setSchema( value );
-		}
-
-		else{
+		}else{
 			conn->setClientOption(property, value );
 		}
 	}
@@ -610,9 +609,7 @@ Variant MySQL::get_property(String p_property){
 	else{
 		ERR_FAIL_V_MSG(Variant(), "Invalid data type. For more information visit: https://dev.mysql.com/doc/connector-cpp/1.1/en/connector-cpp-connect-options.html");
 	}
-	
 
-	
 }
 
 
@@ -620,8 +617,7 @@ String MySQL::get_database() {
 	if (conn != NULL) {
 		sql::SQLString database = conn->getSchema();
 		return SQLstr2GDstr(database);
-	}
-	else {
+	}else{
 		return (String)"Invalid Connection!";
 	}
 }
@@ -633,8 +629,7 @@ void MySQL::set_database( String p_database ) {
 	if(database != "") {
 		if (conn != NULL) {
 			conn->setSchema(database);
-		}
-		else {
+		}else{
 			connection_properties["schema"] = database;
 		}
 	}
@@ -729,7 +724,6 @@ Error MySQL::delete_savepoint(String p_savept){
 //--------HELPERS-------------------
 
 String MySQL::SQLstr2GDstr( sql::SQLString &p_string ) {
-
 	const char * _str_ = p_string.c_str();
 	String str = String::utf8( (char *) _str_ );
 	return str;
@@ -792,9 +786,7 @@ bool MySQL::is_mysql_time(String time) {
 
 	if (get_time_format( time ) == sql::DataType::UNKNOWN){
 		return false;
-	}
-
-	else{
+	}else{
 		return true;
 	}
 }
@@ -845,6 +837,7 @@ int MySQL::get_time_format(String time) {
 	}
 
 	return sql::DataType::UNKNOWN;
+
 }
 
 
@@ -918,12 +911,11 @@ void MySQL::print_runtime_error(std::runtime_error &e) {
 //--------GODOT STUFF-------------------
 
 void MySQL::_bind_methods() {
-//TODO Add Properties
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "allow_multi_statement"), "set_multi_statement", "get_multi_statement");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "allow_objects"), "set_allow_objects", "get_allow_objects");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_reconnect"), "set_reconnection", "get_reconnection");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_json"), "set_json_use", "get_json_use");
+
 
 	ClassDB::bind_method(D_METHOD("set_multi_statement", "allow_multi_statement"),&MySQL::set_multi_statement);
 	ClassDB::bind_method(D_METHOD("get_multi_statement"),&MySQL::get_multi_statement);
@@ -931,16 +923,8 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_allow_objects"),&MySQL::get_allow_objects);
 	ClassDB::bind_method(D_METHOD("set_reconnection", "can_reconnect"),&MySQL::set_reconnection);
 	ClassDB::bind_method(D_METHOD("get_reconnection"),&MySQL::get_reconnection);
-	ClassDB::bind_method(D_METHOD("set_json_use", "use_json"),&MySQL::set_json_use);
-	ClassDB::bind_method(D_METHOD("get_json_use"),&MySQL::get_json_use);
 
 
-	ClassDB::bind_method(D_METHOD("set_database", "database"),&MySQL::set_database);
-	ClassDB::bind_method(D_METHOD("get_database"),&MySQL::get_database);
-
-
-	
-	
 	//--- Connection Managers
 	ClassDB::bind_method(D_METHOD("set_credentials", "HostName", "UserName", "Password"),&MySQL::set_credentials);
 	ClassDB::bind_method(D_METHOD("get_connection_status"),&MySQL::get_connection_status);
@@ -954,6 +938,8 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_property", "property"),&MySQL::get_property);
 	ClassDB::bind_method(D_METHOD("set_properties_array", "properties"),&MySQL::set_properties_array);
 	ClassDB::bind_method(D_METHOD("get_properties_array", "properties"),&MySQL::get_properties_array);
+	ClassDB::bind_method(D_METHOD("set_database", "database"),&MySQL::set_database);
+	ClassDB::bind_method(D_METHOD("get_database"),&MySQL::get_database);
 
 
 	//--- Execute/Update/Query
@@ -1001,7 +987,6 @@ void MySQL::_bind_methods() {
 
 
 MySQL::MySQL(){
-
 	connection_properties["port"] = 3306;
 	connection_properties["OPT_RECONNECT"] = true;
 	connection_properties["CLIENT_MULTI_STATEMENTS"] = false;

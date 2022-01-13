@@ -203,26 +203,18 @@ private:
 
 
 public:
-	//FIXME: Deixar todas as propriedades em false. Está true apenas para proposito de testes
-	bool can_reconnect = true;
 	bool encode_objects = true;
-	bool multi_statement = true;
-	bool use_json = true;
-
-
-	void set_multi_statement(bool _multi_statement) {multi_statement = _multi_statement;}
-	bool get_multi_statement() const{ return multi_statement;}
-
 	void set_allow_objects(bool _encode_objects) {encode_objects = _encode_objects;}
-	bool get_allow_objects() const {return encode_objects;}
+	bool get_allow_objects() {return encode_objects;}
+	
+	void set_multi_statement(bool _multi_statement);
+	bool get_multi_statement() {return (bool)get_property("CLIENT_MULTI_STATEMENTS");}
 
-	void set_reconnection(bool _can_reconnect) {can_reconnect = _can_reconnect;}
-	bool get_reconnection() const {return can_reconnect;}
-
-	void set_json_use(bool _use_json) {use_json = _use_json;}
-	bool get_json_use() const {return use_json;}
+	void set_reconnection(bool _can_reconnect);
+	bool get_reconnection() {return (bool)get_property("OPT_RECONNECT");}
 
 
+ 
 	// CONNECTION
 	Dictionary get_metadata();
 	ConnectionStatus get_connection_status();
