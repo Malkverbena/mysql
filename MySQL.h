@@ -9,11 +9,10 @@
 #else
 	#include "core/reference.h"
 	#include "core/bind/core_bind.h"  
-	#include "core/crypto/crypto_core.h"
+	//#include "core/crypto/crypto_core.h"
 	//#include "core/error_macros.h"
 #endif
 
-#include "core/io/json.h"
 #include <vector>
 #include <sstream>
 
@@ -292,11 +291,6 @@ VARIANT_ENUM_CAST(MySQL::Isolation);
 	// TRANSACTION
 	//Variant transaction( [] );
 	//Variant transaction_prepared( {} );
-
-
-//	Isolation getTransactionIsolation(){ return static_cast <Isolation> ( conn->getTransactionIsolation() ); }
-//	void setTransactionIsolation( Isolation level) {conn->setTransactionIsolation( static_cast <sql::enum_transaction_isolation>(level) );}	
-
 
 
 
