@@ -56,13 +56,10 @@ protected:
 
 public:
 
-
 #ifdef GODOT4
 	typedef PackedInt64Array PoolIntArray;
-	typedef PackedStringArray PoolStringArray;
 	typedef PackedByteArray PoolByteArray;
 #endif
-
 
 	typedef Dictionary MySQLException;
 	MySQLException sqlError;
@@ -88,10 +85,10 @@ public:
 		DICTIONARY	// returns data as an dictionary
 	};
 	
-	enum MetaCollection {	
-		COLUMNS_NAMES,	// returns an array with only one element (names of columns)
-		COLUMNS_TYPES,	// returns an array with only one element (types of the columns)
-		INFO			// return the fields info (is...)
+	enum MetaCollection {	// TODO: Use bitwise?
+		COLUMNS_NAMES = 1,	// returns an array with only one element (names of columns)
+		COLUMNS_TYPES = 2,	// returns an array with only one element (types of the columns)
+		INFO		  = 4	// return the fields info (is...)
 	};
 
 
@@ -245,8 +242,8 @@ public:
 
 	// TRANSACTION
 	void rollback_savepoint(String savepoint){conn->rollback( savepoint_map[savepoint] );}
-	void setAutoCommit(bool autoCommit){conn->setAutoCommit(autoCommit);}
-	bool getAutoCommit(){return conn->getAutoCommit();}
+	void set_auto_commit(bool autoCommit){conn->setAutoCommit(autoCommit);}
+	bool get_auto_commit(){return conn->getAutoCommit();}
 	void commit(){conn->commit();}
 	void set_transaction_isolation( Isolation level) {conn->setTransactionIsolation( (sql::enum_transaction_isolation)(level));}	
 	Isolation get_transaction_isolation(){return (Isolation)(conn->getTransactionIsolation()); }
@@ -260,7 +257,6 @@ public:
 #else	
 	PoolStringArray get_savepoints();
 #endif
-
 
 
 
