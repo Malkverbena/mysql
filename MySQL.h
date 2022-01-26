@@ -59,6 +59,7 @@ public:
 #ifdef GODOT4
 	typedef PackedInt64Array PoolIntArray;
 	typedef PackedByteArray PoolByteArray;
+	typedef PackedStringArray PoolStringArray;
 #endif
 
 	typedef Dictionary MySQLException;
@@ -250,7 +251,6 @@ public:
 
 	Error create_savepoint(String p_savept);
 	Error delete_savepoint(String p_savept);
-
 
 #ifdef GODOT4
 	PackedStringArray get_savepoints();
