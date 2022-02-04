@@ -12,3 +12,9 @@
 
 - Better debug - Integrated with Godot's error system   ***DONE
 
+- Finish the functions and TODO's
+
+- Fix bugs
+
+- Write documentation
+
