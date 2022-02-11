@@ -50,6 +50,8 @@ class MySQL : public Reference{
 #endif
 
 
+	bool encode_objects;
+
 protected:
 	static void _bind_methods();
 
@@ -200,9 +202,9 @@ private:
 
 
 public:
-	bool encode_objects = true;
-	void set_allow_objects(bool _encode_objects) {encode_objects = _encode_objects;}
-	bool get_allow_objects() {return encode_objects;}
+	
+	void set_allow_encode_objects(bool p_encode_objects);
+	bool get_allow_encode_objects();
 	
 	void set_multi_statement(bool _multi_statement);
 	bool get_multi_statement() {return (bool)get_property("CLIENT_MULTI_STATEMENTS");}

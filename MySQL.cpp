@@ -857,19 +857,37 @@ void MySQL::print_runtime_error(std::runtime_error &e) {
 
 
 
+
+
+void MySQL::set_allow_encode_objects(bool p_encode_objects){
+	encode_objects = p_encode_objects;
+}
+
+bool MySQL::get_allow_encode_objects(){
+	return encode_objects;
+}	
+
+	
+	
+
+
 //--------GODOT STUFF-------------------
 
 void MySQL::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "allow_multi_statement"), "set_multi_statement", "get_multi_statement");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "allow_objects"), "set_allow_objects", "get_allow_objects");
+	
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "encode_objects"), "set_allow_encode_objects", "get_allow_encode_objects");
+	
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_reconnect"), "set_reconnection", "get_reconnection");
 
 
 	ClassDB::bind_method(D_METHOD("set_multi_statement", "allow_multi_statement"),&MySQL::set_multi_statement);
 	ClassDB::bind_method(D_METHOD("get_multi_statement"),&MySQL::get_multi_statement);
-	ClassDB::bind_method(D_METHOD("set_allow_objects", "allow_objects"),&MySQL::set_allow_objects);
-	ClassDB::bind_method(D_METHOD("get_allow_objects"),&MySQL::get_allow_objects);
+	
+	ClassDB::bind_method(D_METHOD("set_allow_encode_objects", "allow_encode_objects"),&MySQL::set_allow_encode_objects);
+	ClassDB::bind_method(D_METHOD("get_allow_encode_objects"),&MySQL::get_allow_encode_objects);
+	
 	ClassDB::bind_method(D_METHOD("set_reconnection", "can_reconnect"),&MySQL::set_reconnection);
 	ClassDB::bind_method(D_METHOD("get_reconnection"),&MySQL::get_reconnection);
 
@@ -935,6 +953,9 @@ void MySQL::_bind_methods() {
 
 
 MySQL::MySQL(){
+
+	encode_objects = false;
+
 	connection_properties["port"] = 3306;
 	connection_properties["OPT_RECONNECT"] = true;
 	connection_properties["CLIENT_MULTI_STATEMENTS"] = false;
