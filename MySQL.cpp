@@ -157,7 +157,7 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 					}
 
 					//	INT
-					else if ( d_type == sql::DataType::ENUM || d_type == sql::DataType::TINYINT || d_type == sql::DataType::SMALLINT || d_type == sql::DataType::MEDIUMINT) {
+					else if (d_type == sql::DataType::TINYINT || d_type == sql::DataType::SMALLINT || d_type == sql::DataType::MEDIUMINT) {
 						if ( data_model == DICTIONARY ){ 
 							row[ column_name ] = res->getInt(i); 
 						}else{ 
@@ -200,7 +200,7 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 
 					// STRING - JSON_STRING - VARIANT
 					// Why not getString instead getBlob? Becouse it has size limit and can't be used properly with JSON statements!
-					else if (d_type == sql::DataType::CHAR || d_type == sql::DataType::VARCHAR || d_type == sql::DataType::LONGVARCHAR || d_type == sql::DataType::JSON){
+					else if (d_type == sql::DataType::ENUM || d_type == sql::DataType::CHAR || d_type == sql::DataType::VARCHAR || d_type == sql::DataType::LONGVARCHAR || d_type == sql::DataType::JSON){
 						std::unique_ptr< std::istream > raw(res->getBlob(i));
 						raw->seekg (0, raw->end);
 				   		int length = raw->tellg();
@@ -876,9 +876,7 @@ bool MySQL::get_allow_encode_objects(){
 void MySQL::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "allow_multi_statement"), "set_multi_statement", "get_multi_statement");
-	
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "encode_objects"), "set_allow_encode_objects", "get_allow_encode_objects");
-	
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "can_reconnect"), "set_reconnection", "get_reconnection");
 
 
