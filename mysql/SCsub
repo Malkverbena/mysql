@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+#SCsub
+
+import version
+Import("env")
+
+
+
+# Enter with path to Boost library here
+boost_path = "C:/boost_1_76_0"
+
+# Enter with the path to jdbc here (mysql_connection.h & mysql_driver.h)
+include_path = "C:/mysql/mysql-connector-c++-8.0.25-winx64/include/jdbc"
+
+# Enter with the path to mysql libs here (mysqlcppconn.lib)
+lib_path = "C:/mysql/mysql-connector-c++-8.0.25-winx64/lib64/vs14"
+
+
+
+if version.major == 4:
+	env.Append(CPPDEFINES=["GODOT4"])
+
+
+env.add_source_files(env.modules_sources,"*.cpp")
+mysql_env = env.Clone()
+mysql_env['LIBS'] = []
+
+
+if env["platform"] in ["windows", "UWP"]:
+	target_lib = ""
+	target_lib_arr = []
+	env.Append(CPPPATH=[include_path, boost_path])
+	env.Append(LIBPATH=[lib_path])
+    
+	sufix = env["PROGSUFFIX"]
+	target_lib="mysqlcppconn"
+	sufix = sufix[0:-3]
+	mysql_env.Append(CPPFLAGS =["-I" + include_path, "-L " + lib_path])
+	target_lib_arr = [target_lib]   # TODO: More libs are expected for static compilling (ssl, crypto e etc...)
+
+	# copy libs
+	for i in target_lib_arr:
+		source = lib_path + "/" + i + ".lib"
+		destination = lib_path + "/" + i + sufix + "lib"
+		shutil.copy2(source, destination)
+
+	env.Append(LIBS=target_lib_arr)
+
+
+
+elif env["platform"] in ["x11", "linux", "bsd", "linuxbsd", "server"]:
+	env.Append(LIBPATH=['/usr/lib'])
+	env.Append(LIBS=['mysqlcppconn'])
+
+
+#elif env["platform"] in ["osx"]:
+#	env.Append(LIBPATH=['/usr/lib'])
+#	env.Append(LIBS=['mysqlcppconn'])
+
