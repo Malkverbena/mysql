@@ -20,3 +20,7 @@ Supported sql data types:
   CHAR   =>    String     =>   ENUM - CHAR - VARCHAR - LONGVARCHAR
   JSON   =>  JsonString   =>   JSON
   BINARY =>  ByteArray    =>   BINARY - VARBINARY - LONGVARBINARY
+
+
+
+
