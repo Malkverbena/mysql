@@ -18,5 +18,5 @@ Supported sql data types:
   FLOAT  =>     float     =>   REAL - DOUBLE -  DECIMAL - NUMERIC
   TIME   =>     Array     =>   DATE - TIME - TIMESTAMP - YEAR
   CHAR   =>    String     =>   ENUM - CHAR - VARCHAR - LONGVARCHAR
-  JSON   =>    String     =>   JSON
+  JSON   =>  JsonString   =>   JSON
   BINARY =>  ByteArray    =>   BINARY - VARBINARY - LONGVARBINARY
