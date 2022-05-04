@@ -1,12 +1,21 @@
+Connection:
+  Set/Get Properties
+  SSL connections
+
+
 Simple:
   Query
   Execute
   Update
+  Transactions & Save Points
+
 
 Prepared Statement for:
   Query
   Execute
   Update
+  Transactions & Save Points
+
 
 Supported sql data types:
   TYPE         GODOT             SQL -> sql::DataType::
