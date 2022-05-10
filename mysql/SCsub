@@ -1,24 +1,51 @@
 #!/usr/bin/env python
 #SCsub
 
+import sys
+import shutil
 import version
 Import("env")
 
+
+# ===============================IMPORTANT===============================
+# DO NOT FORGET TO REPLACE THE SLASH FOR BACKSLASH ON PATHS => "\" FOR "/" 
+# =======================================================================
 
 
 # Enter with path to Boost library here
 boost_path = "C:/boost_1_76_0"
 
 # Enter with the path to jdbc here (mysql_connection.h & mysql_driver.h)
-include_path = "C:/mysql/mysql-connector-c++-8.0.25-winx64/include/jdbc"
+include_path = "C:\mysql\mysql-connector-c++-8.0.29-winx64\include\jdbc"
 
 # Enter with the path to mysql libs here (mysqlcppconn.lib)
-lib_path = "C:/mysql/mysql-connector-c++-8.0.25-winx64/lib64/vs14"
+lib_path = 'C:/mysql/mysql-connector-c++-8.0.29-winx64/lib64/vs14/debug'
 
+
+target_platform = env["platform"]
+user_platform = ""
 
 
 if version.major == 4:
 	env.Append(CPPDEFINES=["GODOT4"])
+
+
+#deep trace
+#   -DMYSQLCPPCONN_TRACE_ENABLE:BOOL=1
+#   con->setClientOption("clientTrace", &on_off);
+
+
+print("---------------MySQL------------------")
+
+
+if (sys.platform.startswith("linux") or sys.platform.startswith("dragonfly") or sys.platform.startswith("freebsd") or sys.platform.startswith("netbsd") or sys.platform.startswith("openbsd")):
+	user_platform = "linuxbsd"
+elif sys.platform == "darwin":
+	user_platform = "osx"
+elif sys.platform == "win32":
+	user_platform = "windows"
+else:
+	print("Could not detect the current platform automatically.")
 
 
 env.add_source_files(env.modules_sources,"*.cpp")
@@ -26,34 +53,54 @@ mysql_env = env.Clone()
 mysql_env['LIBS'] = []
 
 
+
+
+
 if env["platform"] in ["windows", "UWP"]:
 	target_lib = ""
 	target_lib_arr = []
+	mysql_env.Append(CXXFLAGS=['-DMYSQLCPPCONN_TRACE_ENABLE:BOOL=1'])
 	env.Append(CPPPATH=[include_path, boost_path])
-	env.Append(LIBPATH=[lib_path])
-    
+	env.Append(LIBPATH=[lib_path_1, lib_path_2])
+
 	sufix = env["PROGSUFFIX"]
 	target_lib="mysqlcppconn"
 	sufix = sufix[0:-3]
-	mysql_env.Append(CPPFLAGS =["-I" + include_path, "-L " + lib_path])
+
+	mysql_env.Append(CPPFLAGS =["-I" + include_path, "-L " + lib_path_1])
 	target_lib_arr = [target_lib]   # TODO: More libs are expected for static compilling (ssl, crypto e etc...)
 
 	# copy libs
 	for i in target_lib_arr:
-		source = lib_path + "/" + i + ".lib"
-		destination = lib_path + "/" + i + sufix + "lib"
+		source = lib_path_1 + "/" + i + ".lib"
+		destination = lib_path_1 + "/" + i + sufix + "lib"
+		print("source, destination =======================")
+		print(source)
+		print(destination)
 		shutil.copy2(source, destination)
 
 	env.Append(LIBS=target_lib_arr)
 
 
 
-elif env["platform"] in ["x11", "linux", "bsd", "linuxbsd", "server"]:
+elif env["platform"] in ["x11", "linux", "bsd", "linuxbsd"]:
 	env.Append(LIBPATH=['/usr/lib'])
 	env.Append(LIBS=['mysqlcppconn'])
+
+
+
+elif env["platform"] == "javascript":
+	print( "javascript")
+	if base_platform == "linuxbsd":
+		print("on linuxbsd ---------------------------------")
+		env.Append(CPPPATH=['/usr/lib', "/usr/lib/x86_64-linux-gnu", "/usr/include/boost"])
+		env.Append(LIBPATH=['/usr/lib', "/usr/lib/x86_64-linux-gnu", "/usr/include/boost"])
+		env.Append(LIBS=['mysqlcppconn', '/usr/lib', "/usr/lib/x86_64-linux-gnu", "/usr/include/boost"])
 
 
 #elif env["platform"] in ["osx"]:
 #	env.Append(LIBPATH=['/usr/lib'])
 #	env.Append(LIBS=['mysqlcppconn'])
+
+
 
