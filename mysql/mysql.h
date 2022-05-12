@@ -55,6 +55,20 @@ public:
 	typedef PackedInt32Array PoolIntArray;
 #endif
 
+//	typedef sql::enum_transaction_isolation Isolation;
+
+
+	enum Isolation { // aka sql::enum_transaction_isolation
+		TRANSACTION_ERROR = -1,
+		TRANSACTION_NONE = sql::enum_transaction_isolation::TRANSACTION_NONE,
+		TRANSACTION_READ_COMMITTED = sql::enum_transaction_isolation::TRANSACTION_READ_COMMITTED,
+		TRANSACTION_READ_UNCOMMITTED = sql::enum_transaction_isolation::TRANSACTION_READ_UNCOMMITTED,
+		TRANSACTION_REPEATABLE_READ = sql::enum_transaction_isolation::TRANSACTION_REPEATABLE_READ,
+		TRANSACTION_SERIALIZABLE = sql::enum_transaction_isolation::TRANSACTION_SERIALIZABLE
+	};
+
+
+
 	enum MetaCollection {
 		COLUMNS_NAMES,	// returns an array with only one element (names of columns)
 		COLUMNS_TYPES,	// returns an array with only one element (types of the columns)
@@ -77,6 +91,15 @@ public:
 
 
 private:
+
+	enum OP {
+		AUTOCOMMIT,
+		CATALOG,
+		CLIENT_INFO,
+		DATABASE,
+		ISOLATION,
+		READONLY,
+	};
 
 	enum TYPE {
 		INVALID,
@@ -118,6 +141,8 @@ private:
 	/*        CORE        */
 	Array _query(String p_sqlquery, Array p_values, DataFormat data_model, bool return_as_string, PoolIntArray meta_col, bool _prep);
 	int _execute( String p_sqlquery, Array p_values, bool prep_st, bool update);
+	Error _set_conn_op( Variant p_value, OP op);
+	Variant _get_conn_op(OP op);
 
 
 protected:
@@ -139,9 +164,8 @@ public:
 	Error set_property(String p_property, Variant p_value);
 	Variant get_property(String p_property);
 	Error set_properties_array(Dictionary p_properties);
-	Dictionary get_properties_array(Array p_properties);
-	Error set_database( String p_database );
-	String get_database();
+	Dictionary get_properties_array(PoolStringArray p_properties);
+
 
 
 	/*     CONNECTOR      */
@@ -162,13 +186,36 @@ public:
 
 	/*    TRANSACTION     */
 //	void rollback_savepoint(String savepoint){conn->rollback( savepoint_map[savepoint] );}
-//	void set_auto_commit(bool autoCommit){conn->setAutoCommit(autoCommit);}
-//	bool get_auto_commit(){return conn->getAutoCommit();}
+	Error create_savepoint(String p_savept);
+	Error delete_savepoint(String p_savept);
+
+
+	/*     CONNECTION     */
+
+	Error set_autocommit( bool autocommit ) { return _set_conn_op( autocommit, MySQL::OP::AUTOCOMMIT );}
+	bool get_autocommit() { return _get_conn_op(MySQL::OP::AUTOCOMMIT);	}
+
+	Error set_transaction_isolation( Isolation level ){ return _set_conn_op( level, MySQL::OP::ISOLATION ); }
+	Isolation get_transaction_isolation() { int iso = (int)_get_conn_op(MySQL::OP::ISOLATION);	return (Isolation) iso;	}
+
+	Error set_database( String database ) { return _set_conn_op( database, MySQL::OP::DATABASE ); }
+	String get_database() { return _get_conn_op(MySQL::OP::DATABASE); }
+
+	Error set_readyonly( bool readyonly ) { return _set_conn_op( readyonly, MySQL::OP::READONLY ); }
+	String get_readyonly() { return _get_conn_op(MySQL::OP::READONLY); }
+
+	Error set_catalog( String catalog) { return _set_conn_op( catalog, MySQL::OP::CATALOG );}
+	String get_catalog() { return _get_conn_op(MySQL::OP::CATALOG);	}
+
+	String get_client_info() { return _get_conn_op(MySQL::OP::CLIENT_INFO);	}
+
+
 //	void commit(){conn->commit();}
 //	void set_transaction_isolation( Isolation level) {conn->setTransactionIsolation( (sql::enum_transaction_isolation)(level));}
 //	Isolation get_transaction_isolation(){return (Isolation)(conn->getTransactionIsolation()); }
 //	Error create_savepoint(String p_savept);
 //	Error delete_savepoint(String p_savept);
+//	PoolStringArray get_savepoints();
 
 
 	Variant teste(String p_property);
@@ -180,8 +227,9 @@ public:
 
 
 VARIANT_ENUM_CAST(MySQL::ConnectionStatus);
-VARIANT_ENUM_CAST(MySQL::DataFormat);
 VARIANT_ENUM_CAST(MySQL::MetaCollection);
+VARIANT_ENUM_CAST(MySQL::DataFormat);
+VARIANT_ENUM_CAST(MySQL::Isolation);
 
 
 #endif  // MYSQL_H
