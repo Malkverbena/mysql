@@ -2,274 +2,14 @@
 #include "mysql.h"
 #include <sstream>
 #include "core/io/json.h"
+
+
 using namespace std;
-Variant MySQL::teste(String p_property){
-	return String();
-}
-
-
-/*     CONNECTION     */
-
-Error MySQL::_set_conn_op( Variant p_value, MySQL::OP op){
-	int conn_status = connection_status();
-	ERR_FAIL_COND_V_EDMSG( (conn_status != CONNECTED and op != MySQL::OP::DATABASE), ERR_CONNECTION_ERROR, "There is no active connection!" );
-	try{
-		switch(op) {
-			case DATABASE: {
-				String data = p_value;
-				sql::SQLString database = data.utf8().get_data();
-				if (conn_status == CONNECTED){
-					conn->setSchema( database );
-				} else {
-					connection_properties["schema"] = database;
-				}
-				break;
-			}
-			case CATALOG: {
-				String data = p_value;
-				sql::SQLString catalog = data.utf8().get_data();
-				conn->setCatalog( catalog );
-				break;
-			}
-			case AUTOCOMMIT: {
-				bool autocommit = p_value;
-				conn->setAutoCommit( autocommit );
-				break;
-			}
-			case ISOLATION: {
-				int level = p_value;
-				ERR_FAIL_COND_V_EDMSG( level == TRANSACTION_ERROR, ERR_PARAMETER_RANGE_ERROR, "TRANSACTION_ERROR is not a valid parameter.");
-				ERR_FAIL_COND_V_EDMSG( level == TRANSACTION_NONE, ERR_PARAMETER_RANGE_ERROR, "TRANSACTION_NONE is not a valid parameter.");
-				ERR_FAIL_COND_V_EDMSG( level < TRANSACTION_ERROR, ERR_PARAMETER_RANGE_ERROR, "Invalid parameter.");
-				ERR_FAIL_COND_V_EDMSG( level > TRANSACTION_SERIALIZABLE, ERR_PARAMETER_RANGE_ERROR, "Invalid parameter.");
-				conn->setTransactionIsolation( (sql::enum_transaction_isolation)level );
-				break;
-			}
-			case READONLY: {
-				bool readyonly = p_value;
-				conn->setReadOnly( readyonly );
-				break;
-			}
-			case CLIENT_INFO: {
-				break;
-			}
-		}
-	}
-
-	catch (sql::SQLException &e) {
-		print_SQLException(e);
-	}
-	catch (std::runtime_error &e) {
-		print_runtime_error(e);
-	}
-	return OK;
-}
-
-/*
-Error MySQL::set_catalog(String p_catalog){
-	ERR_FAIL_COND_V_EDMSG( connection_status() != CONNECTED, ERR_CONNECTION_ERROR, "There is no active connection!" );
-	try{
-		sql::SQLString catalog = p_catalog.utf8().get_data();
-		conn->setCatalog( catalog );
-	}
-	catch (sql::SQLException &e) {
-		print_SQLException(e);
-	}
-	catch (std::runtime_error &e) {
-		print_runtime_error(e);
-	}
-	return OK;
-}
-Error MySQL::set_database( String p_database ){
-	sql::SQLString database = p_database.utf8().get_data();
-	int conn_status = connection_status();
-	if ( conn_status == CONNECTED ) {
-		conn->setSchema(database);
-		return OK;
-	}
-	if ( conn_status == NO_CONNECTION ) {
-		return ERR_CONNECTION_ERROR;
-	}
-	else {
-		connection_properties["schema"] = database;
-		return OK;
-	}
-}
-Error MySQL::set_autocommit(bool autoCommit){
-	ERR_FAIL_COND_V_EDMSG( connection_status() != CONNECTED, ERR_CONNECTION_ERROR, "There is no active connection!" );
-	try{
-		conn->setAutoCommit(autoCommit);
-	}
-	catch (sql::SQLException &e) {
-		print_SQLException(e);
-	}
-	catch (std::runtime_error &e) {
-		print_runtime_error(e);
-	}
-	return OK;
-}
-Error MySQL::set_transaction_isolation( Isolation level) {
-	ERR_FAIL_COND_V_EDMSG( level == TRANSACTION_ERROR, ERR_PARAMETER_RANGE_ERROR, "TRANSACTION_ERROR is not a valid parameter.");
-	ERR_FAIL_COND_V_EDMSG( level == TRANSACTION_NONE, ERR_PARAMETER_RANGE_ERROR, "TRANSACTION_NONE is not a valid parameter.");
-	ERR_FAIL_COND_V_EDMSG( connection_status() != CONNECTED, ERR_CONNECTION_ERROR, "There is no active connection!" );
-	try{
-		conn->setTransactionIsolation( (sql::enum_transaction_isolation)level  );
-	}
-	catch (sql::SQLException &e) {
-		print_SQLException(e);
-	}
-	catch (std::runtime_error &e) {
-		print_runtime_error(e);
-	}
-	return OK;
-}
-
-*/
-
-
-
-Variant MySQL::_get_conn_op(MySQL::OP op){
-	int conn_status = connection_status();
-	ERR_FAIL_COND_V_EDMSG( (conn_status != CONNECTED and op != DATABASE), false, "There is no active connection!" );
-	try{
-		switch(op) {
-			case DATABASE: {
-				if (conn_status == CONNECTED){
-					sql::SQLString database = conn->getSchema();
-					return string_SQL_2_GDT( database );
-				} else {
-					return string_SQL_2_GDT( *connection_properties["schema"].get<sql::SQLString>() );
-				}
-			}
-			case CATALOG:{
-				sql::SQLString catalog = conn->getCatalog();
-				return string_SQL_2_GDT( catalog );
-			}
-			case AUTOCOMMIT:{
-				return (bool)conn->getAutoCommit();
-			}
-			case ISOLATION:{
-				return (int)conn->getTransactionIsolation();
-			}
-			case READONLY: {
-				return (bool)conn->isReadOnly();
-			}
-			case CLIENT_INFO: {
-				sql::SQLString client_info = conn->getClientInfo();
-				return string_SQL_2_GDT( client_info );
-			}
-		}
-	}
-	catch (sql::SQLException &e) {
-		print_SQLException(e);
-	}
-	catch (std::runtime_error &e) {
-		print_runtime_error(e);
-	}
-	return Variant();
-}
-
-
-
-
-
-/*
-
-String MySQL::get_database(){
-	int conn_status = connection_status();
-	if ( conn_status == CONNECTED ) {
-		sql::SQLString database = conn->getSchema();
-		return string_SQL_2_GDT( database );
-	}
-	if ( conn_status == NO_CONNECTION ) {
-		ERR_FAIL_V_MSG("", "There is no active connection!");
-	}
-	else {
-		return string_SQL_2_GDT( *connection_properties["schema"].get<sql::SQLString>() );
-	}
-}
-
-String catalog MySQL::get_catalog(){
-	ERR_FAIL_COND_V_EDMSG( connection_status() != CONNECTED, false, "There is no active connection!" );
-
-
-	try{
-		_autocommit = conn->getAutoCommit();
-
-
-	}
-	catch (sql::SQLException &e) {
-		print_SQLException(e);
-	}
-	catch (std::runtime_error &e) {
-		print_runtime_error(e);
-	}
-	return _autocommit;
-}
-bool MySQL::get_autocommit(){
-	ERR_FAIL_COND_V_EDMSG( connection_status() != CONNECTED, false, "There is no active connection!" );
-	bool _autocommit = false;
-	try{
-		_autocommit = conn->getAutoCommit();
-	}
-	catch (sql::SQLException &e) {
-		print_SQLException(e);
-	}
-	catch (std::runtime_error &e) {
-		print_runtime_error(e);
-	}
-	return _autocommit;
-}
-MySQL::Isolation MySQL::get_transaction_isolation() {
-	ERR_FAIL_COND_V_EDMSG( connection_status() != CONNECTED, TRANSACTION_ERROR, "There is no active connection!" );
-	int ret;
-	try{
-		ret = (int)conn->getTransactionIsolation();
-	}
-	catch (sql::SQLException &e) {
-		print_SQLException(e);
-	}
-	catch (std::runtime_error &e) {
-		print_runtime_error(e);
-	}
-	return (MySQL::Isolation)ret;
-}
-
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*    TRANSACTION     */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
 /*      DATABASE      */
+
 Array MySQL::query(String p_sqlquery, DataFormat data_model, bool return_as_string, PoolIntArray meta_col){
 	return _query(p_sqlquery, Array(), data_model, return_as_string, meta_col, false);
 }
@@ -296,8 +36,8 @@ int MySQL::update_prepared( String p_sqlquery, Array p_values){
 
 
 
-
 /*        CORE        */
+
 int MySQL::_execute( String p_sqlquery, Array p_values, bool prep_st, bool update){
 	sql::SQLString query = p_sqlquery.utf8().get_data();
 	int afectedrows;
@@ -309,7 +49,7 @@ int MySQL::_execute( String p_sqlquery, Array p_values, bool prep_st, bool updat
 			prep_stmt.reset(conn->prepareStatement(query));
 			std::vector<std::stringstream> multiBlob (data_size);
 			for (int h =0; h < data_size; h++){
-				set_datatype(prep_stmt, &multiBlob[h], p_values[h], h);
+				_fit_statement(prep_stmt, &multiBlob[h], p_values[h], h);
 			}
 			if ( update ){
 				afectedrows = prep_stmt->executeUpdate();
@@ -361,7 +101,7 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 			prep_stmt.reset(conn->prepareStatement(query));
 			std::vector<std::stringstream> multiBlob (data_size);
 			for (int h =0; h < data_size; h++){
-				set_datatype(prep_stmt, &multiBlob[h], p_values[h], h);
+				_fit_statement(prep_stmt, &multiBlob[h], p_values[h], h);
 			}
 			res.reset( prep_stmt->executeQuery());
 			res_meta = res->getMetaData();
@@ -575,7 +315,9 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 			}else{
 				ret.push_back( line );
 			}
+
 		}  // WHILE
+
 	} // try
 
 	catch (sql::SQLException &e) {
@@ -590,8 +332,304 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 }
 
 
+
+/*     CONNECTOR  &&  TRANSACTION     */
+
+Error MySQL::_set_conn( Variant p_value, OP op){
+	int conn_status = connection_status();
+	Error err = OK;
+	ERR_FAIL_COND_V_EDMSG( (conn_status != CONNECTED and op != MySQL::OP::DATABASE), ERR_CONNECTION_ERROR, "There is no active connection!" );
+	try{
+		switch(op) {
+			case DATABASE: {
+				String data = p_value;
+				sql::SQLString database = data.utf8().get_data();
+				if (conn_status == CONNECTED){
+					conn->setSchema( database );
+				} else {
+					connection_properties["schema"] = database;
+				}
+				break;
+			}
+			case CATALOG: {
+				String data = p_value;
+				sql::SQLString catalog = data.utf8().get_data();
+				conn->setCatalog( catalog );
+				break;
+			}
+			case AUTOCOMMIT: {
+				bool autocommit = p_value;
+				conn->setAutoCommit( autocommit );
+				break;
+			}
+			case ISOLATION: {
+				int level = p_value;
+				conn->setTransactionIsolation( (sql::enum_transaction_isolation)level );
+				break;
+			}
+			/*
+			case READONLY: {
+				bool readyonly = p_value;
+				conn->setReadOnly( readyonly );
+				break;
+			}
+			*/
+			case CREATE_SAVEPOINT:{
+				String _savep = p_value;
+				sql::SQLString savepoint = _savep.utf8().get_data();
+				savepoint_map[p_value] = conn->setSavepoint( savepoint );
+				//ERR_CANT_CREATE
+				break;
+			}
+			case DELETE_SAVEPOINT:{
+				String savep = p_value;
+				sql::SQLString savepoint = savep.utf8().get_data();
+				map <String, sql::Savepoint* >::iterator sav_p;
+				sav_p = savepoint_map.find( p_value );
+
+				if ( sav_p != savepoint_map.end() ) {
+					conn->releaseSavepoint( sav_p->second );
+					savepoint_map.erase( savep );
+				}
+				else {
+					// SavePoint does not exist.
+					err = ERR_DOES_NOT_EXIST;
+				}
+				break;
+			}
+			case ROLLBACK: {
+				String value = p_value;
+				if ( value.length() == 0 ){
+					conn->rollback();
+					savepoint_map.clear();
+				}
+				else {
+					conn->rollback( savepoint_map[ value ] );
+				}
+				break;
+			}
+			case COMMIT: {
+				conn->commit();
+				break;
+			}
+			default:
+				break;
+		}
+	}
+
+	catch (sql::SQLException &e) {
+		print_SQLException(e);
+
+		if ( Error(e.getErrorCode()) != OK ) {
+			err = ERR_UNAVAILABLE;
+
+			//err_msn
+		}
+
+
+	}
+	catch (std::runtime_error &e) {
+		print_runtime_error(e);
+	}
+	return err;
+}
+
+
+Variant MySQL::_get_conn( OP op){
+	int conn_status = connection_status();
+	Variant ret;
+	ERR_FAIL_COND_V_EDMSG( (conn_status != CONNECTED and op != DATABASE), ret, "There is no active connection!" );
+
+	try{
+		if ( op == DATABASE){
+			if (conn_status == CONNECTED){
+				sql::SQLString database = conn->getSchema();
+				ret = string_SQL_2_GDT( database );
+			} else {
+				ret = string_SQL_2_GDT( *connection_properties["schema"].get<sql::SQLString>() );
+			}
+		}
+		else if ( op == CLIENT_INFO ) {
+			sql::SQLString client_info = conn->getClientInfo();
+			ret = string_SQL_2_GDT( client_info );
+		}
+
+		else if ( op == CATALOG ) {
+			sql::SQLString catalog = conn->getCatalog();
+			ret = string_SQL_2_GDT( catalog );
+		}
+
+		else if ( op == AUTOCOMMIT ) {
+			ret = conn->getAutoCommit();
+		}
+
+		else if ( op == ISOLATION ) {
+			ret = (int)conn->getTransactionIsolation();
+		}
+
+		else if ( op == READONLY ) {
+			//sql::DatabaseMetaData *dbcon_meta = conn->getMetaData();
+			ret = conn->isReadOnly();
+		}
+
+		else if ( op == DRIVER_INFO ) {
+			Dictionary _ret;
+			_ret["MAJOR VERSION"] = driver->getMajorVersion();
+			_ret["MINOR VERSION"] = driver->getMinorVersion();
+			_ret["PATCH VERSION"] = driver->getPatchVersion();
+			sql::SQLString _name = driver->getName();
+			_ret["DRIVER NAME"] = string_SQL_2_GDT( _name );
+			ret = _ret;
+		}
+	}
+	catch (sql::SQLException &e) {
+		print_SQLException(e);
+	}
+	catch (std::runtime_error &e) {
+		print_runtime_error(e);
+	}
+	return ret;
+}
+
+
+
+
+/*    CONN OPTIONS    */
+
+Variant MySQL::get_client_option( String p_option){
+	ERR_FAIL_COND_V_EDMSG( connection_status() != CONNECTED , ERR_CONNECTION_ERROR, "There is no active connection!" );
+	Variant ret;
+	try{
+		sql::SQLString option = p_option.utf8().get_data();
+		if ( p_option == String("metadataUseInfoSchema") ) {
+			//bool p_ret;
+			//conn->getClientOption( option, (void *) &p_ret );
+			//ret = (bool)p_ret;
+			bool p_ret;
+			void * val;
+			val=(static_cast<bool *> (&p_ret));
+			conn->setClientOption("metadataUseInfoSchema", val);
+			ret = p_ret;
+
+
+		}
+		else if (  p_option == String("defaultStatementResultType") or p_option == String("defaultPreparedStatementResultType") ) {
+			int p_ret;
+			conn->getClientOption( option, (void *) &p_ret );
+			ret = (int)p_ret;
+		}
+		else {//if ( p_option == String("defaultPreparedStatementResultType") ) {
+			sql::SQLString p_ret;
+			conn->getClientOption( option, (void *) &p_ret );
+			ret = string_SQL_2_GDT( p_ret );
+		}
+		/*
+		else {
+			ERR_FAIL_V_EDMSG( ERR_INVALID_PARAMETER, "Invalid Option" );
+		}
+		*/
+	}
+	catch (sql::SQLException &e) {
+		print_SQLException(e);
+	}
+	catch (std::runtime_error &e) {
+		print_runtime_error(e);
+	}
+	return ret;
+}
+
+
+Error MySQL::set_client_option(String p_option, Variant p_value){
+	ERR_FAIL_COND_V_EDMSG( connection_status() != CONNECTED , ERR_CONNECTION_ERROR, "There is no active connection!" );
+
+//	ERR_FAIL_COND_V_EDMSG( not valid_op.has(p_option) , ERR_INVALID_PARAMETER, "Invalid Option"  );
+	Error err = OK;
+	try{
+
+		if ( p_option == String("metadataUseInfoSchema") ) {
+			bool input_value=true;
+			void * input;
+			input=(static_cast<bool *> (&input_value));
+			conn->setClientOption("metadataUseInfoSchema", input);
+		}
+
+		else if (  p_option == String("defaultStatementResultType") or  p_option == String("defaultPreparedStatementResultType")) {
+			String p_optionName = p_option;
+			sql::SQLString optionName = p_optionName.utf8().get_data();
+			int input_value  = (int)p_value;
+			int output_value = (int)p_value;
+			void * input;
+			void * output;
+			input=(static_cast<int *> (&input_value));
+			output=(static_cast<int *> (&output_value));
+
+			bool valid_param = ( input_value < sql::ResultSet::TYPE_FORWARD_ONLY or input_value > sql::ResultSet::TYPE_SCROLL_SENSITIVE);
+			ERR_FAIL_COND_V_EDMSG( valid_param , ERR_INVALID_PARAMETER, "" );
+
+			conn->getClientOption(optionName, output);
+			if ( input_value == output_value ){
+				return OK;
+			}
+
+			conn->setClientOption(optionName, input);
+			conn->getClientOption(optionName, output);
+			if ( input_value == output_value ){
+				err = FAILED;
+			}
+			if ( input_value < sql::ResultSet::TYPE_FORWARD_ONLY or input_value > sql::ResultSet::TYPE_SCROLL_SENSITIVE){
+				err = FAILED;
+			}
+
+
+
+		}
+
+
+
+
+
+
+
+
+		else {
+			ERR_FAIL_V_EDMSG( ERR_INVALID_PARAMETER, "Invalid Option"  );
+		}
+
+		//sql::SQLString option  = p_option.utf8().get_data();
+		//sql::SQLString value = p_value.utf8().get_data();
+		//conn->setClientOption(option, value);
+	}
+	catch (sql::SQLException &e) {
+		print_SQLException(e);
+	}
+	catch (std::runtime_error &e) {
+		print_runtime_error(e);
+	}
+	return err;
+}
+
+
+
 /*     PROPERTIES     */
 
+Error MySQL::set_properties_array(Dictionary p_properties){
+	Error erro;
+	for ( int i = 0; i < p_properties.size(); i++){
+		erro = set_property( p_properties.keys()[i], p_properties.values()[i] );
+		ERR_FAIL_COND_V( erro != OK, erro );
+	}
+	return OK;
+}
+
+
+Dictionary MySQL::get_properties_array(PoolStringArray p_properties){
+	Dictionary ret;
+	for ( int i = 0; i < p_properties.size(); i++){
+		ret[ p_properties[i] ] = get_property( p_properties[i] );
+		ERR_FAIL_COND_V( ret[ p_properties[i] ] == Variant(), Variant() );
+	}
+	return ret;
+}
 
 
 Error MySQL::set_property(String p_property, Variant p_value){
@@ -606,30 +644,33 @@ Error MySQL::set_property(String p_property, Variant p_value){
 	}
 
 	switch(prop_type) {
-		case MySQL::TYPE::INVALID:
+		case TYPE::INVALID:
 			return ERR_DOES_NOT_EXIST;
 
-		case MySQL::TYPE::STRING:
+		case TYPE::STRING:{
 			ERR_FAIL_COND_V_EDMSG( val_type != Variant::STRING, ERR_INVALID_PARAMETER, "The parameter of this property must be of type String");
-			connection_properties[property] = (sql::SQLString)String(p_value).utf8().get_data();
+			String _val = p_value;
+			sql::SQLString value = _val.utf8().get_data();
+			connection_properties[property] = value;
 			break;
-
-		case MySQL::TYPE::BOOL:
+		}
+		case TYPE::BOOL:{
 			ERR_FAIL_COND_V_EDMSG( val_type != Variant::BOOL, ERR_INVALID_PARAMETER, "The parameter of this property must be of type Boolean");
-			connection_properties[property] = (bool)p_value;
+			bool value = p_value;
+			connection_properties[property] = value;
 			break;
-
-		case MySQL::TYPE::INT:
+		}
+		case TYPE::INT:{
 			ERR_FAIL_COND_V_EDMSG( val_type != Variant::INT, ERR_INVALID_PARAMETER, "The parameter of this property must be of type Integer");
-			connection_properties[property] = (std::string)String(p_value).utf8().get_data();
+			int value = p_value;
+			connection_properties[property] = value;
 			break;
-
-		case MySQL::TYPE::VOID:
-			ERR_FAIL_COND_V_EDMSG( val_type != Variant::NIL, ERR_INVALID_PARAMETER, "The parameter of this property must be of type Null");
-			connection_properties[property] = sql::SQLString("NULL");   // nullptr?
+		}
+		case TYPE::VOID:{
+			connection_properties[property] = sql::SQLString("NULL"); // nullptr?
 			break;
-
-		case MySQL::TYPE::LIST:{
+		}
+		case TYPE::LIST:{
 #ifdef GODOT4
 			ERR_FAIL_COND_V_EDMSG( val_type != Variant::PACKED_STRING_ARRAY, ERR_INVALID_PARAMETER, "The parameter of this property must be of type PackedStringArray");
 #else
@@ -644,7 +685,7 @@ Error MySQL::set_property(String p_property, Variant p_value){
 			break;
 		}
 
-		case MySQL::TYPE::MAP:{
+		case TYPE::MAP:{
 			ERR_FAIL_COND_V_EDMSG( val_type != Variant::DICTIONARY, ERR_INVALID_PARAMETER, "The parameter of this property must be of type Dictionary");
 			map< sql::SQLString, sql::SQLString > map_prop;
 			Dictionary map_data = Dictionary(p_value);
@@ -670,24 +711,30 @@ Variant MySQL::get_property(String p_property){
 	}
 
 	switch(prop_type) {
-		case MySQL::TYPE::INVALID:
+		case TYPE::INVALID:{
 			// Colocar no doc
 			// "Non-existent property. \nFor more information visit: https://dev.mysql.com/doc/connector-cpp/1.1/en/connector-cpp-connect-options.html"
 			return Variant();
+		}
 
-		case MySQL::TYPE::STRING:
- 			return string_SQL_2_GDT( *connection_properties[ property ].get<sql::SQLString>() );
+		case TYPE::STRING:{
+			return string_SQL_2_GDT( *connection_properties[ property ].get<sql::SQLString>() );
+		}
 
-		case MySQL::TYPE::BOOL:
+		case TYPE::BOOL:{
 			return *connection_properties[ property ].get< bool >();
+		}
 
-		case MySQL::TYPE::INT:
+		case TYPE::INT:{
 			return *connection_properties[ property ].get< int >();
 
-		case MySQL::TYPE::VOID:
-			return string_SQL_2_GDT( *connection_properties[ property ].get<sql::SQLString>() );
+		}
 
-		case MySQL::TYPE::MAP: {
+		case TYPE::VOID:{
+			return string_SQL_2_GDT( *connection_properties[ property ].get<sql::SQLString>() );
+		}
+
+		case TYPE::MAP: {
 			auto ret_map = *connection_properties[ property ].get< map< sql::SQLString, sql::SQLString > >();
 			Dictionary ret_dic;
 			for (auto it = ret_map.begin(); it != ret_map.end(); it++ ) {
@@ -698,40 +745,22 @@ Variant MySQL::get_property(String p_property){
 			return ret_dic;
 		}
 
-		case MySQL::TYPE::LIST:
+		case TYPE::LIST:{
 			auto ret_list = *connection_properties[ property ].get< std::list < sql::SQLString > >();
 			PoolStringArray data;
 			for (sql::SQLString val : ret_list) {
 				data.append( string_SQL_2_GDT(val) );
 			}
 			return data;
+		}
 	}
 	return Variant();
 }
 
 
-Error MySQL::set_properties_array(Dictionary p_properties){
-	Error erro;
-	for ( int i = 0; i < p_properties.size(); i++){
-		erro = set_property( p_properties.keys()[i], p_properties.values()[i] );
-		ERR_FAIL_COND_V( erro != OK, erro );
-	}
-	return OK;
-}
 
+/*     CONNECTION     */
 
-Dictionary MySQL::get_properties_array(PoolStringArray p_properties){
-	Dictionary ret;
-	for ( int i = 0; i < p_properties.size(); i++){
-		ret[ p_properties[i] ] = get_property( p_properties[i] );
-		ERR_FAIL_COND_V( ret[ p_properties[i] ] == Variant(), Variant() );
-	}
-	return ret;
-}
-
-
-
-/*     CONNECTIONS    */
 void MySQL::set_credentials( String p_host, String p_user, String p_pass ) {
 	connection_properties["hostName"] = p_host.utf8().get_data();
 	connection_properties["userName"] = p_user.utf8().get_data();
@@ -745,7 +774,10 @@ MySQL::ConnectionStatus MySQL::connection_start() {
 		conn.reset( driver->connect( connection_properties ) );
 	}
 	catch (sql::SQLException &e) {
-		print_SQLException( e );
+		print_SQLException(e);
+	}
+	catch (std::runtime_error &e) {
+		print_runtime_error(e);
 	}
 	return connection_status();
 }
@@ -780,6 +812,7 @@ MySQL::ConnectionStatus MySQL::connection_status() {
 }
 
 
+
 Dictionary MySQL::get_metadata(){
 	ERR_FAIL_COND_V_MSG(connection_status() != CONNECTED, Dictionary(), "DatabaseMetaData FAILURE - database is not connected! - METHOD: get_metadata");
 	Dictionary ret;
@@ -812,50 +845,23 @@ Dictionary MySQL::get_metadata(){
 
 
 
-/*       ERROS        */
-
-void MySQL::print_SQLException(sql::SQLException &e) {
-	//If (e.getErrorCode() == 1047) = Your server does not seem to support Prepared Statements at all. Perhaps MYSQL < 4.1?.
-
-	Variant file = __FILE__;
-	Variant line = __LINE__;
-	Variant func = __FUNCTION__;
-	Variant errCode = e.getErrorCode();
-	sql::SQLString _err = e.getSQLState();
-	String _error = string_SQL_2_GDT(_err);
-
-	sqlError.clear();
-	sqlError["FILE"] = String( file );
-	sqlError["FUNCTION"] = String( func );
-	sqlError["LINE"] = String( line );
-	sqlError["ERROR"] = String( e.what() );
-	sqlError["MySQL error code"] = String( errCode );
-	sqlError["SQLState"] = _error;
-
-	//FIXME: 	ERR_FAIL_	just print
-	//	ERR_PRINT(sqlError)
-
-#ifdef TOOLS_ENABLED
-	print_line("# EXCEPTION Caught ˇ");
-	print_line("# ERR: SQLException in: "+String(file)+" in function: "+String(func)+"() on line "+String(line));
-	print_line("# ERR: " + String(e.what()));
-	print_line(" (MySQL error code: " + String( errCode)+ ")" );
-	print_line("SQLState: " + _error);
-#endif
-
-}
-
-
-void MySQL::print_runtime_error(std::runtime_error &e) {
-	std::cout << "ERROR: runtime_error in " << __FILE__;
-	std::cout << " (" << __func__ << ") on line " << __LINE__ << std::endl;
-	std::cout << "ERROR: " << e.what() << std::endl;
-}
-
-
-
-
 /*      HELPERS       */
+
+String MySQL::string_SQL_2_GDT( sql::SQLString &p_string ){
+	const char * _char = p_string.c_str();
+	String str = String::utf8( (char *) _char );
+	return str;
+}
+
+
+bool MySQL::is_mysql_time(String time){
+	if (get_time_format( time ) == sql::DataType::UNKNOWN){
+		return false;
+	}else{
+		return true;
+	}
+}
+
 
 bool MySQL::is_json( Variant p_arg ){
 #ifdef GODOT4
@@ -868,73 +874,6 @@ bool MySQL::is_json( Variant p_arg ){
 	Error err = JSON::parse(p_arg, r_ret, errs, errl);
 	return (err == OK);
 #endif
-}
-
-
-bool MySQL::is_mat_empty( Variant p_matrix ){
-	int tp = p_matrix.get_type();
-	if ( tp == Variant::DICTIONARY ){
-		Dictionary matrix = p_matrix;
-#ifdef GODOT4
-		return matrix.is_empty();
-#else
-		return matrix.empty();
-#endif
-	}
-
-#ifdef GODOT4
-	if ( tp >= Variant::PACKED_BYTE_ARRAY and tp <= Variant::PACKED_BYTE_ARRAY ) {
-		Array ret = p_matrix;
-		return ret.is_empty();
-	}
-#else
-	if ( tp >= Variant::POOL_BYTE_ARRAY and tp <= Variant::POOL_COLOR_ARRAY ) {
-		Array ret = p_matrix;
-		return ret.empty();
-	}
-#endif
-	CRASH_NOW_MSG("The given type is not an matrix.");
-}
-
-
-String MySQL::string_SQL_2_GDT( sql::SQLString &p_string ){
-	const char * _str_ = p_string.c_str();
-	String str = String::utf8( (char *) _str_ );
-	return str;
-}
-
-
-int	MySQL::get_prop_type( String prop ){
-	if ( prop_string.has( prop ) ) {
-		return MySQL::TYPE::STRING;
-	}
-	else if ( prop_bool.has( prop ) ) {
-		return MySQL::TYPE::BOOL;
-	}
-	else if ( prop_int.has( prop ) ) {
-		return MySQL::TYPE::INT;
-	}
-	else if ( prop_void.has( prop ) ) {
-		return MySQL::TYPE::VOID;
-	}
-	else if ( prop_map.has( prop ) ) {
-		return MySQL::TYPE::MAP;
-	}
-	else if ( prop_list.has( prop ) ) {
-		return MySQL::TYPE::LIST;
-	}
-	else{
-		return MySQL::TYPE::INVALID;
-	}
-}
-
-
-bool MySQL::is_mysql_time(String time){
-	if (get_time_format( time ) == sql::DataType::UNKNOWN){
-		return false;
-	}else{
-		return true;
-	}
 }
 
 
@@ -956,6 +895,56 @@ Array MySQL::format_time(String str, bool return_string) {
 		token = strtok( NULL, seps );
 	}
 	return datando;
+}
+
+
+bool MySQL::is_mat_empty( Variant p_matrix ){
+	int tp = p_matrix.get_type();
+	if ( tp == Variant::DICTIONARY ){
+		Dictionary matrix = p_matrix;
+#ifdef GODOT4
+		return matrix.is_empty();
+#else
+		return matrix.empty();
+#endif
+	}
+#ifdef GODOT4
+	if ( tp >= Variant::PACKED_BYTE_ARRAY and tp <= Variant::PACKED_BYTE_ARRAY ) {
+		Array ret = p_matrix;
+		return ret.is_empty();
+	}
+#else
+	if ( tp >= Variant::POOL_BYTE_ARRAY and tp <= Variant::POOL_COLOR_ARRAY ) {
+		Array ret = p_matrix;
+		return ret.empty();
+	}
+#endif
+	CRASH_NOW_MSG("The given type is not a matrix.");
+}
+
+
+int	MySQL::get_prop_type( String prop ){
+	if ( prop_string.has( prop ) ) {
+		return TYPE::STRING;
+	}
+	else if ( prop_bool.has( prop ) ) {
+		return TYPE::BOOL;
+	}
+	else if ( prop_int.has( prop ) ) {
+		return TYPE::INT;
+	}
+	else if ( prop_void.has( prop ) ) {
+		return TYPE::VOID;
+	}
+	else if ( prop_map.has( prop ) ) {
+		return TYPE::MAP;
+	}
+	else if ( prop_list.has( prop ) ) {
+		return TYPE::LIST;
+	}
+	else{
+		return TYPE::INVALID;
+	}
 }
 
 
@@ -1001,7 +990,7 @@ int MySQL::get_time_format(String time){
 }
 
 
-void MySQL::set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std::stringstream *multiBlob, Variant arg, int index){
+void MySQL::_fit_statement(std::shared_ptr<sql::PreparedStatement> prep_stmt, std::stringstream *multiBlob, Variant arg, int index){
 	int value_type = arg.get_type();
 
 	if (value_type == Variant::NIL){
@@ -1013,7 +1002,6 @@ void MySQL::set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std:
 	else if (value_type == Variant::INT){
 		prep_stmt->setInt64(index+1, int32_t(arg));
 	}
-
 #ifdef GODOT4
 	else if (value_type == Variant::FLOAT){
 #else
@@ -1021,7 +1009,6 @@ void MySQL::set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std:
 #endif
 		prep_stmt->setDouble(index+1, double(arg));
 	}
-
 	else if (value_type == Variant::STRING){
 		String gdt_data = arg;
 		std::string std_string = gdt_data.utf8().get_data();
@@ -1038,9 +1025,8 @@ void MySQL::set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std:
 			prep_stmt->setString(index+1, sql_string );
 		}
 	}
-
 #ifdef GODOT4
-	else if (value_type == Variant::Variant::PACKED_BYTE_ARRAY){
+	else if (value_type == Variant::PACKED_BYTE_ARRAY){
 		Vector<uint8_t> data = arg;
 		for ( int y = 0; y < data.size(); y++){
 			*multiBlob << (char)data[y];
@@ -1058,6 +1044,52 @@ void MySQL::set_datatype(std::shared_ptr<sql::PreparedStatement> prep_stmt, std:
 }
 
 
+
+/*       ERROS        */
+
+void MySQL::print_SQLException(sql::SQLException &e) {
+	/*
+	If (e.getErrorCode() == 1047) = Your server does not seem to support Prepared Statements at all. Perhaps MYSQL < 4.1?.
+	Error: 1047 SQLSTATE: 08S01 (ER_UNKNOWN_COM_ERROR)
+	Message: Unknown command
+	*/
+	Variant file = __FILE__;
+	Variant line = __LINE__;
+	Variant func = __FUNCTION__;
+	Variant errCode = e.getErrorCode();
+	sql::SQLString _err = e.getSQLState();
+	String _error = string_SQL_2_GDT(_err);
+
+	_last_sql_error.clear();
+	_last_sql_error["FILE"] = String( file );
+	_last_sql_error["LINE"] = line;
+	_last_sql_error["FUNCTION"] = String( func );
+	_last_sql_error["ERROR"] = String( e.what() );
+	_last_sql_error["MySQL error code"] = errCode;
+	_last_sql_error["SQLState"] = _error;
+
+	//FIXME: 	ERR_FAIL_	just print
+	//	ERR_PRINT(sqlError) ?
+
+#ifdef TOOLS_ENABLED
+	print_line("# EXCEPTION Caught ˇ");
+	print_line("# ERR: SQLException in: "+String(file)+" in function: "+String(func)+"() on line "+String(line));
+	print_line("# ERR: " + String(e.what()));
+	print_line(" (MySQL error code: " + String( errCode)+ ")" );
+	print_line("SQLState: " + _error);
+#endif
+
+}
+
+
+void MySQL::print_runtime_error(std::runtime_error &e) {
+	std::cout << "ERROR: runtime_error in " << __FILE__;
+	std::cout << " (" << __func__ << ") on line " << __LINE__ << std::endl;
+	std::cout << "ERROR: " << e.what() << std::endl;
+}
+
+
+
 /*       GODOT        */
 
 void MySQL::_bind_methods() {
@@ -1069,18 +1101,15 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("connection_status"),&MySQL::connection_status);
 	ClassDB::bind_method(D_METHOD("get_metadata"),&MySQL::get_metadata);
 
+
+	ClassDB::bind_method(D_METHOD("get_last_error"),&MySQL::get_last_error);
+
+
 	/*     PROPERTIES     */
 	ClassDB::bind_method(D_METHOD("get_property", "property"),&MySQL::get_property);
 	ClassDB::bind_method(D_METHOD("set_property", "property", "value"),&MySQL::set_property);
 	ClassDB::bind_method(D_METHOD("set_properties_array", "properties"),&MySQL::set_properties_array);
 	ClassDB::bind_method(D_METHOD("get_properties_array", "properties"),&MySQL::get_properties_array);
-
-
-	/*     CONNECTOR      */
-//	ClassDB::bind_method(D_METHOD("set_client_option", "option", "value"),&MySQL::set_client_option);
-//	ClassDB::bind_method(D_METHOD("get_client_option", "option"),&MySQL::get_client_option);
-//	ClassDB::bind_method(D_METHOD("set_session_variable", "varname", "value"),&MySQL::set_session_variable);
-//	ClassDB::bind_method(D_METHOD("get_session_variable", "varname"),&MySQL::get_session_variable);
 
 	/*      DATABASE      */
 	ClassDB::bind_method(D_METHOD("query", "Sql Statement", "DataFormat", "Return data as String", "Metadata"),&MySQL::query, DEFVAL(DICTIONARY), DEFVAL(false), DEFVAL(PoolIntArray()) );
@@ -1090,50 +1119,38 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("update", "sql_statement"),&MySQL::update);
 	ClassDB::bind_method(D_METHOD("update_prepared", "sql_statement", "Values"),&MySQL::update_prepared);
 
-	/*    TRANSACTION     */
-	ClassDB::bind_method(D_METHOD("set_autocommit", "bool"),&MySQL::set_autocommit);
-	ClassDB::bind_method(D_METHOD("get_autocommit"),&MySQL::get_autocommit);
+	/*     CONNECTOR      */
 	ClassDB::bind_method(D_METHOD("set_database", "database"),&MySQL::set_database);
 	ClassDB::bind_method(D_METHOD("get_database"),&MySQL::get_database);
-	ClassDB::bind_method(D_METHOD("set_transaction_isolation", "level"),&MySQL::set_transaction_isolation);
-	ClassDB::bind_method(D_METHOD("get_transaction_isolation"),&MySQL::get_transaction_isolation);
-	ClassDB::bind_method(D_METHOD("set_readyonly", "readyonly"),&MySQL::set_readyonly);
-	ClassDB::bind_method(D_METHOD("get_readyonly"),&MySQL::get_readyonly);
+//	ClassDB::bind_method(D_METHOD("set_readyonly", "readyonly"),&MySQL::set_readyonly);
+//	ClassDB::bind_method(D_METHOD("get_readyonly"),&MySQL::get_readyonly);
 	ClassDB::bind_method(D_METHOD("set_catalog", "catalog"),&MySQL::set_catalog);
 	ClassDB::bind_method(D_METHOD("get_catalog"),&MySQL::get_catalog);
 	ClassDB::bind_method(D_METHOD("get_client_info"),&MySQL::get_client_info);
 
+	/*    CONN OPTIONS    */
+	ClassDB::bind_method(D_METHOD("get_driver_info"),&MySQL::get_driver_info);
+	ClassDB::bind_method(D_METHOD("set_client_option", "option", "value"),&MySQL::set_client_option);
+	ClassDB::bind_method(D_METHOD("get_client_option", "option"),&MySQL::get_client_option);
+
+	/*    TRANSACTION     */
+		ClassDB::bind_method(D_METHOD("set_autocommit", "bool"),&MySQL::set_autocommit);
+	ClassDB::bind_method(D_METHOD("get_autocommit"),&MySQL::get_autocommit);
+	ClassDB::bind_method(D_METHOD("commit"),&MySQL::commit);
+	ClassDB::bind_method(D_METHOD("set_transaction_isolation", "level"),&MySQL::set_transaction_isolation);
+	ClassDB::bind_method(D_METHOD("get_transaction_isolation"),&MySQL::get_transaction_isolation);
+	ClassDB::bind_method(D_METHOD("rollback", "savepoint"),&MySQL::rollback);
+	ClassDB::bind_method(D_METHOD("create_savepoint", "savepoint"),&MySQL::create_savepoint);
+	ClassDB::bind_method(D_METHOD("delete_savepoint", "savepoint"),&MySQL::delete_savepoint);
+	ClassDB::bind_method(D_METHOD("get_savepoints"),&MySQL::get_savepoints);
 
 
-
-
-//	ClassDB::bind_method(D_METHOD("commit"),&MySQL::commit);
-
-//	ClassDB::bind_method(D_METHOD("set_transaction_isolation", "level"),&MySQL::set_transaction_isolation);
-//	ClassDB::bind_method(D_METHOD("get_transaction_isolation"),&MySQL::get_transaction_isolation);
-
-//	ClassDB::bind_method(D_METHOD("rollback_savepoint", "savepoint"),&MySQL::rollback_savepoint);
-//	ClassDB::bind_method(D_METHOD("create_savepoint", "savepoint"),&MySQL::create_savepoint);
-//	ClassDB::bind_method(D_METHOD("delete_savepoint", "savepoint"),&MySQL::delete_savepoint);
-//	ClassDB::bind_method(D_METHOD("get_savepoints"),&MySQL::get_savepoints);
-
-	ClassDB::bind_method(D_METHOD("teste", "teste"),&MySQL::teste);
-
-//	BIND_ENUM_CONSTANT(TRANSACTION_ERROR);
-/*
-	BIND_ENUM_CONSTANT(sql::enum_transaction_isolation::TRANSACTION_NONE);
-	BIND_ENUM_CONSTANT(sql::enum_transaction_isolation::TRANSACTION_READ_COMMITTED);
-	BIND_ENUM_CONSTANT(sql::enum_transaction_isolation::TRANSACTION_READ_UNCOMMITTED);
-	BIND_ENUM_CONSTANT(sql::enum_transaction_isolation::TRANSACTION_REPEATABLE_READ);
-	BIND_ENUM_CONSTANT(sql::enum_transaction_isolation::TRANSACTION_SERIALIZABLE);
-*/
 	BIND_ENUM_CONSTANT(TRANSACTION_ERROR);
 	BIND_ENUM_CONSTANT(TRANSACTION_NONE);
 	BIND_ENUM_CONSTANT(TRANSACTION_READ_COMMITTED);
 	BIND_ENUM_CONSTANT(TRANSACTION_READ_UNCOMMITTED);
 	BIND_ENUM_CONSTANT(TRANSACTION_REPEATABLE_READ);
 	BIND_ENUM_CONSTANT(TRANSACTION_SERIALIZABLE);
-
 
 	BIND_ENUM_CONSTANT(COLUMNS_NAMES);
 	BIND_ENUM_CONSTANT(COLUMNS_TYPES);
@@ -1154,18 +1171,14 @@ void MySQL::_bind_methods() {
 
 MySQL::MySQL(){
 	connection_properties["port"] = 3306;
-	connection_properties["OPT_RECONNECT"] = true;
+	connection_properties["OPT_RECONNECT"] = false;
 	connection_properties["CLIENT_MULTI_STATEMENTS"] = false;
 	connection_properties["OPT_REPORT_DATA_TRUNCATION"] = false;
-/*
-IF DEBUG
-https://dev.mysql.com/doc/connector-cpp/1.1/en/connector-cpp-debug-tracing.html
-con->setClientOption("libmysql_debug", "d:t:O,client.trace");
-*/
 }
 
 
 MySQL::~MySQL(){
+	connection_stop();
 }
 
 /*  mysql.cpp */
