@@ -90,7 +90,7 @@ private:
 		DRIVER_INFO		 = 11,
 	};
 
-	enum TYPE {
+	enum PROPERTY_TYPES {
 		INVALID,
 		BOOL,
 		INT,
@@ -100,13 +100,11 @@ private:
 		VOID,
 	};
 
-
 	/*       ERROS        */
 	typedef Dictionary MySQLException;
 	MySQLException _last_sql_error;
 	void print_SQLException( sql::SQLException &e );
 	void print_runtime_error( std::runtime_error &e );
-
 
 	/*      CONNECTION    */
 	sql::ConnectOptionsMap connection_properties;
@@ -114,18 +112,16 @@ private:
 	std::shared_ptr<sql::Connection> conn;
 	std::map <String, sql::Savepoint* > savepoint_map;
 
-
 	/*        CORE        */
 	Array _query(String p_sqlquery, Array p_values, DataFormat data_model, bool return_as_string, PoolIntArray meta_col, bool _prep);
 	int _execute( String p_sqlquery, Array p_values, bool prep_st, bool update);
 	Error _set_conn( Variant p_value, OP op);
 	Variant _get_conn(OP op);
 
-
 	/*       HELPERS      */
 	Array format_time( String str, bool return_string );
 	String string_SQL_2_GDT ( sql::SQLString &p_string );
-	bool is_mat_empty( Variant p_matrix );
+//	bool is_mat_empty( Variant p_matrix );
 	bool is_json( Variant p_arg );
 	bool is_mysql_time( String time );
 	int	get_prop_type( String p_prop );
@@ -148,15 +144,13 @@ protected:
 
 public:
 
-	Dictionary get_last_error() { return _last_sql_error; }
-
 	/*     CONNECTION     */
-	void set_credentials( String p_host, String p_user, String p_pass );
+	void set_credentials( String p_host, String p_user, String p_pass, String p_schema = String() );
+	Dictionary get_last_error() { return _last_sql_error; }
+	Dictionary get_metadata();
 	ConnectionStatus connection_start();
 	ConnectionStatus connection_stop();
 	ConnectionStatus connection_status();
-	Dictionary get_metadata();
-
 
 	/*     PROPERTIES     */
 	Error set_property(String p_property, Variant p_value);
@@ -164,13 +158,11 @@ public:
 	Error set_properties_array(Dictionary p_properties);
 	Dictionary get_properties_array(PoolStringArray p_properties);
 
-
 	/*    CONN OPTIONS    */
 	Dictionary get_driver_info() { return _get_conn(DRIVER_INFO); }	// PASS
 	String get_client_info() { return _get_conn( CLIENT_INFO);	}	// PASS
 	Error set_client_option(String p_option, Variant p_value);
-	Variant get_client_option( String p_option);
-
+	Variant get_client_option( String p_option);					// PASS
 
 	/*      DATABASE      */
 	Array query(String p_sqlquery, DataFormat data_model = DICTIONARY, bool return_as_string = false, PoolIntArray meta_col = PoolIntArray());
@@ -180,18 +172,29 @@ public:
 	int update(String p_sqlquery);
 	int update_prepared(String p_sqlquery, Array p_values);
 
-
 	/*     CONNECTOR      */
-	Error set_database( String database ) { return _set_conn( database, OP::DATABASE ); }
-	String get_database() { return _get_conn( DATABASE); }
-
-//	Error set_readyonly( bool readyonly ) { return _set_conn( readyonly, READONLY ); }
-//	bool get_readyonly() { return _get_conn( READONLY ); }
-
-
-
+	Error set_readyonly( bool readyonly ) { return _set_conn( readyonly, READONLY ); }
+	bool get_readyonly() { return _get_conn( READONLY ); }
 	Error set_catalog( String catalog) { return _set_conn( catalog, CATALOG );}
 	String get_catalog() { return _get_conn( CATALOG);	}
+
+	Error set_database( String database ) {
+		if ( connection_status() == CONNECTED ) {
+			return _set_conn( database, DATABASE );
+		}
+		else {
+			return set_property( String("schema"), database );
+		}
+	}
+
+	String get_database() {
+		if ( connection_status() == CONNECTED ) {
+			return _get_conn( DATABASE );
+		}
+		else {
+			return get_property( String("schema") );
+		}
+	}
 
 
 	/*    TRANSACTION     */
@@ -215,7 +218,7 @@ public:
 	}
 
 	// All savepoints of the current transaction are deleted if you execute a COMMIT, or a ROLLBACK that does not name a savepoint.
-	Error rollback(String savepoint){ return _set_conn(savepoint, ROLLBACK); }
+	Error rollback(String savepoint = ""){ return _set_conn(savepoint, ROLLBACK); }
 
 
 	// confirma a transação atual, tornando suas alterações permanentes.
@@ -237,7 +240,6 @@ public:
 //	Todos os pontos de salvamento da transação atual são excluídos se você executar um COMMIT, ou um ROLLBACK que não nomeie um ponto de salvamento.
 //	All savepoints of the current transaction are deleted if you execute a COMMIT, or a ROLLBACK that does not name a savepoint.
 	Error delete_savepoint(String p_savept) { return _set_conn(p_savept, DELETE_SAVEPOINT); }
-
 
 	PoolStringArray get_savepoints(){
 		PoolStringArray ret;

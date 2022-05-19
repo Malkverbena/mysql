@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MySQL" inherits="RefCounted" version="4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A MySQL connector for Godot.
+	</brief_description>
+	<description>
+		This module is a wrapper of the Mysql connector for C ++. 
+		It works online 
+		Is fully compatible with MariaDB.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="commit">
+			<return type="int" enum="Error" />
+			<description>
+				Makes changes made to the current transaction permanent and visible to other sessions. Also release all InnoDB locks that were set during the current transaction.
+				All savepoints of the current transaction are deleted if you execute a COMMIT.
+			</description>
+		</method>
+		<method name="connection_start">
+			<return type="int" enum="MySQL.ConnectionStatus" />
+			<description>
+				Starts the connection. Also returns the status of connection.
+			</description>
+		</method>
+		<method name="connection_status">
+			<return type="int" enum="MySQL.ConnectionStatus" />
+			<description>
+				Returns the status of connection.
+			</description>
+		</method>
+		<method name="connection_stop">
+			<return type="int" enum="MySQL.ConnectionStatus" />
+			<description>
+				Close the connection. Also returns the status of connection after closed.
+			</description>
+		</method>
+		<method name="create_savepoint">
+			<return type="int" enum="Error" />
+			<argument index="0" name="savepoint" type="String" />
+			<description>
+				Create a savepoint that can be retrieved within a transaction.
+			</description>
+		</method>
+		<method name="delete_savepoint">
+			<return type="int" enum="Error" />
+			<argument index="0" name="savepoint" type="String" />
+			<description>
+				Delete a savepoint.
+			</description>
+		</method>
+		<method name="execute">
+			<return type="bool" />
+			<argument index="0" name="sql_statement" type="String" />
+			<description>
+				Execute SQL statements. Returns true if the statement was successful.
+			</description>
+		</method>
+		<method name="execute_prepared">
+			<return type="bool" />
+			<argument index="0" name="sql_statement" type="String" />
+			<argument index="1" name="Values" type="Array" />
+			<description>
+				Execute prepared SQL statements. Returns true if the statement was successful.
+			</description>
+		</method>
+		<method name="get_autocommit">
+			<return type="bool" />
+			<description>
+				Get auto-commit mode for the current session.
+			</description>
+		</method>
+		<method name="get_catalog">
+			<return type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="get_client_info">
+			<return type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="get_client_option">
+			<return type="Variant" />
+			<argument index="0" name="option" type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="get_database">
+			<return type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="get_driver_info">
+			<return type="Dictionary" />
+			<description>
+			</description>
+		</method>
+		<method name="get_last_error">
+			<return type="Dictionary" />
+			<description>
+			</description>
+		</method>
+		<method name="get_metadata">
+			<return type="Dictionary" />
+			<description>
+			</description>
+		</method>
+		<method name="get_properties_array">
+			<return type="Dictionary" />
+			<argument index="0" name="properties" type="PackedStringArray" />
+			<description>
+			</description>
+		</method>
+		<method name="get_property">
+			<return type="Variant" />
+			<argument index="0" name="property" type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="get_readyonly">
+			<return type="bool" />
+			<description>
+			</description>
+		</method>
+		<method name="get_savepoints">
+			<return type="PackedStringArray" />
+			<description>
+			</description>
+		</method>
+		<method name="get_transaction_isolation">
+			<return type="int" enum="MySQL.Isolation" />
+			<description>
+			</description>
+		</method>
+		<method name="query">
+			<return type="Array" />
+			<argument index="0" name="Sql Statement" type="String" />
+			<argument index="1" name="DataFormat" type="int" enum="MySQL.DataFormat" default="1" />
+			<argument index="2" name="Return data as String" type="bool" default="false" />
+			<argument index="3" name="Metadata" type="PackedInt32Array" default="PackedInt32Array()" />
+			<description>
+			</description>
+		</method>
+		<method name="query_prepared">
+			<return type="Array" />
+			<argument index="0" name="sql_statement" type="String" />
+			<argument index="1" name="Values" type="Array" default="[]" />
+			<argument index="2" name="DataFormat" type="int" enum="MySQL.DataFormat" default="1" />
+			<argument index="3" name="return_string" type="bool" default="false" />
+			<argument index="4" name="meta" type="PackedInt32Array" default="PackedInt32Array()" />
+			<description>
+			</description>
+		</method>
+		<method name="rollback">
+			<return type="int" enum="Error" />
+			<argument index="0" name="savepoint" type="String" />
+			<description>
+				When a Rollback is used with a savepoint, it rolls back all changes made by the current transaction up to the savepoint. 
+				When used without a savepoint name cancels all changes made by the current transaction and release all InnoDB locks that were set during the current transaction.
+				All savepoints of the current transaction are deleted if you execute a ROLLBACK without a savepoint.
+			</description>
+		</method>
+		<method name="set_autocommit">
+			<return type="int" enum="Error" />
+			<argument index="0" name="bool" type="bool" />
+			<description>
+				Enables or disables the default auto-commit mode for the current session.
+			</description>
+		</method>
+		<method name="set_catalog">
+			<return type="int" enum="Error" />
+			<argument index="0" name="catalog" type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="set_client_option">
+			<return type="int" enum="Error" />
+			<argument index="0" name="option" type="String" />
+			<argument index="1" name="value" type="Variant" />
+			<description>
+			</description>
+		</method>
+		<method name="set_credentials">
+			<return type="void" />
+			<argument index="0" name="HostName" type="String" />
+			<argument index="1" name="UserName" type="String" />
+			<argument index="2" name="Password" type="String" />
+			<argument index="3" name="Database" type="String" default="&quot;&quot;" />
+			<description>
+			</description>
+		</method>
+		<method name="set_database">
+			<return type="int" enum="Error" />
+			<argument index="0" name="database" type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="set_properties_array">
+			<return type="int" enum="Error" />
+			<argument index="0" name="properties" type="Dictionary" />
+			<description>
+			</description>
+		</method>
+		<method name="set_property">
+			<return type="int" enum="Error" />
+			<argument index="0" name="property" type="String" />
+			<argument index="1" name="value" type="Variant" />
+			<description>
+			</description>
+		</method>
+		<method name="set_readyonly">
+			<return type="int" enum="Error" />
+			<argument index="0" name="readyonly" type="bool" />
+			<description>
+			</description>
+		</method>
+		<method name="set_transaction_isolation">
+			<return type="int" enum="Error" />
+			<argument index="0" name="level" type="int" enum="MySQL.Isolation" />
+			<description>
+			</description>
+		</method>
+		<method name="update">
+			<return type="int" />
+			<argument index="0" name="sql_statement" type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="update_prepared">
+			<return type="int" />
+			<argument index="0" name="sql_statement" type="String" />
+			<argument index="1" name="Values" type="Array" />
+			<description>
+			</description>
+		</method>
+	</methods>
+	<constants>
+		<constant name="TRANSACTION_ERROR" value="-1" enum="Isolation">
+		</constant>
+		<constant name="TRANSACTION_NONE" value="0" enum="Isolation">
+		</constant>
+		<constant name="TRANSACTION_READ_COMMITTED" value="1" enum="Isolation">
+		</constant>
+		<constant name="TRANSACTION_READ_UNCOMMITTED" value="2" enum="Isolation">
+		</constant>
+		<constant name="TRANSACTION_REPEATABLE_READ" value="3" enum="Isolation">
+		</constant>
+		<constant name="TRANSACTION_SERIALIZABLE" value="4" enum="Isolation">
+		</constant>
+		<constant name="COLUMNS_NAMES" value="0" enum="MetaCollection">
+		</constant>
+		<constant name="COLUMNS_TYPES" value="1" enum="MetaCollection">
+		</constant>
+		<constant name="ATTRIBUTES" value="2" enum="MetaCollection">
+		</constant>
+		<constant name="TABLE_INFO" value="3" enum="MetaCollection">
+		</constant>
+		<constant name="NO_QUERY" value="4" enum="MetaCollection">
+		</constant>
+		<constant name="NO_CONNECTION" value="0" enum="ConnectionStatus">
+		</constant>
+		<constant name="CLOSED" value="1" enum="ConnectionStatus">
+		</constant>
+		<constant name="CONNECTED" value="2" enum="ConnectionStatus">
+		</constant>
+		<constant name="DISCONNECTED" value="3" enum="ConnectionStatus">
+		</constant>
+		<constant name="ARRAY" value="0" enum="DataFormat">
+		</constant>
+		<constant name="DICTIONARY" value="1" enum="DataFormat">
+		</constant>
+	</constants>
+</class>

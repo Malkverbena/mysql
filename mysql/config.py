@@ -16,7 +16,9 @@ def get_doc_path():
 
 def get_doc_classes():
 	return [ 
-	"MySQL", 
+	    "MySQL", 
 	]
 
 
+#def get_icons_path():
+ #   return "path/to/icons"
