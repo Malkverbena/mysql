@@ -7,8 +7,11 @@
 
 #### Supported platforms:
 MacOS
+
 Linux
+
 Windows
+
 javascript(soon)
 
 
