@@ -1,8 +1,28 @@
-# This module will be rewritten. This branch is WIP at moment. Please use the 1.x branch.
 
 # MySQL Module 
 
 ## This module is an wrapper of the Mysql C++ connector for Godot. 
+
+### If you use this module, let me know it. Leave a star. 
+
+#### Supported platforms:
+MacOS
+Linux
+Windows
+javascript(soon)
+
+
+#### Requirements: 
+
+* C++ MySQL Connector Library. 
+  You can get here https://dev.mysql.com/downloads/connector/cpp/. 
+  On linux you can use the command: sudo apt-get install libmysqlcppconn-dev.
+
+
+
+
+
+
 
 
 # Disclaimer
