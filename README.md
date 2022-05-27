@@ -5,6 +5,8 @@
 
 ### If you use this module, let me know it. Leave a star. 
 
+This branch is a WIP. For now use the 1.x branch.
+
 #### Supported platforms:
 MacOS
 
