@@ -38,7 +38,7 @@ https://www.boost.org/users/download/
 
 
 Install the MySQL C++ Connector. You can get it here:
-https://www.mysql.com/products/connector/
+https://dev.mysql.com/downloads/connector/cpp/
 
 There is a video in Portuguese teaching how to compile on the Windows platform.
 English subtitle can be activated anyway.
