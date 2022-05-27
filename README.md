@@ -5,30 +5,50 @@
 
 ### If you use this module, let me know it. Leave a star. 
 
-This branch is a WIP. For now use the 1.x branch.
-
 #### Supported platforms:
-MacOS
-
-Linux
-
-Windows
-
-javascript(soon)
+* MacOS
+* X11/Unix
+* Windows
+* javascript (soon)
 
 
 #### Requirements: 
 
-* C++ MySQL Connector Library. 
-  You can get here https://dev.mysql.com/downloads/connector/cpp/. 
-  On linux you can use the command: sudo apt-get install libmysqlcppconn-dev.
+* **C++ MySQL Connector Library**.
+
+    On Unix/x11 you can use the command: sudo apt install libmysqlcppconn-dev.
+
+     https://dev.mysql.com/downloads/connector/cpp/
+ 
+
+* **Boost library**.
+
+    It is usually installed by default on Unix systems.
+
+     https://www.boost.org/users/download/
+ 
 
 
+#### Installation: 
+**On linux like systems there are no trouble found to compile and no changes are needed. 
+On Windows systems there is some issues to compile. You need edit the SCsub with the path to the libraries. 
+Not tested on macOS.**
 
 
+Step by step:
+* Install Boost library if you haven't it.
+* Install the MySQL C++ Connector.
+* Copy or clone the the folder mysql into Godot/path/modules.
+* On Winndows you need edit the SCsub file before you start the compilation. You have to SCsub file with the path of Boost libraries and MySQL connector. (Instructions on file).
+* Compile the module with the engine.
+  More info on: https://docs.godotengine.org/en/stable/development/cpp/custom_modules_in_cpp.html
 
 
+#### Usage:
+  There is some exemples on exemple folders.
 
+It provides a
+comprehen
 
 # Disclaimer
 
