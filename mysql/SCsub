@@ -1,57 +1,71 @@
 #!/usr/bin/env python
 #SCsub
 
+# ===============================MODULE OPTIONS===============================
+# DO NOT FORGET TO REPLACE THE SLASH FOR BACKSLASH ON PATHS => "\" FOR "/" 
+
+# Enter with path to Boost library here
+boost_path = "C:/boost_1_76_0"
+
+# Enter with the path to jdbc here (mysql_connection.h & mysql_driver.h)
+include_path = "C:/mysql/mysql-connector-c++-8.0.29-winx64/include/jdbc"
+
+# Enter with the path to mysql libs here (mysqlcppconn.lib)
+lib_path = 'C:/mysql/mysql-connector-c++-8.0.29-winx64/lib64/vs14/debug'
+
+
+# Enable the module debug.
+module_debug = True
+
+# Compile the module with connector trace mode ON.
+# https://dev.mysql.com/doc/connector-cpp/1.1/en/connector-cpp-debug-tracing.html
+connector_trace = True
+
+# ============================================================================
+
+
+
+
+print("---------------MySQL------------------")
+
 import sys
 import shutil
 import version
 Import("env")
 
 
-# ===============================IMPORTANT===============================
-# DO NOT FORGET TO REPLACE THE SLASH FOR BACKSLASH ON PATHS => "\" FOR "/" 
-# =======================================================================
-
-
-# Enter with path to Boost library here
-boost_path = "C:/boost_1_76_0"
-
-# Enter with the path to jdbc here (mysql_connection.h & mysql_driver.h)
-include_path = "C:\mysql\mysql-connector-c++-8.0.29-winx64\include\jdbc"
-
-# Enter with the path to mysql libs here (mysqlcppconn.lib)
-lib_path = 'C:/mysql/mysql-connector-c++-8.0.29-winx64/lib64/vs14/debug'
-
-
-target_platform = env["platform"]
-user_platform = ""
-
-
-if version.major == 4:
-	env.Append(CPPDEFINES=["GODOT4"])
-
-
-#deep trace
-#   -DMYSQLCPPCONN_TRACE_ENABLE:BOOL=1
-#   con->setClientOption("clientTrace", &on_off);
-
-
-print("---------------MySQL------------------")
-
-
-if (sys.platform.startswith("linux") or sys.platform.startswith("dragonfly") or sys.platform.startswith("freebsd") or sys.platform.startswith("netbsd") or sys.platform.startswith("openbsd")):
-	user_platform = "linuxbsd"
-elif sys.platform == "darwin":
-	user_platform = "osx"
-elif sys.platform == "win32":
-	user_platform = "windows"
-else:
-	print("Could not detect the current platform automatically.")
-
-
 env.add_source_files(env.modules_sources,"*.cpp")
 mysql_env = env.Clone()
 mysql_env['LIBS'] = []
 
+#--------------
+
+target_platform = env["platform"]
+host_platform = ""
+
+#--------------
+
+if module_debug:
+    env.Append(CPPDEFINES=["MYSQL_DEBUG"])
+
+if version.major == 4:
+	env.Append(CPPDEFINES=["GODOT4"])
+
+if connector_trace:
+    mysql_env.Append(CPPDEFINES=["-DMYSQLCPPCONN_TRACE_ENABLE=1"])
+
+#--------------
+
+if (sys.platform.startswith("linux") or sys.platform.startswith("dragonfly") or sys.platform.startswith("freebsd") or sys.platform.startswith("netbsd") or sys.platform.startswith("openbsd")):
+	host_platform = "linuxbsd"
+elif sys.platform == "darwin":
+	host_platform = "osx"
+elif sys.platform == "win32":
+	host_platform = "windows"
+else:
+	print("Could not detect the host platform automatically.")
+
+#--------------
 
 
 
