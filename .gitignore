@@ -10,3 +10,7 @@
 *.ox
 *.Plo
 *.so
+
+
+# Local editor & project files.
+*.*[~]
