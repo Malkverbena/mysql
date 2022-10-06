@@ -23,11 +23,6 @@ connector_trace = True
 
 # ============================================================================
 
-
-
-
-print("---------------MySQL------------------")
-
 import os
 import sys
 import shutil
@@ -88,9 +83,6 @@ if env["platform"] in ["windows", "UWP"]:
 	for i in target_lib_arr:
 		source = lib_path + "/" + i + ".lib"
 		destination = lib_path + "/" + i + sufix + "lib"
-		print("source, destination =======================")
-		print(source)
-		print(destination)
 		shutil.copy2(source, destination)
 
 	env.Append(LIBS=target_lib_arr)
@@ -103,15 +95,10 @@ elif env["platform"] in ["x11", "linux", "bsd", "linuxbsd"]:
 
 
 
-elif env["platform"] == "javascript":
-
-
+elif env["platform"] in ["javascript", "web"]:
 	env.Append(CPPPATH=['/usr/lib', '/usr/include'])
 	env.Append(LIBPATH=['/usr/include', '/usr/include/x86_64-linux-gnu/bits', '/usr/include/x86_64-linux-gnu'])
 	env.Append(LIBS=['mysqlcppconn'])
-
-
-
 
 
 elif env["platform"] in ["osx"]:
