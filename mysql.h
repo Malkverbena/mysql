@@ -43,33 +43,33 @@ public:
 	typedef PackedInt32Array PoolIntArray;
 #endif
 
-	enum Isolation { // aka sql::enum_transaction_isolation
-		TRANSACTION_ERROR			 = -1,
-		TRANSACTION_NONE			 = sql::enum_transaction_isolation::TRANSACTION_NONE,
-		TRANSACTION_READ_COMMITTED	 = sql::enum_transaction_isolation::TRANSACTION_READ_COMMITTED,
-		TRANSACTION_READ_UNCOMMITTED = sql::enum_transaction_isolation::TRANSACTION_READ_UNCOMMITTED,
-		TRANSACTION_REPEATABLE_READ	 = sql::enum_transaction_isolation::TRANSACTION_REPEATABLE_READ,
-		TRANSACTION_SERIALIZABLE	 = sql::enum_transaction_isolation::TRANSACTION_SERIALIZABLE
+	enum Isolation { // aka sql::enum_transaction_isolation plus extras from this modules 
+		TRANSACTION_ERROR					= -1,
+		TRANSACTION_NONE					= sql::enum_transaction_isolation::TRANSACTION_NONE,
+		TRANSACTION_READ_COMMITTED		= sql::enum_transaction_isolation::TRANSACTION_READ_COMMITTED,
+		TRANSACTION_READ_UNCOMMITTED	= sql::enum_transaction_isolation::TRANSACTION_READ_UNCOMMITTED,
+		TRANSACTION_REPEATABLE_READ	= sql::enum_transaction_isolation::TRANSACTION_REPEATABLE_READ,
+		TRANSACTION_SERIALIZABLE		= sql::enum_transaction_isolation::TRANSACTION_SERIALIZABLE
 	};
 
 	enum MetaCollection {
-		COLUMNS_NAMES,		// returns an array with only one element (names of columns)
-		COLUMNS_TYPES,		// returns an array with only one element (types of the columns)
-		ATTRIBUTES,			// returns a dictionary with column atributes ( )
-		TABLE_INFO,			// return a dictionary with table info
-		NO_QUERY,			// DO NOT return the result of querty. This function is a waste of processing. Useful only if you want the metadata and nothing else.
+		COLUMNS_NAMES,	// returns an array with only one element (names of columns)
+		COLUMNS_TYPES,	// returns an array with only one element (types of the columns)
+		ATTRIBUTES,		// returns a dictionary with column atributes ( )
+		TABLE_INFO,		// return a dictionary with table info
+		NO_QUERY,		// DO NOT return the result of querty. This function is a waste of processing. Useful only if you want the metadata and nothing else.
 	};
 
 	enum ConnectionStatus {
-		NO_CONNECTION,		// No connection set
-		CLOSED,				// Connection was started but closed
-		CONNECTED,			// Connected and operational
-		DISCONNECTED		// Disconnected by server or client
+		NO_CONNECTION,	// No connection set
+		CLOSED,			// Connection was started but closed
+		CONNECTED,		// Connected and operational
+		DISCONNECTED	// Disconnected by server or client
 	};
 
 	enum DataFormat {
-		ARRAY,				// returns data as an array
-		DICTIONARY			// returns data as an dictionary
+		ARRAY,		// returns data as an array
+		DICTIONARY	// returns data as an dictionary
 	};
 
 
@@ -77,17 +77,17 @@ public:
 private:
 
 	enum OP {
-		AUTOCOMMIT		 = 1,
-		CATALOG			 = 2,
-		CLIENT_INFO		 = 3,
-		DATABASE		 = 4,
-		ISOLATION		 = 5,
-		READONLY		 = 6,
-		CREATE_SAVEPOINT = 7,
-		DELETE_SAVEPOINT = 8,
-		COMMIT			 = 9,
-		ROLLBACK		 = 10,
-		DRIVER_INFO		 = 11,
+		AUTOCOMMIT			= 1,
+		CATALOG				= 2,
+		CLIENT_INFO			= 3,
+		DATABASE				= 4,
+		ISOLATION			= 5,
+		READONLY				= 6,
+		CREATE_SAVEPOINT	= 7,
+		DELETE_SAVEPOINT	= 8,
+		COMMIT				= 9,
+		ROLLBACK				= 10,
+		DRIVER_INFO			= 11,
 	};
 
 	enum PROPERTY_TYPES {
@@ -99,6 +99,7 @@ private:
 		STRING,
 		VOID,
 	};
+
 
 	/*       ERROS        */
 	typedef Dictionary MySQLException;

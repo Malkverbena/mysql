@@ -348,7 +348,7 @@ Error MySQL::_set_conn( Variant p_value, OP op){
 	ERR_FAIL_COND_V_EDMSG( connection_status() != CONNECTED, ERR_CONNECTION_ERROR, "There is no active connection!" );
 
 	// FIXME:
-	// I know It would be much nicier using switch case, but for some reason Godot 4 does not like it.
+	// I know It would be much better using switch case, but for some reason Godot 4 does not like it.
 	// I'll fix it in future when Godot 4 be more stable.
 	try{
 		if ( op == OP::DATABASE ) {
@@ -621,7 +621,7 @@ Error MySQL::set_property(String p_property, Variant p_value){
 	sql::SQLString property = p_property.utf8().get_data();
 	Error err = OK;
 
-	// Colocar no doc
+	// TODO Put it on docs
 	// "Non-existent property. \nFor more information visit: \nhttps://dev.mysql.com/doc/connector-cpp/1.1/en/connector-cpp-connect-options.html"
 	ERR_FAIL_COND_V_EDMSG( prop_type == PROPERTY_TYPES::INVALID, ERR_DOES_NOT_EXIST, "The property '" + p_property.to_upper() +  "' does not exist!");
 
@@ -688,7 +688,7 @@ Error MySQL::set_property(String p_property, Variant p_value){
 }
 
 
-
+// NOTE
 // Return a property from connection_properties.
 // Return null if the property is not set or does not exist.
 Variant MySQL::get_property(String p_property){
@@ -878,8 +878,7 @@ Array MySQL::format_time(String str, bool return_string) {
 	while( token != NULL ) {
 		if (return_string) {
 			datando.push_back( String(token) );   //--As String
-		}
-		else{
+		}else{
 			datando.push_back( atoi(token) ); //--As Data (int)
 		}
 
