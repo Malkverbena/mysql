@@ -13,3 +13,5 @@
 
 # Local editor & project files.
 *.*[~]
+.vscode/
+__pycache__/

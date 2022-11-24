@@ -5,121 +5,118 @@
 	</brief_description>
 	<description>
 		This module is a wrapper of the Mysql connector for C ++. 
-	Supports connections over the internet. It's fully compatible with MariaDB. Supports secure connections (SSL).
+		Supports connections over the internet. It's fully compatible with MariaDB. Supports secure connections (SSL).
 	</description>
 	<tutorials>
 		<link title="Tutorial">http://asdad.html</link>
 	</tutorials>
 	<methods>
 		<method name="commit">
-			<Returns type="int" enum="Error" />
+			<return type="int" enum="Error" />
 			<description>
 				Makes changes made to the current transaction permanent and visible to other sessions. Also release all InnoDB locks that were set during the current transaction.
-			All savepoints of the current transaction are deleted if you execute a COMMIT.
+				All savepoints of the current transaction are deleted if you execute a COMMIT.
 			</description>
 		</method>
 		<method name="connection_start">
-			<Returns type="int" enum="MySQL.ConnectionStatus" />
+			<return type="int" enum="MySQL.ConnectionStatus" />
 			<description>
 				Starts the connection. Also returns the status of connection.
 			</description>
 		</method>
 		<method name="connection_status">
-			<Returns type="int" enum="MySQL.ConnectionStatus" />
+			<return type="int" enum="MySQL.ConnectionStatus" />
 			<description>
 				Returns the status of connection.
 			</description>
 		</method>
 		<method name="connection_stop">
-			<Returns type="int" enum="MySQL.ConnectionStatus" />
+			<return type="int" enum="MySQL.ConnectionStatus" />
 			<description>
 				Close the connection. Also returns the status of connection after closed.
 			</description>
 		</method>
 		<method name="create_savepoint">
-			<Returns type="int" enum="Error" />
-			<argument index="0" name="savepoint" type="String" />
+			<return type="int" enum="Error" />
+			<param index="0" name="savepoint" type="String" />
 			<description>
 				Create a savepoint that can be retrieved within a transaction.
 			</description>
 		</method>
 		<method name="delete_savepoint">
-			<Returns type="int" enum="Error" />
-			<argument index="0" name="savepoint" type="String" />
+			<return type="int" enum="Error" />
+			<param index="0" name="savepoint" type="String" />
 			<description>
 				Delete a savepoint.
 			</description>
 		</method>
 		<method name="execute">
-			<Returns type="bool" />
-			<argument index="0" name="sql_statement" type="String" />
+			<return type="bool" />
+			<param index="0" name="sql_statement" type="String" />
 			<description>
 				Execute SQL statements. Returns true if the statement was successful.
 			</description>
 		</method>
 		<method name="execute_prepared">
-			<Returns type="bool" />
-			<argument index="0" name="sql_statement" type="String" />
-			<argument index="1" name="Values" type="Array" />
+			<return type="bool" />
+			<param index="0" name="sql_statement" type="String" />
+			<param index="1" name="Values" type="Array" />
 			<description>
 				Execute prepared SQL statements. Returns true if the statement was successful.
-			The values for Prepared Statements must be supplied within an array. Parameters in prepared statements are for data values ONLY. Do not use for object identifiers or any other part of a SQL statement.
-ONLY data values.
+				The values for Prepared Statements must be supplied within an array. Parameters in prepared statements are for data values ONLY. Do not use for object identifiers or any other part of a SQL statement.
+				ONLY data values.
 			</description>
 		</method>
 		<method name="get_autocommit">
-			<Returns type="bool" />
+			<return type="bool" />
 			<description>
 				Get auto-commit mode for the current session.
 			</description>
 		</method>
 		<method name="get_catalog">
-			<Returns type="String" />
+			<return type="String" />
 			<description>
 			</description>
 		</method>
 		<method name="get_client_info">
-			<Returns type="String" />
+			<return type="String" />
 			<description>
 				Returns the Client information.
 			</description>
 		</method>
 		<method name="get_client_option">
-			<Returns type="Variant" />
-			<argument index="0" name="option" type="String" />
-			<description>The method can be used to check the value of connection properties set when establishing a database connection.
+			<return type="Variant" />
+			<param index="0" name="option" type="String" />
+			<description>
+				The method can be used to check the value of connection properties set when establishing a database connection.
 			</description>
-			<tutorials>
-				<link title="More info on:">https://dev.mysql.com/doc/connector-cpp/1.1/en/connector-cpp-usage-notes.html</link>
-			</tutorials>
+		</method>
+		<method name="get_connection_metadata">
+			<return type="Dictionary" />
+			<description>
+			</description>
 		</method>
 		<method name="get_database">
-			<Returns type="String" />
+			<return type="String" />
 			<description>
 				Returns the currently selected database.
 			</description>
 		</method>
 		<method name="get_driver_info">
-			<Returns type="Dictionary" />
+			<return type="Dictionary" />
 			<description>
 				Returns driver information.
 			</description>
 		</method>
 		<method name="get_last_error">
-			<Returns type="Dictionary" />
+			<return type="Dictionary" />
 			<description>
 				Return a Dictionary containing details about the last MySQL exception occurred.
 			</description>
 		</method>
-		<method name="get_metadata">
-			<Returns type="Dictionary" />
-			<description>
-				Returns a Dictionary with connection metadata.
-			</description>
-		</method>
 		<method name="get_properties_array">
-			<Returns type="Dictionary" />
-			<argument index="0" name="properties" type="PackedStringArray" />
+			<return type="Dictionary" />
+			<param index="0" name="properties" type="PackedStringArray" />
 			<description>
 				Returns a Dictionary with multiple properties at the same time.
 				[codeblocks]
@@ -136,35 +133,35 @@ ONLY data values.
 			</description>
 		</method>
 		<method name="get_property">
-			<Returns type="Variant" />
-			<argument index="0" name="property" type="String" />
+			<return type="Variant" />
+			<param index="0" name="property" type="String" />
 			<description>
 				Returns the value of a property.
 			</description>
 		</method>
 		<method name="get_readyonly">
-			<Returns type="bool" />
+			<return type="bool" />
 			<description>
 			</description>
 		</method>
 		<method name="get_savepoints">
-			<Returns type="PackedStringArray" />
+			<return type="PackedStringArray" />
 			<description>
 				Returns an Array with all set savepoints.
 			</description>
 		</method>
 		<method name="get_transaction_isolation">
-			<Returns type="int" enum="MySQL.Isolation" />
+			<return type="int" enum="MySQL.Isolation" />
 			<description>
 				Get the current transaction Isolation Level.
 			</description>
 		</method>
 		<method name="query">
-			<Returns type="Array" />
-			<argument index="0" name="Sql Statement" type="String" />
-			<argument index="1" name="DataFormat" type="int" enum="MySQL.DataFormat" default="1" />
-			<argument index="2" name="Returns data as String" type="bool" default="false" />
-			<argument index="3" name="Metadata" type="PackedInt32Array" default="PackedInt32Array()" />
+			<return type="Array" />
+			<param index="0" name="Sql Statement" type="String" />
+			<param index="1" name="DataFormat" type="int" enum="MySQL.DataFormat" default="1" />
+			<param index="2" name="Return data as String" type="bool" default="false" />
+			<param index="3" name="Metadata" type="PackedInt32Array" default="PackedInt32Array()" />
 			<description>
 				Returns an array containing the query result. 
 				[code]Sql Statement[/code] SQL statement. The querty it'self.
@@ -174,12 +171,12 @@ ONLY data values.
 			</description>
 		</method>
 		<method name="query_prepared">
-			<Returns type="Array" />
-			<argument index="0" name="sql_statement" type="String" />
-			<argument index="1" name="Values" type="Array" default="[]" />
-			<argument index="2" name="DataFormat" type="int" enum="MySQL.DataFormat" default="1" />
-			<argument index="3" name="return_string" type="bool" default="false" />
-			<argument index="4" name="meta" type="PackedInt32Array" default="PackedInt32Array()" />
+			<return type="Array" />
+			<param index="0" name="sql_statement" type="String" />
+			<param index="1" name="Values" type="Array" default="[]" />
+			<param index="2" name="DataFormat" type="int" enum="MySQL.DataFormat" default="1" />
+			<param index="3" name="return_string" type="bool" default="false" />
+			<param index="4" name="meta" type="PackedInt32Array" default="PackedInt32Array()" />
 			<description>
 				Returns an array containing the query result. The query must be done using prepared statement. 
 				[code]Sql Statement[/code] SQL statement. The querty it'self.
@@ -195,54 +192,54 @@ ONLY data values.
 			</description>
 		</method>
 		<method name="rollback">
-			<Returns type="int" enum="Error" />
-			<argument index="0" name="savepoint" type="String" default="&quot;&quot;" />
+			<return type="int" enum="Error" />
+			<param index="0" name="savepoint" type="String" />
 			<description>
 				When a Rollback is used with a savepoint, it rolls back all changes made by the current transaction up to the savepoint. 
-			When used without a savepoint name cancels all changes made by the current transaction and release all InnoDB locks that were set during the current transaction.
-			All savepoints of the current transaction are deleted if you execute a ROLLBACK without a savepoint.
+				When used without a savepoint name cancels all changes made by the current transaction and release all InnoDB locks that were set during the current transaction.
+				All savepoints of the current transaction are deleted if you execute a ROLLBACK without a savepoint.
 			</description>
 		</method>
 		<method name="set_autocommit">
-			<Returns type="int" enum="Error" />
-			<argument index="0" name="bool" type="bool" />
+			<return type="int" enum="Error" />
+			<param index="0" name="bool" type="bool" />
 			<description>
 				Enables or disables the default auto-commit mode for the current session.
 			</description>
 		</method>
 		<method name="set_catalog">
-			<Returns type="int" enum="Error" />
-			<argument index="0" name="catalog" type="String" />
+			<return type="int" enum="Error" />
+			<param index="0" name="catalog" type="String" />
 			<description>
 			</description>
 		</method>
 		<method name="set_client_option">
-			<Returns type="int" enum="Error" />
-			<argument index="0" name="option" type="String" />
-			<argument index="1" name="value" type="Variant" />
+			<return type="int" enum="Error" />
+			<param index="0" name="option" type="String" />
+			<param index="1" name="value" type="Variant" />
 			<description>
 			</description>
 		</method>
 		<method name="set_credentials">
-			<Returns type="void" />
-			<argument index="0" name="HostName" type="String" />
-			<argument index="1" name="UserName" type="String" />
-			<argument index="2" name="Password" type="String" />
-			<argument index="3" name="Database" type="String" default="&quot;&quot;" />
+			<return type="void" />
+			<param index="0" name="HostName" type="String" />
+			<param index="1" name="UserName" type="String" />
+			<param index="2" name="Password" type="String" />
+			<param index="3" name="Database" type="String" default="&quot;&quot;" />
 			<description>
 				Quick way to set up a connection.
 			</description>
 		</method>
 		<method name="set_database">
-			<Returns type="int" enum="Error" />
-			<argument index="0" name="database" type="String" />
+			<return type="int" enum="Error" />
+			<param index="0" name="database" type="String" />
 			<description>
 				Select a database.
 			</description>
 		</method>
 		<method name="set_properties_array">
-			<Returns type="int" enum="Error" />
-			<argument index="0" name="properties" type="Dictionary" />
+			<return type="int" enum="Error" />
+			<param index="0" name="properties" type="Dictionary" />
 			<description>
 				Set several properties at same time.
 				[codeblocks]
@@ -262,32 +259,29 @@ ONLY data values.
 			</description>
 		</method>
 		<method name="set_property">
-			<Returns type="int" enum="Error" />
-			<argument index="0" name="property" type="String" />
-			<argument index="1" name="value" type="Variant" />
+			<return type="int" enum="Error" />
+			<param index="0" name="property" type="String" />
+			<param index="1" name="value" type="Variant" />
 			<description>
 				Sets a property.
 			</description>
 		</method>
 		<method name="set_readyonly">
-			<Returns type="int" enum="Error" />
-			<argument index="0" name="readyonly" type="bool" />
+			<return type="int" enum="Error" />
+			<param index="0" name="readyonly" type="bool" />
 			<description>
 			</description>
 		</method>
 		<method name="set_transaction_isolation">
-			<Returns type="int" enum="Error" />
-			<argument index="0" name="level" type="int" enum="MySQL.Isolation" />
+			<return type="int" enum="Error" />
+			<param index="0" name="level" type="int" enum="MySQL.Isolation" />
 			<description>
 				Controls the behavior of locks and versioning of lines and statements.
 			</description>
-			<tutorials>
-				<link title="For more information check">https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html</link>
-			</tutorials>
 		</method>
 		<method name="update">
-			<Returns type="int" />
-			<argument index="0" name="sql_statement" type="String" />
+			<return type="int" />
+			<param index="0" name="sql_statement" type="String" />
 			<description>
 				Run update statements. Returns the number of modified rows.
 					Run queries using Prepared Statements. Returns the number of modified rows. 
@@ -296,9 +290,9 @@ ONLY data values.
 			</description>
 		</method>
 		<method name="update_prepared">
-			<Returns type="int" />
-			<argument index="0" name="sql_statement" type="String" />
-			<argument index="1" name="Values" type="Array" />
+			<return type="int" />
+			<param index="0" name="sql_statement" type="String" />
+			<param index="1" name="Values" type="Array" />
 			<description>
 				Run update prepared statements. Returns the number of modified rows.
 					Run queries using Prepared Statements. Returns the number of modified rows. 
@@ -309,55 +303,55 @@ ONLY data values.
 	</methods>
 	<constants>
 		<constant name="TRANSACTION_ERROR" value="-1" enum="Isolation">
-				Invalid paramenter. Used only by the module for internal control.
+			Invalid paramenter. Used only by the module for internal control.
 		</constant>
 		<constant name="TRANSACTION_NONE" value="0" enum="Isolation">
-				Invalid paramenter. Used only by the connector for internal control.
+			Invalid paramenter. Used only by the connector for internal control.
 		</constant>
 		<constant name="TRANSACTION_READ_COMMITTED" value="1" enum="Isolation">
-				Each consistent read, even within the same transaction, sets and reads its own fresh snapshot.
+			Each consistent read, even within the same transaction, sets and reads its own fresh snapshot.
 		</constant>
 		<constant name="TRANSACTION_READ_UNCOMMITTED" value="2" enum="Isolation">
-				SELECT statements are performed in a nonlocking fashion.
+			SELECT statements are performed in a nonlocking fashion.
 		</constant>
 		<constant name="TRANSACTION_REPEATABLE_READ" value="3" enum="Isolation">
-				This is the default isolation level for InnoDB.
+			This is the default isolation level for InnoDB.
 		</constant>
 		<constant name="TRANSACTION_SERIALIZABLE" value="4" enum="Isolation">
-				This level is like REPEATABLE READ, but InnoDB implicitly converts all plain SELECT statements to SELECT ... FOR SHARE if autocommit is disabled.
+			This level is like REPEATABLE READ, but InnoDB implicitly converts all plain SELECT statements to SELECT ... FOR SHARE if autocommit is disabled.
 		</constant>
 		<constant name="COLUMNS_NAMES" value="0" enum="MetaCollection">
-				Returns an extra Array inside the result containing the column names.
+			Returns an extra Array inside the result containing the column names.
 		</constant>
 		<constant name="COLUMNS_TYPES" value="1" enum="MetaCollection">
-				Returns an extra Array inside the result containing the column types.
+			Returns an extra Array inside the result containing the column types.
 		</constant>
 		<constant name="ATTRIBUTES" value="2" enum="MetaCollection">
-				Returns an extra Dictionary within the result containing the column attributes.
+			Returns an extra Dictionary within the result containing the column attributes.
 		</constant>
 		<constant name="TABLE_INFO" value="3" enum="MetaCollection">
-				Returns an extra Array inside the result containing table info.
+			Returns an extra Array inside the result containing table info.
 		</constant>
 		<constant name="NO_QUERY" value="4" enum="MetaCollection">
-				DO NOT Returns the result of querty. This function is a waste of processing. Useful only if you want the metadata and nothing else.
+			DO NOT Returns the result of querty. This function is a waste of processing. Useful only if you want the metadata and nothing else.
 		</constant>
 		<constant name="NO_CONNECTION" value="0" enum="ConnectionStatus">
-				No connection set.
+			No connection set.
 		</constant>
 		<constant name="CLOSED" value="1" enum="ConnectionStatus">
-				Connection was started but closed.
+			Connection was started but closed.
 		</constant>
 		<constant name="CONNECTED" value="2" enum="ConnectionStatus">
-				Connected and operational.
+			Connected and operational.
 		</constant>
 		<constant name="DISCONNECTED" value="3" enum="ConnectionStatus">
-				Disconnected by server or client.
+			Disconnected by server or client.
 		</constant>
 		<constant name="ARRAY" value="0" enum="DataFormat">
-				returns the querty result as an array.
+			returns the querty result as an array.
 		</constant>
 		<constant name="DICTIONARY" value="1" enum="DataFormat">
-				returns the querty result as an Dictionary.
+			returns the querty result as an Dictionary.
 		</constant>
 	</constants>
 </class>
