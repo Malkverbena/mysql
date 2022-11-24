@@ -148,7 +148,7 @@ public:
 	/*     CONNECTION     */
 	void set_credentials( String p_host, String p_user, String p_pass, String p_schema = String() );
 	Dictionary get_last_error() { return _last_sql_error; }
-	Dictionary get_metadata();
+	Dictionary get_connection_metadata();
 	ConnectionStatus connection_start();
 	ConnectionStatus connection_stop();
 	ConnectionStatus connection_status();

@@ -804,8 +804,8 @@ MySQL::ConnectionStatus MySQL::connection_status() {
 
 
 
-Dictionary MySQL::get_metadata(){
-	ERR_FAIL_COND_V_MSG(connection_status() != CONNECTED, Dictionary(), "DatabaseMetaData FAILURE - database is not connected! - METHOD: get_metadata");
+Dictionary MySQL::get_connection_metadata(){
+	ERR_FAIL_COND_V_MSG(connection_status() != CONNECTED, Dictionary(), "DatabaseMetaData FAILURE - database is not connected! - METHOD: get_connection_metadata");
 	Dictionary ret;
 	sql::DatabaseMetaData *dbcon_meta = conn->getMetaData();
 	std::unique_ptr < sql::ResultSet > res(dbcon_meta->getSchemas());
@@ -1089,7 +1089,7 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("connection_start"),&MySQL::connection_start);
 	ClassDB::bind_method(D_METHOD("connection_stop"),&MySQL::connection_stop);
 	ClassDB::bind_method(D_METHOD("connection_status"),&MySQL::connection_status);
-	ClassDB::bind_method(D_METHOD("get_metadata"),&MySQL::get_metadata);
+	ClassDB::bind_method(D_METHOD("get_connection_metadata"),&MySQL::get_connection_metadata);
 	ClassDB::bind_method(D_METHOD("get_last_error"),&MySQL::get_last_error);
 
 	/*     PROPERTIES     */
