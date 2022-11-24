@@ -1,20 +1,21 @@
-- Support Godot 3 and 4   ***DONE
+- [x]  Support Godot 3 and 4
 
-- Rewrite functions  ***DONE
+- [x]  Rewrite functions
 
-- Support for more datatypes (Variant)   ***DONE
+- [x]  Support for more datatypes (Variant)
 
-- Support for doubles (now Godot 4 supports it)  ***DONE
+- [x]  Support for doubles (now Godot 4 supports it)
 
-- Support for JSON  ***DONE
+- [x]  Support for JSON
  
-- Support transaction   ***DONE
+- [x]  Support transaction
 
-- Better debug - Integrated with Godot's error system   ***DONE
+- [x] Better debug - Integrated with Godot's error system
 
-- Add supported to javascript
+- [ ]  Add supported to javascript
 
-- Fix bugs
+- [ ]  Fix bugs
 
-- Write documentation
+- [ ]  Write documentation
+
 
