@@ -12,7 +12,7 @@
 
 - Better debug - Integrated with Godot's error system   ***DONE
 
-- Finish the functions and TODO's
+- Add supported to javascript
 
 - Fix bugs
 
