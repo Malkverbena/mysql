@@ -19,7 +19,6 @@ Prepared Statement for:
 
 Supported sql data types:
   TYPE         GODOT             SQL -> sql::DataType::
-
   NULL   =>    null      =>   NILL - res->isNull
   BOOL   =>    bool      =>   BIT
   INT32  =>  Integer 32  =>   TINYINT - SMALLINT - MEDIUMINT
