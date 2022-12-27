@@ -22,13 +22,21 @@
 ####  TYPE         GODOT             SQL -> sql::DataType::
 
   NULL   =>    null      =>   NILL - res->isNull
+  
   BOOL   =>    bool      =>   BIT
+  
   INT32  =>  Integer 32  =>   TINYINT - SMALLINT - MEDIUMINT
+  
   INT64  =>  Integer 64  =>   INTEGER - BIGINT
+  
   FLOAT  =>    float     =>   REAL - DOUBLE -  DECIMAL - NUMERIC
+  
   TIME   =>    Array     =>   DATE - TIME - TIMESTAMP - YEAR
+  
   CHAR   =>    String    =>   ENUM - CHAR - VARCHAR - LONGVARCHAR
+  
   JSON   =>  JsonString  =>   JSON/TEXT
+  
   BINARY =>   ByteArray  =>   BINARY - VARBINARY - LONGVARBINARY
 
 
