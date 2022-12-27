@@ -1,6 +1,6 @@
 Connection:
   Set/Get Properties
-  SSL connections
+  SSL/TLS connections
 
 
 Simple:
