@@ -1,24 +1,26 @@
-Connection:
-  Set/Get Properties
-  SSL/TLS connections
+## Capabilities:
+
+### Connection:
+  - Set/Get Properties
+  - SSL/TLS connections
+  - Map of properties 
+
+### Simple text queries:
+  - Query
+  - Execute
+  - Update
+  - Transactions & Save Points
+
+### Prepared Statement for:
+  - Query
+  - Execute
+  - Update
+  - Transactions & Save Points
 
 
-Simple:
-  Query
-  Execute
-  Update
-  Transactions & Save Points
+### Supported sql data types:
+####  TYPE         GODOT             SQL -> sql::DataType::
 
-
-Prepared Statement for:
-  Query
-  Execute
-  Update
-  Transactions & Save Points
-
-
-Supported sql data types:
-  TYPE         GODOT             SQL -> sql::DataType::
   NULL   =>    null      =>   NILL - res->isNull
   BOOL   =>    bool      =>   BIT
   INT32  =>  Integer 32  =>   TINYINT - SMALLINT - MEDIUMINT
