@@ -73,7 +73,6 @@ public:
 	};
 
 
-
 private:
 
 	enum OP {
@@ -128,14 +127,14 @@ private:
 	int	get_prop_type( String p_prop );
 	int get_time_format( String time );
 	void _fit_statement( std::shared_ptr<sql::PreparedStatement> prep_stmt, std::stringstream *blob, Variant arg, int index );
-	PoolStringArray prop_string = String("hostName, userName, password, schema, pipe, pluginDir, postInit, preInit, readDefaultFile, readDefaultGroup, rsaKey, socket, sslCA, sslCAPath, sslCert, sslCipher, sslCRL, sslCRLPath, sslKey, characterSetResults, charsetDir, defaultAuth, defaultPreparedStatementResultType, defaultStatementResultType, OPT_TLS_VERSION, OPT_CHARSET_NAME").rsplit(", ");
-	PoolStringArray prop_bool = String("OPT_RECONNECT, CLIENT_COMPRESS, CLIENT_FOUND_ROWS, CLIENT_IGNORE_SIGPIPE, CLIENT_IGNORE_SPACE, CLIENT_INTERACTIVE, CLIENT_LOCAL_FILES, CLIENT_MULTI_STATEMENTS, CLIENT_NO_SCHEMA, OPT_REPORT_DATA_TRUNCATION, OPT_CAN_HANDLE_EXPIRED_PASSWORDS, OPT_ENABLE_CLEARTEXT_PLUGIN, OPT_GET_SERVER_PUBLIC_KEY, sslEnforce, sslVerify, useLegacyAuth").rsplit(", ");
+
 	PoolStringArray prop_int = String("port, OPT_CONNECT_TIMEOUT, OPT_LOCAL_INFILE, OPT_WRITE_TIMEOUT, OPT_READ_TIMEOUT").rsplit(", ");
 	PoolStringArray prop_map = String("OPT_CONNECT_ATTR_ADD").rsplit(", ");
 	PoolStringArray prop_list = String("OPT_CONNECT_ATTR_DELETE").rsplit(", ");
 	PoolStringArray prop_void = String("OPT_CONNECT_ATTR_RESET, OPT_NAMED_PIPE").rsplit(", ");
-
-
+	PoolStringArray prop_string = String("hostName, userName, password, schema, pipe, pluginDir, postInit, preInit, readDefaultFile, readDefaultGroup, rsaKey, socket, sslCA, sslCAPath, sslCert, sslCipher, sslCRL, sslCRLPath, sslKey, characterSetResults, charsetDir, defaultAuth, defaultPreparedStatementResultType, defaultStatementResultType, OPT_TLS_VERSION, OPT_CHARSET_NAME").rsplit(", ");
+	PoolStringArray prop_bool = String("OPT_RECONNECT, CLIENT_COMPRESS, CLIENT_FOUND_ROWS, CLIENT_IGNORE_SIGPIPE, CLIENT_IGNORE_SPACE, CLIENT_INTERACTIVE, CLIENT_LOCAL_FILES, CLIENT_MULTI_STATEMENTS, CLIENT_NO_SCHEMA, OPT_REPORT_DATA_TRUNCATION, OPT_CAN_HANDLE_EXPIRED_PASSWORDS, OPT_ENABLE_CLEARTEXT_PLUGIN, OPT_GET_SERVER_PUBLIC_KEY, sslEnforce, sslVerify, useLegacyAuth").rsplit(", ");
+	
 
 protected:
 

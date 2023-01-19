@@ -310,7 +310,7 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 
 					else{
 						// This module can't recognize this format.
-						ERR_FAIL_V_EDMSG( Array(), "Format not supoeted!");
+						ERR_FAIL_V_EDMSG( Array(), "Format not supported!");
 					}
 					// FITTING DATA  --------  END
 
@@ -326,7 +326,7 @@ Array MySQL::_query(String p_sqlquery, Array p_values, DataFormat data_model, bo
 
 		}  // WHILE
 
-	}  // try
+	}  // TRY
 
 	catch (sql::SQLException &e) {
 		print_SQLException(e);
@@ -698,7 +698,7 @@ Variant MySQL::get_property(String p_property){
 
 	ERR_FAIL_COND_V_EDMSG( prop_type == INVALID, ret, "The property '" + p_property.to_upper() +  "' does not exist!");
 
-	// Colocar no doc
+	// TODO: Put it on docs
 	// "Non-existent property. \nFor more information visit: \nhttps://dev.mysql.com/doc/connector-cpp/1.1/en/connector-cpp-connect-options.html"
 	map <sql::SQLString, sql::Variant>::iterator _prop;
 	_prop = connection_properties.find( property );
@@ -805,8 +805,10 @@ MySQL::ConnectionStatus MySQL::connection_status() {
 
 
 Dictionary MySQL::get_connection_metadata(){
-	ERR_FAIL_COND_V_MSG(connection_status() != CONNECTED, Dictionary(), "DatabaseMetaData FAILURE - database is not connected! - METHOD: get_connection_metadata");
+
 	Dictionary ret;
+	ERR_FAIL_COND_V_MSG(connection_status() != CONNECTED, ret, "DatabaseMetaData FAILURE - database is not connected! - METHOD: get_connection_metadata");
+
 	sql::DatabaseMetaData *dbcon_meta = conn->getMetaData();
 	std::unique_ptr < sql::ResultSet > res(dbcon_meta->getSchemas());
 	ret["Total number of schemas"] = res->rowsCount();
@@ -831,6 +833,7 @@ Dictionary MySQL::get_connection_metadata(){
 	ret["Maximum Columns per Table"] = dbcon_meta->getMaxColumnsInTable();
 	ret["Maximum Columns per Index"] = dbcon_meta->getMaxColumnsInIndex();
 	ret["Maximum Row Size per Table"] = dbcon_meta->getMaxRowSize();
+
 	return ret;
 }
 
@@ -1039,6 +1042,7 @@ void MySQL::_fit_statement(std::shared_ptr<sql::PreparedStatement> prep_stmt, st
 
 void MySQL::print_SQLException(sql::SQLException &e) {
 	/*
+	// NOTE: 
 	If (e.getErrorCode() == 1047) = Your server does not seem to support Prepared Statements at all. Perhaps MYSQL < 4.1?.
 	Error: 1047 SQLSTATE: 08S01 (ER_UNKNOWN_COM_ERROR)
 	Message: Unknown command
@@ -1058,8 +1062,9 @@ void MySQL::print_SQLException(sql::SQLException &e) {
 	_last_sql_error["MySQL error code"] = errCode;
 	_last_sql_error["SQLState"] = _error;
 
-	//FIXME: 	ERR_FAIL_	just print
+	//	FIXME:	ERR_FAIL_just print
 	//	ERR_PRINT(sqlError) ?
+
 
 #ifdef TOOLS_ENABLED
 	print_line("# EXCEPTION Caught ˇ");
@@ -1092,19 +1097,22 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_connection_metadata"),&MySQL::get_connection_metadata);
 	ClassDB::bind_method(D_METHOD("get_last_error"),&MySQL::get_last_error);
 
+
 	/*     PROPERTIES     */
 	ClassDB::bind_method(D_METHOD("get_property", "property"),&MySQL::get_property);
 	ClassDB::bind_method(D_METHOD("set_property", "property", "value"),&MySQL::set_property);
 	ClassDB::bind_method(D_METHOD("set_properties_array", "properties"),&MySQL::set_properties_array);
 	ClassDB::bind_method(D_METHOD("get_properties_array", "properties"),&MySQL::get_properties_array);
 
+
 	/*      DATABASE      */
-	ClassDB::bind_method(D_METHOD("query", "Sql Statement", "DataFormat", "Return data as String", "Metadata"),&MySQL::query, DEFVAL(DICTIONARY), DEFVAL(false), DEFVAL(PoolIntArray()) );
-	ClassDB::bind_method(D_METHOD("query_prepared", "sql_statement", "Values", "DataFormat", "return_string", "meta"), &MySQL::query_prepared, DEFVAL(Array()), DEFVAL(MySQL::DataFormat::DICTIONARY), DEFVAL(false), DEFVAL(PoolIntArray()));
 	ClassDB::bind_method(D_METHOD("execute", "sql_statement"),&MySQL::execute);
 	ClassDB::bind_method(D_METHOD("execute_prepared", "sql_statement", "Values"),&MySQL::execute_prepared);
 	ClassDB::bind_method(D_METHOD("update", "sql_statement"),&MySQL::update);
 	ClassDB::bind_method(D_METHOD("update_prepared", "sql_statement", "Values"),&MySQL::update_prepared);
+	ClassDB::bind_method(D_METHOD("query", "Sql Statement", "DataFormat", "Return data as String", "Metadata"),&MySQL::query, DEFVAL(DICTIONARY), DEFVAL(false), DEFVAL(PoolIntArray()) );
+	ClassDB::bind_method(D_METHOD("query_prepared", "sql_statement", "Values", "DataFormat", "return_string", "meta"), &MySQL::query_prepared, DEFVAL(Array()), DEFVAL(MySQL::DataFormat::DICTIONARY), DEFVAL(false), DEFVAL(PoolIntArray()));
+
 
 	/*     CONNECTOR      */
 	ClassDB::bind_method(D_METHOD("set_database", "database"),&MySQL::set_database);
@@ -1115,10 +1123,12 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_catalog"),&MySQL::get_catalog);
 	ClassDB::bind_method(D_METHOD("get_client_info"),&MySQL::get_client_info);
 
+
 	/*    CONN OPTIONS    */
 	ClassDB::bind_method(D_METHOD("get_driver_info"),&MySQL::get_driver_info);
 	ClassDB::bind_method(D_METHOD("set_client_option", "option", "value"),&MySQL::set_client_option);
 	ClassDB::bind_method(D_METHOD("get_client_option", "option"),&MySQL::get_client_option);
+
 
 	/*    TRANSACTION     */
 		ClassDB::bind_method(D_METHOD("set_autocommit", "bool"),&MySQL::set_autocommit);
@@ -1132,6 +1142,7 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_savepoints"),&MySQL::get_savepoints);
 
 
+	/*        ENUMS       */
 	BIND_ENUM_CONSTANT(TRANSACTION_ERROR);
 	BIND_ENUM_CONSTANT(TRANSACTION_NONE);
 	BIND_ENUM_CONSTANT(TRANSACTION_READ_COMMITTED);
@@ -1152,6 +1163,7 @@ void MySQL::_bind_methods() {
 
 	BIND_ENUM_CONSTANT(ARRAY);
 	BIND_ENUM_CONSTANT(DICTIONARY);
+
 
 }
 

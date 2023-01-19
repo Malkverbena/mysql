@@ -5,14 +5,18 @@
 # DO NOT FORGET TO REPLACE THE SLASH FOR BACKSLASH ON PATHS => "\" FOR "/" 
 
 # Enter with path to Boost library here
-boost_path = "C:/boost_1_76_0"
+# boost_path = "C:/boost_1_76_0"
+boost_path = "/media/cleber/686A6A516A6A1BD6/boost_1_76_0"
+
 
 # Enter with the path to jdbc here (mysql_connection.h & mysql_driver.h)
-include_path = "C:/mysql/mysql-connector-c++-8.0.29-winx64/include/jdbc"
+# include_path = "C:/mysql/mysql-connector-c++-8.0.29-winx64/include/jdbc"
+include_path = "/media/cleber/686A6A516A6A1BD6/mysql/mysql-connector-c++-8.0.29-winx64/include/jdbc"
+
 
 # Enter with the path to mysql libs here (mysqlcppconn.lib)
-lib_path = 'C:/mysql/mysql-connector-c++-8.0.29-winx64/lib64/vs14/debug'
-
+# lib_path = 'C:/mysql/mysql-connector-c++-8.0.29-winx64/lib64/vs14/debug'
+lib_path = "/media/cleber/686A6A516A6A1BD6/mysql/mysql-connector-c++-8.0.29-winx64/lib64/vs14/debug"
 
 # Enable the module debug.
 module_debug = True
@@ -77,7 +81,8 @@ if env["platform"] in ["windows", "UWP"]:
 	sufix = sufix[0:-3]
 
 	mysql_env.Append(CPPFLAGS =["-I" + include_path, "-L " + lib_path])
-	target_lib_arr = [target_lib]   # TODO: More libs are expected for static compilling (ssl, crypto e etc...)
+	# TODO: More libs are expected for static compilling (ssl, crypto e etc...)
+	target_lib_arr = [target_lib]   
 
 	# copy libs
 	for i in target_lib_arr:
