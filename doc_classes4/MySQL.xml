@@ -1,60 +1,48 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="MySQL" inherits="RefCounted" version="4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+<class name="MySQL" inherits="RefCounted" version="4.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
 	<brief_description>
-		A MySQL connector for Godot.
 	</brief_description>
 	<description>
-		This module is a wrapper of the Mysql connector for C ++. 
-		Supports connections over the internet. It's fully compatible with MariaDB. Supports secure connections (SSL).
 	</description>
 	<tutorials>
-		<link title="Tutorial">http://asdad.html</link>
 	</tutorials>
 	<methods>
 		<method name="commit">
 			<return type="int" enum="Error" />
 			<description>
-				Makes changes made to the current transaction permanent and visible to other sessions. Also release all InnoDB locks that were set during the current transaction.
-				All savepoints of the current transaction are deleted if you execute a COMMIT.
 			</description>
 		</method>
 		<method name="connection_start">
 			<return type="int" enum="MySQL.ConnectionStatus" />
 			<description>
-				Starts the connection. Also returns the status of connection.
 			</description>
 		</method>
 		<method name="connection_status">
 			<return type="int" enum="MySQL.ConnectionStatus" />
 			<description>
-				Returns the status of connection.
 			</description>
 		</method>
 		<method name="connection_stop">
 			<return type="int" enum="MySQL.ConnectionStatus" />
 			<description>
-				Close the connection. Also returns the status of connection after closed.
 			</description>
 		</method>
 		<method name="create_savepoint">
 			<return type="int" enum="Error" />
 			<param index="0" name="savepoint" type="String" />
 			<description>
-				Create a savepoint that can be retrieved within a transaction.
 			</description>
 		</method>
 		<method name="delete_savepoint">
 			<return type="int" enum="Error" />
 			<param index="0" name="savepoint" type="String" />
 			<description>
-				Delete a savepoint.
 			</description>
 		</method>
 		<method name="execute">
 			<return type="bool" />
 			<param index="0" name="sql_statement" type="String" />
 			<description>
-				Execute SQL statements. Returns true if the statement was successful.
 			</description>
 		</method>
 		<method name="execute_prepared">
@@ -62,15 +50,11 @@
 			<param index="0" name="sql_statement" type="String" />
 			<param index="1" name="Values" type="Array" />
 			<description>
-				Execute prepared SQL statements. Returns true if the statement was successful.
-				The values for Prepared Statements must be supplied within an array. Parameters in prepared statements are for data values ONLY. Do not use for object identifiers or any other part of a SQL statement.
-				ONLY data values.
 			</description>
 		</method>
 		<method name="get_autocommit">
 			<return type="bool" />
 			<description>
-				Get auto-commit mode for the current session.
 			</description>
 		</method>
 		<method name="get_catalog">
@@ -81,14 +65,12 @@
 		<method name="get_client_info">
 			<return type="String" />
 			<description>
-				Returns the Client information.
 			</description>
 		</method>
 		<method name="get_client_option">
 			<return type="Variant" />
 			<param index="0" name="option" type="String" />
 			<description>
-				The method can be used to check the value of connection properties set when establishing a database connection.
 			</description>
 		</method>
 		<method name="get_connection_metadata">
@@ -99,44 +81,28 @@
 		<method name="get_database">
 			<return type="String" />
 			<description>
-				Returns the currently selected database.
 			</description>
 		</method>
 		<method name="get_driver_info">
 			<return type="Dictionary" />
 			<description>
-				Returns driver information.
 			</description>
 		</method>
 		<method name="get_last_error">
 			<return type="Dictionary" />
 			<description>
-				Return a Dictionary containing details about the last MySQL exception occurred.
 			</description>
 		</method>
 		<method name="get_properties_array">
 			<return type="Dictionary" />
 			<param index="0" name="properties" type="PackedStringArray" />
 			<description>
-				Returns a Dictionary with multiple properties at the same time.
-				[codeblocks]
-				[gdscript]
-				var mysql := MySQL.new()
-				var conn_set := [
-					    "schema",
-					    "CLIENT_MULTI_STATEMENTS",
-					    "OPT_RECONNECT"
-					]
-				mysql.get_properties_array(conn_set)
-				[/gdscript]
-				[/codeblocks]
 			</description>
 		</method>
 		<method name="get_property">
 			<return type="Variant" />
 			<param index="0" name="property" type="String" />
 			<description>
-				Returns the value of a property.
 			</description>
 		</method>
 		<method name="get_readyonly">
@@ -147,13 +113,11 @@
 		<method name="get_savepoints">
 			<return type="PackedStringArray" />
 			<description>
-				Returns an Array with all set savepoints.
 			</description>
 		</method>
 		<method name="get_transaction_isolation">
 			<return type="int" enum="MySQL.Isolation" />
 			<description>
-				Get the current transaction Isolation Level.
 			</description>
 		</method>
 		<method name="query">
@@ -163,11 +127,6 @@
 			<param index="2" name="Return data as String" type="bool" default="false" />
 			<param index="3" name="Metadata" type="PackedInt32Array" default="PackedInt32Array()" />
 			<description>
-				Returns an array containing the query result. 
-				[code]Sql Statement[/code] SQL statement. The querty it'self.
-				[code]DataFormat[/code] The way each row will be returned. It can be an Array or a Dictionary.
-				[code]return_as_string[/code] If false, the all data is returned as string. If true, the data will be returned as it data type.
-				[code]Metadata[/code] Returns rows containing additional information about the query made.
 			</description>
 		</method>
 		<method name="query_prepared">
@@ -178,33 +137,18 @@
 			<param index="3" name="return_string" type="bool" default="false" />
 			<param index="4" name="meta" type="PackedInt32Array" default="PackedInt32Array()" />
 			<description>
-				Returns an array containing the query result. The query must be done using prepared statement. 
-				[code]Sql Statement[/code] SQL statement. The querty it'self.
-				[code]Values[/code] This Array contains the values that will replace the placeholders on statement.
-				[code]DataFormat[/code] The way each row will be returned. It can be an Array or a Dictionary.
-				[code]return_as_string[/code] If false, the all data is returned as string. If true, the data will be returned as it data type.
-				[code]Metadata[/code] Returns rows containing additional information about the query made.
-				[codeblocks]
-				[gdscript]
-				mysql.query_prepared("SELECT * FROM test_table WHERE id = (?)", [2])
-				[/gdscript]
-				[/codeblocks]
 			</description>
 		</method>
 		<method name="rollback">
 			<return type="int" enum="Error" />
 			<param index="0" name="savepoint" type="String" />
 			<description>
-				When a Rollback is used with a savepoint, it rolls back all changes made by the current transaction up to the savepoint. 
-				When used without a savepoint name cancels all changes made by the current transaction and release all InnoDB locks that were set during the current transaction.
-				All savepoints of the current transaction are deleted if you execute a ROLLBACK without a savepoint.
 			</description>
 		</method>
 		<method name="set_autocommit">
 			<return type="int" enum="Error" />
 			<param index="0" name="bool" type="bool" />
 			<description>
-				Enables or disables the default auto-commit mode for the current session.
 			</description>
 		</method>
 		<method name="set_catalog">
@@ -227,35 +171,18 @@
 			<param index="2" name="Password" type="String" />
 			<param index="3" name="Database" type="String" default="&quot;&quot;" />
 			<description>
-				Quick way to set up a connection.
 			</description>
 		</method>
 		<method name="set_database">
 			<return type="int" enum="Error" />
 			<param index="0" name="database" type="String" />
 			<description>
-				Select a database.
 			</description>
 		</method>
 		<method name="set_properties_array">
 			<return type="int" enum="Error" />
 			<param index="0" name="properties" type="Dictionary" />
 			<description>
-				Set several properties at same time.
-				[codeblocks]
-				[gdscript]
-				var mysql := MySQL.new()
-				var conn_set := {
-					    "hostName": my_host_name, 
-					    "userName": my_user_name, 
-					    "password": my_password, 
-					    "schema": "tests",
-					    "CLIENT_MULTI_STATEMENTS": true,
-					    "OPT_RECONNECT": true
-					}
-				mysql.set_properties_array(conn_set)
-				[/gdscript]
-				[/codeblocks]
 			</description>
 		</method>
 		<method name="set_property">
@@ -263,7 +190,6 @@
 			<param index="0" name="property" type="String" />
 			<param index="1" name="value" type="Variant" />
 			<description>
-				Sets a property.
 			</description>
 		</method>
 		<method name="set_readyonly">
@@ -276,17 +202,12 @@
 			<return type="int" enum="Error" />
 			<param index="0" name="level" type="int" enum="MySQL.Isolation" />
 			<description>
-				Controls the behavior of locks and versioning of lines and statements.
 			</description>
 		</method>
 		<method name="update">
 			<return type="int" />
 			<param index="0" name="sql_statement" type="String" />
 			<description>
-				Run update statements. Returns the number of modified rows.
-					Run queries using Prepared Statements. Returns the number of modified rows. 
-					The values ​​for Prepared Statements must be supplied within an array. 
-					Parameters in prepared statements are for data values ONLY. Do not use for object identifiers or any other part of a SQL statement. ONLY data values.
 			</description>
 		</method>
 		<method name="update_prepared">
@@ -294,64 +215,43 @@
 			<param index="0" name="sql_statement" type="String" />
 			<param index="1" name="Values" type="Array" />
 			<description>
-				Run update prepared statements. Returns the number of modified rows.
-					Run queries using Prepared Statements. Returns the number of modified rows. 
-					The values ​​for Prepared Statements must be supplied within an array. 
-					Parameters in prepared statements are for data values ONLY. Do not use for object identifiers or any other part of a SQL statement. ONLY data values.
 			</description>
 		</method>
 	</methods>
 	<constants>
 		<constant name="TRANSACTION_ERROR" value="-1" enum="Isolation">
-			Invalid paramenter. Used only by the module for internal control.
 		</constant>
 		<constant name="TRANSACTION_NONE" value="0" enum="Isolation">
-			Invalid paramenter. Used only by the connector for internal control.
 		</constant>
 		<constant name="TRANSACTION_READ_COMMITTED" value="1" enum="Isolation">
-			Each consistent read, even within the same transaction, sets and reads its own fresh snapshot.
 		</constant>
 		<constant name="TRANSACTION_READ_UNCOMMITTED" value="2" enum="Isolation">
-			SELECT statements are performed in a nonlocking fashion.
 		</constant>
 		<constant name="TRANSACTION_REPEATABLE_READ" value="3" enum="Isolation">
-			This is the default isolation level for InnoDB.
 		</constant>
 		<constant name="TRANSACTION_SERIALIZABLE" value="4" enum="Isolation">
-			This level is like REPEATABLE READ, but InnoDB implicitly converts all plain SELECT statements to SELECT ... FOR SHARE if autocommit is disabled.
 		</constant>
 		<constant name="COLUMNS_NAMES" value="0" enum="MetaCollection">
-			Returns an extra Array inside the result containing the column names.
 		</constant>
 		<constant name="COLUMNS_TYPES" value="1" enum="MetaCollection">
-			Returns an extra Array inside the result containing the column types.
 		</constant>
 		<constant name="ATTRIBUTES" value="2" enum="MetaCollection">
-			Returns an extra Dictionary within the result containing the column attributes.
 		</constant>
 		<constant name="TABLE_INFO" value="3" enum="MetaCollection">
-			Returns an extra Array inside the result containing table info.
 		</constant>
 		<constant name="NO_QUERY" value="4" enum="MetaCollection">
-			DO NOT Returns the result of querty. This function is a waste of processing. Useful only if you want the metadata and nothing else.
 		</constant>
 		<constant name="NO_CONNECTION" value="0" enum="ConnectionStatus">
-			No connection set.
 		</constant>
 		<constant name="CLOSED" value="1" enum="ConnectionStatus">
-			Connection was started but closed.
 		</constant>
 		<constant name="CONNECTED" value="2" enum="ConnectionStatus">
-			Connected and operational.
 		</constant>
 		<constant name="DISCONNECTED" value="3" enum="ConnectionStatus">
-			Disconnected by server or client.
 		</constant>
 		<constant name="ARRAY" value="0" enum="DataFormat">
-			returns the querty result as an array.
 		</constant>
 		<constant name="DICTIONARY" value="1" enum="DataFormat">
-			returns the querty result as an Dictionary.
 		</constant>
 	</constants>
 </class>
