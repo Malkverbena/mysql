@@ -49,4 +49,5 @@
 *.*[~]
 __pycache__/
 .vscode/
-/.godot
+.code-workspace
+.godot/
