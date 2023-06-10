@@ -1,7 +1,5 @@
 # config.py
 
-import version
-
 
 def can_build(env, platform):
 	return True
@@ -12,12 +10,12 @@ def configure(env):
 
 
 def get_doc_path():
-	return "doc_classes" + str(version.major)
+	return "doc_classes"
 
 
 def get_doc_classes():
 	return [ 
-	    "MySQL", 
+	    "mysql", 
 	]
 
 
