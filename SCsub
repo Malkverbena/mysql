@@ -2,6 +2,25 @@
 # SCsub
 
 
-Import('env')
 
-env.add_source_files(env.modules_sources, "*.cpp")
+Import('env')
+mysql_env = env.Clone()
+
+
+sources = [
+    "register_types.cpp",
+    "scr/helpers.cpp",
+    "scr/sql_conn.cpp",
+    "scr/mysql.cpp",
+
+]
+
+
+mysql_env.Prepend(CPPPATH=["/media/cleber/DATA/COMPILATIONS/dependencies/boost/libs/mysql/include/boost"]) 
+
+env.Append(LIBPATH=["#/media/cleber/DATA/COMPILATIONS/dependencies/boost/stage/lib"])
+env.Append(LIBPATH=['#/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/ssl/lib64'])
+env.Append(LIBS=["libcrypto", "libssl"])
+
+
+mysql_env.add_source_files(env.modules_sources, sources)

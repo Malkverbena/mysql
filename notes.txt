@@ -1,0 +1,81 @@
+
+int *pnum;	// Declara o ponteiro
+int num;		// Declara o valor
+
+num = 10;
+pnum = &num
+&num	// Endereço
+
+*pnum; //Imprime o 
+
+delete pnum; OBRIGATÓRIO 
+
+
+
+Trabalhando com unique_ptr:
+https://learn.microsoft.com/pt-br/cpp/cpp/how-to-create-and-use-unique-ptr-instances?view=msvc-170
+
+
+new_connection = Instancia nova conexão
+
+
+set_credeltials = configura a conexão
+
+get/set_param = Mudaparametros
+
+//		std::string std_string = gdt_data.utf8().get_data();
+
+
+mysql uses: boost::mysql::string_view  AKA boost::core::basic_string_view<char>
+Godot uses: CharType 
+
+Godot::String >> boost::core::basic_string_view<char>
+boost::core::basic_string_view<char> >> Godot::String
+
+/*
+Conexão:
+	todo o contexto de conexão entra aqui
+
+
+	Principais membros:
+		mysql::handshake_params
+		mysql::tcp_ssl_connection conn
+	
+	Funções:
+		set/get param
+		set_credential
+		connect
+		disconnect
+		get_status
+		get_meta
+
+
+mysql:
+	todas as operaç~pes são feitas daqui
+	querty
+	prep_stmt querty
+	 
+	
+	
+result:
+	Os dados e meta dados das queruties ficarão aqui
+	
+	[get]
+		affected_rows
+		has_value
+		info
+		last_insert_id
+		meta
+		rows
+		warning_count
+		
+		
+Error MySQL::set_credentials(String conn_name, String hostname, String user, String password, String schema, int port){
+	ERR_FAIL_COND_V_MSG(connections_holder[conn_name].set_param("hostname", hostname), ERR_INVALID_PARAMETER, vformat("%s is an invalid parameter: hostname "));
+	ERR_FAIL_COND_V_MSG(connections_holder[conn_name].set_param("username", user), ERR_INVALID_PARAMETER, vformat("%s is an invalid parameter: user "));
+	ERR_FAIL_COND_V_MSG(connections_holder[conn_name].set_param("password", password), ERR_INVALID_PARAMETER, vformat("%s is an invalid parameter: password"));
+	ERR_FAIL_COND_V_MSG(connections_holder[conn_name].set_param("database", schema), ERR_INVALID_PARAMETER, vformat("%s is an invalid parameter: schema"));
+	ERR_FAIL_COND_V_MSG(connections_holder[conn_name].set_param("port", port), ERR_INVALID_PARAMETER, vformat("%s is an invalid parameter: port"));
+	return OK;
+}
+*/

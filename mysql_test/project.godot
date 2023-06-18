@@ -11,5 +11,7 @@ config_version=5
 [application]
 
 config/name="Mysql 3 Tests"
+config/tags=PackedStringArray("test")
+run/main_scene="res://teste1/teste1.tscn"
 config/features=PackedStringArray("4.1", "Double Precision", "Forward Plus")
 config/icon="res://icon.svg"
