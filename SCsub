@@ -2,14 +2,13 @@
 # SCsub
 
 
-
 Import('env')
 mysql_env = env.Clone()
 
 
 sources = [
     "register_types.cpp",
-    "scr/helpers.cpp",
+#    "scr/helpers.cpp",
     "scr/sql_conn.cpp",
     "scr/mysql.cpp",
 

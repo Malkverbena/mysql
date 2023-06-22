@@ -24,18 +24,12 @@
 #include <memory>
 
 
-//using namespace boost::mysql;
-
-
-
-
-//#pragma once
-
+/*
 class Helpers : public RefCounted {
 	GDCLASS(Helpers, RefCounted);
 
 };
-
+*/
 #endif  // HELPERS_H
 
 

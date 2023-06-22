@@ -4,7 +4,7 @@
 #define SQL_CONN_H
 
 
-#include "helpers.h"
+//#include "helpers.h"
 
 
 #include "core/object/ref_counted.h"  
@@ -29,82 +29,79 @@
 
 using namespace std;
 using namespace boost;
-//using namespace boost::mysql;
-
-// === SQL aceita const char *
-// === Retirnar result como um objeto(classe)
+using namespace boost::asio;
+using namespace boost::mysql;
 
 //	template <class T>
 // return class name: typeid(this).name()
 
+class Conn{
+public:
+};
+
 
 /* ===== TCP  TYPE: tcp_connection ===== */
-
 /* ===== TCP_SSL  TYPE: tcp_ssl_connection ===== */
 
 
 
-class Conn{
 
-public:
-
-
-};
-
-
-//--------------------------------------
 
 class ConnTcpSsl : public Conn {
-
 friend class MySQL;
 
 private:
-	bool async = false;
-//	bool tls = true;
-
-	mysql::string_view username = "";
-	mysql::string_view password = "";
-	mysql::string_view schema = "";
-	std::uint16_t collation = 45;  //FIXME: dESCOBRIR O TIPO DE DADO DDE COLLATION
-
-	mysql::string_view host = "localhost";
-	int port = 3306;
-	
 	// Common
-	unique_ptr<asio::ip::tcp::resolver::results_type> eps;	// Physical endpoint(s) to connect to
-	unique_ptr<asio::io_context> ctx;								// boost::asio context
-	unique_ptr<mysql::handshake_params> conn_params;			// MySQL credentials and other connection config
-	unique_ptr<asio::ip::tcp::resolver> resolver;				// To perform hostname resolution
+	io_context ctx;								// boost::asio context
+	ip::tcp::resolver::results_type eps;	// Physical endpoint(s) to connect to
+	handshake_params conn_params;				// MySQL credentials and other connection config
+	ip::tcp::resolver resolver;				// To perform hostname resolution
 
 	// TCP Connection
-	unique_ptr<mysql::tcp_ssl_connection> conn;					// Represents the connection to the MySQL server
-	unique_ptr<asio::ssl::context> ssl_ctx;						// MySQL 8+ default settings require SSL
-
-protected:
-
-	Error set_param(String param, Variant p_value);	// Set connection parameters.
-	Variant get_param(String param);						// Retrives connection parameters.
+	ssl::context ssl_ctx;						// MySQL 8+ default settings require SSL
+	tcp_ssl_connection conn;					// Represents the connection to the MySQL server
 
 
-	Error run();	// setup the connection's objects
-
-
-	void start();					// Setup connection (run)
-	Error connect();				// Establish the connection - must be inside try{}
-	void disconnect();			// Disconnect & cleanning.
-	int status();					// Return the connection status
 
 public:
-	ConnTcpSsl(bool _async = false);
-	~ConnTcpSsl();
 
+	const PackedStringArray param_names = {
+		String("connection_collation"), String("database"), String("multi_queries"), String("password"), String("username"), String("hostname"), String("port")
+	};
+
+	// Set connection parameters.
+	Error set_param(String param, Variant p_value);
+
+	// Retrives connection parameters.
+	Variant get_param(String param);						
+
+	// Establish the connection  NOTE: must be inside try{}
+	void connect(mysql::string_view hostanme, mysql::string_view port = "3306");
+
+	// Closes the connection.
+	void disconnect();
+
+	// The configuration of the parameters is done inside the Constructor. 
+	ConnTcpSsl(	mysql::string_view	username, 
+					mysql::string_view	password,
+					mysql::string_view	schema,
+					std::uint16_t			collation,
+					mysql::ssl_mode		ssl,
+					bool 						multi_queries,
+					bool						async)
+	:	conn_params(username, password, schema, collation, ssl, multi_queries),
+		resolver(ctx.get_executor()),
+		ssl_ctx(boost::asio::ssl::context::tls_client),
+		conn(ctx, ssl_ctx)
+	{
+	}
+	~ConnTcpSsl();
 };
 
 
 
 
 /* ===== UNIX  TYPE: unix_connection ===== */
-
 /* ===== UNIX_SSL  TYPE: unix_ssl_connection ===== */
 
 

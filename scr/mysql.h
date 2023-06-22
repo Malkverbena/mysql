@@ -6,7 +6,6 @@
 
 #include "sql_conn.h"
 
-
 #include "core/object/ref_counted.h"  
 #include "core/core_bind.h"
 
@@ -26,50 +25,60 @@
 #include <map>
 #include <memory>
 
+
+
+
 class MySQL : public RefCounted {
 	GDCLASS(MySQL, RefCounted);
 
-private:
 
-
-
-
-//==========================================
-
-	// Helpers
-
-	const PackedStringArray param_names = {
-		String("connection_collation"), String("database"), String("multi_queries"), String("password"), String("username"), String("hostname"), String("port")
-	};
-
-
-	std::map<String, std::shared_ptr<ConnTcpSsl>> connections_holder;   //TODO: Make connections a template
-
-protected:
-	static void _bind_methods();
-
-
+friend class ConnTcpSsl;
 
 public:
-
 	enum CONN_TYPE{
 		TCP,
 		SOCKET,
 	};
 
+private:
+
+	class ConnBox{
+	public:
+		bool async; CONN_TYPE type; bool tls;
+		std::shared_ptr<ConnTcpSsl> conn;
+		ConnBox( CONN_TYPE _type = TCP, bool _async = false, bool _tls = false ){
+			type = _type; async = _async; tls = _tls;
+		}
+	};
+
+	std::map<String, ConnBox> connections_holder;   //TODO: Make connections a template
+	Dictionary connections;
+
+
+
+protected:
+
+	static void _bind_methods();
+
+
+
+public:
+	
+/* ==== CONNECTION ==== */
+
 	// Add a new connection to the connection stack.
 	//	CONN_NAME: The name of the connection.
+	// TYPE: Use TCP or UNIX SOCKET.
 	// ASYNC: Determines that the new connection will be asynchronous.
-	// TLS: Determines that the new connection will use TLS only.
-	void new_connection(String conn_name, CONN_TYPE type = TCP, bool async = false, bool tls = true);
+	// SSL: Determines how the new connection will use SSL.
+	void new_connection(String conn_name, CONN_TYPE type = TCP, bool async = false, bool tls = false);
 
 	// Delete a connection from connection stack.
 	//	CONN_NAME: The name of the connection to be deleted.
-	void delete_connection(String conn_name);
+	Error delete_connection(String conn_name);
 
-	// Quikly setup for a connection
-	Error set_credentials(String conn_name, String p_hostname, String p_user, String p_password, String p_schema = "", int p_port = 3306);
-	// FIXME: Port must be a variable in connection
+	// List all connections in the stack
+	Array get_connections();
 
 	// Retrieves parameter values from the specified connection. NOTE: Values must be passed within an PackedStringArray.
 	//	CONN_NAME: The name of the connection from which you want to retrieve information.
@@ -81,6 +90,18 @@ public:
 	// PARAMS: The parameters to be passed to the function. Must be a valid parameter followed by a corresponding value.
 	Error set_params(String conn_name, Dictionary p_params);
 
+	// Setup new connections.
+	Error set_credentials(	String conn_name,
+									String p_username,
+									String p_password,
+									String p_schema 			= String(),
+									std::uint16_t collation	= handshake_params::default_collation,
+									ssl_mode p_ssl				= ssl_mode::require,
+									bool multi_queries		= false);
+
+
+
+
 
 
 
@@ -91,8 +112,8 @@ public:
 	~MySQL();
 };
 
-	VARIANT_ENUM_CAST(MySQL::CONN_TYPE);
-	VARIANT_ENUM_CAST(boost::mysql::ssl_mode);
+VARIANT_ENUM_CAST(MySQL::CONN_TYPE);
+VARIANT_ENUM_CAST(boost::mysql::ssl_mode);
 
 #endif // MYSQL_H
 
