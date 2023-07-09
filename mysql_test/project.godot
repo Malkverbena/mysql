@@ -13,5 +13,10 @@ config_version=5
 config/name="Mysql 3 Tests"
 config/tags=PackedStringArray("test")
 run/main_scene="res://teste1/teste1.tscn"
-config/features=PackedStringArray("4.1", "Double Precision", "Forward Plus")
+config/features=PackedStringArray("4.2", "Double Precision", "Forward Plus")
 config/icon="res://icon.svg"
+
+[filesystem]
+
+import/blender/enabled=false
+import/fbx/enabled=false

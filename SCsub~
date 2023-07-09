@@ -26,6 +26,7 @@ mysql_env.Prepend(CPPPATH=["/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/
 
 
 # LIB
+/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost/
 #env.Append(LIBPATH=["#/media/cleber/DATA/COMPILATIONS/dependencies/boost/stage/lib"]) FUNCIONA!
 env.Append(LIBPATH=["#/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost/lib"])
 

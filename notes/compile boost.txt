@@ -1,0 +1,24 @@
+
+
+COMPILANDO O BOOST:
+./bootstrap.sh --includedir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost --libdir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost/lib
+
+
+PATH = /media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost/include\
+
+./b2 headers -j30
+
+--includedir=<PATH>/include
+--cmakedir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost/cmake\
+--build-dir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost/build\
+variant=debug link=static threading=multi runtime-link=static
+
+
+
+Properties:
+	toolset=toolset					Indicate the toolset to build with.
+	variant=debug|release			Select the build variant
+	link=static|shared				Whether to build static or shared libraries
+	threading=single|multi			Whether to build single or multithreaded binaries
+	runtime-link=static|shared		Whether to link to static or shared C and C++ runtime.
+

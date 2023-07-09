@@ -51,3 +51,6 @@ __pycache__/
 .vscode/
 .code-workspace
 .godot/
+dep/
+deb/
+
