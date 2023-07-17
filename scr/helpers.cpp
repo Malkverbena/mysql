@@ -4,14 +4,6 @@
 #include "sql_conn.h"
 
 
-const char * sqlstr2gdt(boost::mysql::string_view s){
-	const char * str; // = s.data;
-//	String t;// = char2gdt(str);
-	return str;
-}
-
-
-
 String char2gdt(const char * s){
     String str = String::utf8((char *)s);
     return str;

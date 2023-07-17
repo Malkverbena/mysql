@@ -24,6 +24,14 @@
 #include <string.h>
 
 
+#include <boost/asio/local/stream_protocol.hpp>
+#include <boost/mysql/error_with_diagnostics.hpp>
+#include <boost/mysql/results.hpp>
+#include <boost/asio/io_service.hpp>
+#include <boost/mysql/row_view.hpp>
+#include <boost/mysql/statement.hpp>
+
+
 using namespace std;
 using namespace boost;
 using namespace boost::asio;
@@ -54,7 +62,9 @@ Variant field2Var(const field_view fv);
 
 String char2gdt(const char * s);
 
-const char * sqlstr2gdt(boost::mysql::string_view s);
+
+
+
 
 
 #endif  // HELPERS_H

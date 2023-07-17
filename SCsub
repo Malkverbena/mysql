@@ -22,19 +22,14 @@ mysql_env.Append(CXXFLAGS='-std=c++20')
 
 # INCLUDE:
 #mysql_env.Prepend(CPPPATH=["/media/cleber/DATA/COMPILATIONS/dependencies/boost/libs/mysql/include/boost"])  FUNCIONA!
-mysql_env.Prepend(CPPPATH=["/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost/include"]) 
+mysql_env.Prepend(CPPPATH=["#/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost"]) 
 
 
 # LIB
 #env.Append(LIBPATH=["#/media/cleber/DATA/COMPILATIONS/dependencies/boost/stage/lib"]) FUNCIONA!
-env.Append(LIBPATH=["#/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost/lib"])
+env.Append(LIBPATH=["#/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost/lib", '#/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/ssl/lib64'])
 
 
-
-
-
-
-env.Append(LIBPATH=['#/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/ssl/lib64'])
 env.Append(LIBS=["libcrypto", "libssl", "libboost_thread"])
 
 

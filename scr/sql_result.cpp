@@ -4,59 +4,48 @@
 #include "sql_result.h"
 
 
-Array SqlResult::get_array(){
-	return Array();
-}
-
-
-
-Dictionary SqlResult::get_dictionary(){
-/*
-	Dictionary ret;
-	for (int col = 0; col < result.size(); col++){
-
-		Array row = result[col];
-
-		String column_name = String("column_name");
-		String col_name = meta[col].get(column_name);
-		Dictionary line;
-		
-
-		for (int row = 0; row < c.size(); row++ ){
-			Array s = c;
-			line[col_name] = s[row];
-		}
-		ret[col_name] = line;
-	}
-*/
-
-	
-
-
-
-	return result;
-}
-
-
-
-Array SqlResult::get_column(String column){
+Array SqlResult::get_array()
+{
 	Array ret;
-	
-	
-//	for (int column = 0; column < result.size(); column++){
-	
-	
-	
-	
-	
+	for (int col = 0; col < result.size(); col++){
+		Dictionary dic_row = result[col];
+		Array row = dic_row.values();
+		ret.push_back(row);
+	}
+	return ret;
+}
+
+
+Array SqlResult::get_column(String column, bool as_array)
+{
+	Array ret;
+	for (int col = 0; col < result.size(); col++){
+		Dictionary dic_row = result[col];
+		if (as_array){		
+			ret.push_back(dic_row[column]);
+		} 
+		else {
+			Dictionary b = Dictionary();
+			b[dic_row.keys()[col]]=dic_row[column];
+			ret.push_back(b);
+		}
+	}
 	return ret;
 }
 
 
 
-Variant SqlResult::get_row(bool as_dictionary){
-	Variant ret;
-	return ret;
+Variant SqlResult::get_row(int row, bool as_array)
+{
+	if(as_array){
+		Array ret = Array();
+		Dictionary line = result[row];
+		for (int col = 0; col < line.size(); col++){
+			ret.push_back(line[col]);
+		}
+		return ret;
+	}
+	return result[row];
 }
 
 
@@ -72,13 +61,15 @@ Array SqlResult::get_column(int column, bool as_string){
 */
 
 
-Dictionary SqlResult::get_metadata(){
+Dictionary SqlResult::get_metadata()
+{
 	return meta;
 }
 
 
 
-void SqlResult::_bind_methods() {
+void SqlResult::_bind_methods()
+{
 
 	/* ===== QUERY ===== */
 	ClassDB::bind_method(D_METHOD("get_array"), &SqlResult::get_array);

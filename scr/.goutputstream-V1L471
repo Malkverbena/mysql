@@ -2,123 +2,7 @@
 
 #include "mysql.h"
 /*
-Error MySQL::set_credentials( const String conn_name,
-										String p_username,
-										String p_password,
-										String p_database,
-										std::uint16_t collation,
-										MySQL::ssl_mode p_ssl,
-										bool multi_queries){
-
-	std::map<String, VariantConn>::iterator p_con;
-	p_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
-
-	p_con->second->username = copy_string(const_cast<char*>(p_username.utf8().get_data()));
-	p_con->second->password = copy_string(const_cast<char*>(p_password.utf8().get_data()));
-	p_con->second->database = copy_string(const_cast<char*>(p_database.utf8().get_data()));
-
-	p_con->second->conn_params.set_username(p_con->second.conn_ptr->username);
-	p_con->second->conn_params.set_password(p_con->second.conn_ptr->password);
-	p_con->second->conn_params.set_database(p_con->second.conn_ptr->database);
-	p_con->second->conn_params.set_connection_collation(collation);
-	p_con->second->conn_params.set_ssl((mysql::ssl_mode)p_ssl);
-	p_con->second->conn_params.set_multi_queries(multi_queries);
-
-	return OK;
-}
-
-*/
-
-PackedStringArray MySQL::get_connections() const {
-	PackedStringArray ret;
-	for(auto it:connections_holder){
-		ret.append(it.first);
-	}
-	return ret;
-}
-
-
-
-Error MySQL::delete_connection(const String conn_name){
-	Error err = MySQL::sql_disconnect(conn_name);
-	ERR_FAIL_COND_V_MSG(err == ERR_CONNECTION_ERROR, ERR_CONNECTION_ERROR, "Connection not found.");
-	connections_holder.erase(conn_name);
-	ERR_FAIL_COND_V_MSG(err != OK, err, "Failed!.");
-	return err;
-}
-
-
-
-//TODO: Colocar em Helper
-MySQL::CONN_TYPE MySQL::get_conn_type(VariantConn v){
-		if (std::holds_alternative<std::shared_ptr<ConnTcp>>(v)){return TCP;}
-		else if (std::holds_alternative<std::shared_ptr<ConnTcpSsl>>(v)){return TCP_SSL;}
-		else if (std::holds_alternative<std::shared_ptr<ConnUnix>>(v)){return UNIX;}
-		else if (std::holds_alternative<std::shared_ptr<ConnUnixSsl>>(v)){return UNIX_SSL;}
-		else {return NONE;}
-}
-
-
-
-
-Error MySQL::sql_disconnect(const String conn_name){
-	std::map<String, VariantConn>::iterator p_con;
-	p_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
-
-	try{
-		size_t t = (size_t)get_conn_type(p_con->second);
-		std::get<t>(p_con->second)->conn.close();
-	}
-	catch (const error_with_diagnostics& err){
-		MySQL::SQLException(err);
-		return FAILED;
-	}
-	catch (const std::exception& err){
-		MySQL::runtime_error(err);
-		return FAILED;
-	}
-
-	return OK;
-}
-
-Error MySQL::new_connection(const String conn_name, CONN_TYPE type){
-
-	std::map<String, VariantConn>::iterator it_con;
-	it_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(it_con != connections_holder.end(), ERR_ALREADY_EXISTS, "Connection already exists.");
-
-	switch (type){
-
-		case TCP:{
-			connections_holder[conn_name] = std::make_shared<ConnTcp>();
-			return OK;
-		}
-		case TCP_SSL:{
-			connections_holder[conn_name] = std::make_shared<ConnTcpSsl>();
-			return OK;
-		}
-		case UNIX:{
-			connections_holder[conn_name] = std::make_shared<ConnUnix>();
-			return OK;
-		}
-		case UNIX_SSL:{
-			connections_holder[conn_name] = std::make_shared<ConnUnixSsl>();
-			return OK;
-		}
-		default:
-			return FAILED;
-	}
-
-	it_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(it_con==connections_holder.end(), FAILED, "Connection not found.");
-	return OK;
-
-}
-
-/*
-
+using namespace boost::mysql;
 
 
 Ref<SqlResult> MySQL::execute(const String conn_name, String stmt){return _execute(conn_name, stmt, false);}
@@ -248,17 +132,64 @@ Error MySQL::delete_connection(const String conn_name){
 }
 
 
+Error MySQL::sql_disconnect(const String conn_name){
+
+	std::map<String, ConnBox>::iterator p_con;
+	p_con = connections_holder.find(conn_name);
+	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
+
+	try{
+		p_con->second.conn_ptr->conn.close();
+	}
+	catch (const error_with_diagnostics& err){
+		MySQL::SQLException(err);
+		return FAILED;
+	}
+	catch (const std::exception& err){
+		MySQL::runtime_error(err);
+		return FAILED;
+	}
+
+	return OK;
+}
 
 
 
 
 
+Error MySQL::new_connection(const String conn_name, CONN_TYPE type, bool ssl){
+	// TODO: template : ConnTcp - ConnTcpSsl - ConnSocket - ConnSocketSsl
+
+
+	//if (){}
+	std::map<String, ConnBox>::iterator it_con;
+	it_con = connections_holder.find(conn_name);
+	ERR_FAIL_COND_V_MSG(it_con != connections_holder.end(), ERR_ALREADY_EXISTS, "Connection already exists.");
+	
+//	std::shared_ptr<Conn<tcp_connection>> c; /////////////////////////////
+	
+	
+//	auto c = std::make_shared<Conn<tcp_connection>> ();
+
+	std::shared_ptr<Conn<tcp_ssl_connection>> c ;	//(new Conn<tcp_connection>());
+	c.reset(new Conn<tcp_ssl_connection>);
+	
+	connections_holder[conn_name] = c;
+	it_con = connections_holder.find(conn_name);
+	ERR_FAIL_COND_V_MSG(it_con==connections_holder.end(), FAILED, "Connection not found.");
+
+	return OK;
+}
 
 
 
-
-
-
+PackedStringArray MySQL::get_connections() const {
+	PackedStringArray ret;
+	for(auto it:connections_holder){
+		ret.append(it.first);
+	}
+	return ret;
+}
 
 
 
@@ -281,7 +212,31 @@ Dictionary MySQL::get_credentials(const String conn_name){
 	
 	
 	
+Error MySQL::set_credentials( const String conn_name,
+										String p_username,
+										String p_password,
+										String p_database,
+										std::uint16_t collation,
+										MySQL::ssl_mode p_ssl,
+										bool multi_queries){
 
+	std::map<String, ConnBox>::iterator p_con;
+	p_con = connections_holder.find(conn_name);
+	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
+
+	p_con->second.conn_ptr->username = copy_string(const_cast<char*>(p_username.utf8().get_data()));
+	p_con->second.conn_ptr->password = copy_string(const_cast<char*>(p_password.utf8().get_data()));
+	p_con->second.conn_ptr->database = copy_string(const_cast<char*>(p_database.utf8().get_data()));
+
+	p_con->second.conn_ptr->conn_params.set_username(p_con->second.conn_ptr->username);
+	p_con->second.conn_ptr->conn_params.set_password(p_con->second.conn_ptr->password);
+	p_con->second.conn_ptr->conn_params.set_database(p_con->second.conn_ptr->database);
+	p_con->second.conn_ptr->conn_params.set_connection_collation(collation);
+	p_con->second.conn_ptr->conn_params.set_ssl((mysql::ssl_mode)p_ssl);
+	p_con->second.conn_ptr->conn_params.set_multi_queries(multi_queries);
+
+	return OK;
+}
 
 
 
@@ -327,44 +282,38 @@ MySQL::~MySQL() {
 	// close connections before empty connections_holder
 }
 
-
 */
+
 
 void MySQL::_bind_methods() {
 
-	// ==== CONNECTION ==== /
-	ClassDB::bind_method(D_METHOD("new_connection", "connection", "type"), &MySQL::new_connection, DEFVAL(TCP));
-
-	ClassDB::bind_method(D_METHOD("sql_disconnect", "connection"), &MySQL::sql_disconnect);
-
-
+	/ ==== CONNECTION ==== /
+	ClassDB::bind_method(D_METHOD("new_connection", "connection", "type", "ssl"), &MySQL::new_connection, DEFVAL(TCP), DEFVAL(false));
+/*
 	ClassDB::bind_method(D_METHOD("get_connections"), &MySQL::get_connections);
 	ClassDB::bind_method(D_METHOD("delete_connection", "connection"), &MySQL::delete_connection);
-	
-	
-	
-/*
+
 	ClassDB::bind_method(D_METHOD("get_credentials", "connection"), &MySQL::get_credentials);
 	ClassDB::bind_method(D_METHOD("set_credentials", "connection", "username", "password", "schema", "collation", "ssl_mode", "multi_queries"),&MySQL::set_credentials,\
 	DEFVAL(String()), DEFVAL(handshake_params::default_collation), DEFVAL((int)ssl_mode::require), DEFVAL(false));
 
-	ClassDB::bind_method(D_METHOD("sql_connect", "connection", "hostname", "port", "socket path"), &MySQL::sql_connect, DEFVAL("localhost"), DEFVAL("3306"), DEFVAL(""));
-
+	ClassDB::bind_method(D_METHOD("sql_connect", "connection", "hostname", "port"), &MySQL::sql_connect, DEFVAL("localhost"), DEFVAL("3306"));
+	ClassDB::bind_method(D_METHOD("sql_disconnect", "connection"), &MySQL::sql_disconnect);
 
 	ClassDB::bind_method(D_METHOD("execute", "connection", "statement"), &MySQL::execute);
-//	ClassDB::bind_method(D_METHOD("execute_prepared", "connection", "statement", "binds"), &MySQL::execute, DEFVAL(Array()));
+	ClassDB::bind_method(D_METHOD("execute_prepared", "connection", "statement", "binds"), &MySQL::execute, DEFVAL(Array()));
 */
 
 	BIND_ENUM_CONSTANT(TCP);
-	BIND_ENUM_CONSTANT(TCP_SSL);
-	BIND_ENUM_CONSTANT(UNIX);
-	BIND_ENUM_CONSTANT(UNIX_SSL);
+	BIND_ENUM_CONSTANT(SOCKET);
 
 	BIND_ENUM_CONSTANT(disable);
 	BIND_ENUM_CONSTANT(enable);
 	BIND_ENUM_CONSTANT(require);
 
 }
+
+
 
 
 

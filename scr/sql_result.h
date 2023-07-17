@@ -7,10 +7,7 @@
 
 
 
-using namespace std;
-using namespace boost;
-using namespace boost::asio;
-using namespace boost::mysql;
+
 
 //TODO: isolar os get dentro de consts
 
@@ -41,17 +38,16 @@ protected:
 
 public:
 
-	// bool as_string -> Retorna os dados como string.
 	
-	
-	Array get_array();									// Retrieves the query content as an array.
-	Dictionary get_dictionary();						// Retrieves the query content as an dictionary.
-	Variant get_row(bool as_array = true);			// Retrieves a specific row.
-	Array get_column(String column);					// Retrieves a specific column by searching for the column name.
-// *OVERLOAD
-//	Array get_column(int column, bool as_string = false);				// Retrieves a specific column by searching for the column number.
+	Array get_array();													// Retrieves the query content as an array.
+	Dictionary get_dictionary(){return result;}					// Retrieves the query content as an dictionary.
 
-	Dictionary get_metadata();			// Returns metadata from a specific column.
+	Variant get_row(int row, bool as_array = true);				// Retrieves a specific row.
+	Array get_column(String column, bool as_array = true);	// Retrieves a specific column by searching for the column name.
+// *OVERLOAD
+//	Array get_column(int column, bool as_string = false);		// Retrieves a specific column by searching for the column number.
+
+	Dictionary get_metadata();											// Returns metadata from a specific column.
 	int get_affected_rows() const {return affected_rows;}
 	int get_last_insert_id() const {return last_insert_id;}
 	int get_warning_count() const {return warning_count;}

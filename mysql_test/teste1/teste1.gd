@@ -14,7 +14,7 @@ func _ready():
 	mysql.sql_connect("polo", "localhost", "3306")
 	print(mysql.get_credentials("polo"))
 
-	var res : SqlResult = mysql.execute("polo", "SELECT * FROM testes.text")
+	var res : SqlResult = mysql.execute("polo", "SELECT * FROM testes.text01")
 	
 	var metadata = res.get_metadata()
 	for m in metadata:
@@ -29,5 +29,8 @@ func _ready():
 
 	print(dic)
 
+	var arr = res.get_array()
+	for a in arr:
+		print(a)
 
 	get_tree().quit()
