@@ -15,7 +15,7 @@ void initialize_mysql_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
-//	ClassDB::register_class<MySQL>();
+	ClassDB::register_class<MySQL>();
 	ClassDB::register_class<SqlResult>();
 }
 

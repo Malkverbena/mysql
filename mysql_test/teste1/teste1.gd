@@ -7,10 +7,11 @@ func _ready():
 #	mysql.new_connection("marco")
 	mysql.new_connection("polo")
 	print(mysql.get_connections())
+	mysql.sql_disconnect("polo",)
 #	mysql.delete_connection("marco")
 #	print(mysql.get_connections())
 	
-	mysql.set_credentials("polo", "cleber", "jeovaerei", "testes")
+	#mysql.set_credentials("polo", "cleber", "jeovaerei", "testes")
 	mysql.sql_connect("polo", "localhost", "3306")
 	print(mysql.get_credentials("polo"))
 

@@ -118,55 +118,34 @@ Variant field2Var(const field_view fv){
 }
 
 
-/*
-Variant get_array_kind(column_type type, Array p_array){
 
-	if (	type == column_type::year or\
-			type == column_type::smallint or\
-			type == column_type::mediumint)
-	{
-		return PackedInt32Array(p_array);
-	}
+// TODO: CRIAR MACROS PARA UMA FUNÇAO DE ERRO
 
-	else if (type == column_type::int_ or\
-				type == column_type::bigint or\
-				type == column_type::bit)
-	{
-		return PackedInt64Array(p_array);
-	}
+void SQLException(const boost::mysql::error_with_diagnostics &err){
 
-	else if (type == column_type::float_)
-	{
-		return PackedFloat32Array(p_array);	
-	}
+	Dictionary _last_error;
+	_last_error["FILE"] = String(__FILE__);
+	_last_error["LINE"] = (int)__LINE__;
+	_last_error["FUNCTION"] = String(__FUNCTION__);
+	_last_error["ERROR"] = err.what();
+	_last_error["SERVER_MESSAGE"] = err.get_diagnostics().server_message().data();
+	_last_error["CLIENT_MESSAGE"] = err.get_diagnostics().client_message().data();
 
-	else if (type == column_type::double_)
-	{
-		return PackedFloat64Array(p_array);	
-	}
+#ifdef TOOLS_ENABLED
+	print_line("# EXCEPTION Caught!");
+	print_line("# ERR: SQLException in: " + String(_last_error["FILE"]) + " in function: "+ String(_last_error["FUNCTION"]) +"() on line "+ String(_last_error["LINE"]));
+	print_line("# ERR: " + String(_last_error["ERROR"]));
+	print_line("# Server error: (" + String(_last_error["SERVER_MESSAGE"]) + ")" + "\n# Client Error: (" + String(_last_error["CLIENT_MESSAGE"]) + ")");
+#endif
 
-	else if (type == column_type::char_ or\
-				type == column_type::varchar or\
-				type == column_type::text or\
-				type == column_type::enum_ or\
-				type == column_type::set or\
-				type == column_type::decimal or\
-				type == column_type::json)
-	{
-		return PackedStringArray(p_array);	
-	}
 
-	else if (type == column_type::binary or\
-				type == column_type::varbinary or\
-				type == column_type::blob or\
-				type == column_type::geometry)
-	{
-		return PackedByteArray(p_array);	
-	}
-
-	return p_array;
 }
 
 
 
-*/
+void _runtime_error(const std::exception& err){
+	WARN_PRINT(String("ERROR: runtime_error in ") + String(__FILE__));
+	WARN_PRINT(vformat("( %s ) on line ", String(__func__)) + itos(__LINE__));
+	WARN_PRINT(vformat("ERROR: %s", String(err.what())));
+}
+

@@ -6,16 +6,15 @@
 
 #include "sql_result.h"
 
+#include <variant>
+#include <typeinfo>
 
 
+
+//========================================
 
 class Conn{
 friend class MySQL;
-//friend class ConnTcp;
-//friend class ConnTcpSsl;
-//friend class ConnUnix;
-//friend class ConnUnixSsl;
-
 protected:
 	io_context ctx;
 	int type;
@@ -26,6 +25,7 @@ protected:
 };
 
 
+//========================================
 
 class ConnTcp : public Conn{
 friend class MySQL;
@@ -38,12 +38,14 @@ private:
 	tcp_connection conn;
 
 public:
+	Error connect(String p_socket_path, bool p_async){return OK;}
+	Error connect(String hostname, String port, bool p_async);
+	int conn_type(){return 1;}
 	ConnTcp():
 		conn_params((const char *)&username, (const char *)&password, (const char *)&database),
 		resolver(ctx.get_executor()),
 		conn(ctx)
 	 {
-	 	type = 0;  //FIXME
 	 }
 	~ConnTcp(){
 		conn.close();
@@ -51,27 +53,29 @@ public:
 };
 
 
-
+//========================================
 
 class ConnTcpSsl : public Conn{
 friend class MySQL;
 
 private:
 //	io_context ctx;
-	ip::tcp::resolver::results_type eps;
+	ip::tcp::resolver::results_type endpoints;
 	handshake_params conn_params;
 	ip::tcp::resolver resolver;
 	ssl::context ssl_ctx;
 	tcp_ssl_connection conn;
 
 public:
+	Error connect(String p_socket_path, bool p_async){return OK;}
+	Error connect(String hostname, String port, bool p_async);
+	int conn_type(){return 2;}
 	ConnTcpSsl():	
 		conn_params((const char *)&username, (const char *)&password, (const char *)&database),
 		resolver(ctx.get_executor()),
 		ssl_ctx(ssl::context::tls_client),
 		conn(ctx.get_executor(), ssl_ctx)
 	{
-	 	type = 1;  //FIXME
 	}
 	~ConnTcpSsl(){
 		conn.close();
@@ -79,14 +83,14 @@ public:
 };
 
 
+//========================================
 
-/* ===== UNIX  TYPE: unix_connection ===== */
 class ConnUnix : public Conn{
 friend class MySQL;
 
 private:
 //	io_context ctx;
-	local::stream_protocol::endpoint ep;
+	local::stream_protocol::endpoint endpoints;
 	handshake_params conn_params;
 	unix_connection conn;
 
@@ -94,26 +98,28 @@ protected:
 	const char* socket_path;
 
 public:
+	Error connect(String p_socket_path, bool p_async);
+	Error connect(String hostname, String port, bool p_async){return OK;}
+	int conn_type(){return 3;}
 	ConnUnix():
-		ep((const char *)&socket_path),
+		endpoints((const char *)&socket_path),
 		conn_params((const char *)&username, (const char *)&password, (const char *)&database),
 		conn(ctx)
 	{
-		type = 2;  //FIXME
 	}
 	~ConnUnix(){
 		conn.close();
 	}
 };
 
-
+//========================================
 
 class ConnUnixSsl : public Conn{
 friend class MySQL;
 
 private:
 //	io_context ctx;
-	local::stream_protocol::endpoint ep;
+	local::stream_protocol::endpoint endpoints;
 	handshake_params conn_params;
 	ssl::context ssl_ctx;
 	unix_ssl_connection conn;
@@ -123,13 +129,15 @@ protected:
 
 
 public:
+	Error connect(String p_socket_path, bool p_async);
+	Error connect(String hostname, String port, bool p_async){return OK;}
+	int conn_type(){return 4;}
 	ConnUnixSsl():
-		ep(socket_path),
+		endpoints(socket_path),
 		conn_params((const char *)&username, (const char *)&password, (const char *)&database),
 		ssl_ctx(ssl::context::tls_client),
 		conn(ctx, ssl_ctx)
 	{
-		type = 3;  //FIXME
 	}
 	~ConnUnixSsl(){
 		conn.close();
@@ -137,8 +145,14 @@ public:
 };
 
 
+//========================================
 
 
+typedef std::shared_ptr<ConnTcp>			conntcp;
+typedef std::shared_ptr<ConnTcpSsl>		conntcpssl;
+typedef std::shared_ptr<ConnUnix>		connunix;
+typedef std::shared_ptr<ConnUnixSsl>	connunixssl;
+using VariantConn = std::variant<conntcp, conntcpssl, connunix, connunixssl>;
 
 
 

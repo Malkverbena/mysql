@@ -63,7 +63,8 @@ Variant field2Var(const field_view fv);
 String char2gdt(const char * s);
 
 
-
+void SQLException(const boost::mysql::error_with_diagnostics &err);
+void _runtime_error(const std::exception& err);
 
 
 
