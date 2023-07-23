@@ -2,27 +2,111 @@
 
 #include "mysql.h"
 
-//TODO: Testar se é TCP
-Error MySQL::tcp_connect(const String conn_name, String hostname, String port, bool async){
 
-//	std::map<String, VariantConn>::iterator p_con;
+Ref<SqlResult> MySQL::execute_prepared(const String conn_name, const String p_stmt, Array binds){
+	return _execute(conn_name, p_stmt, true, binds);
+}
+
+
+
+Ref<SqlResult> MySQL::execute(const String conn_name, const String p_stmt){
+	return _execute(conn_name, p_stmt, false, Array());
+}
+
+
+
+Ref<SqlResult> MySQL::_execute(const String conn_name, const String p_stmt, bool prep, Array binds) {
+
+
+	Ref<SqlResult> sql_result;
 	auto p_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
+	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), sql_result, "Connection not found.");
 
+	sql_result = Ref<SqlResult>(memnew(SqlResult()));
+
+	const char* stmt = p_stmt.utf8().get_data();
+	results result;
+
+	Error err = std::visit([&](auto c) -> Error {
+		mysql::error_code ec;
+		diagnostics diag;
+
+		if (not prep){
+			c->conn.execute(stmt, result, ec, diag);
+			SQL_EXCEPTION_ERR(ec, diag);
+		}
+		else{
+			const statement prep_stmt = c->conn.prepare_statement(stmt);
+			const std::vector<field> args = binds_to_field(binds);
+			c->conn.execute(prep_stmt.bind(args.begin(), args.end()), result);
+			SQL_EXCEPTION_ERR(ec, diag);
+		}
+		
+		return OK;
+	}, p_con->second);
+
+
+	if (err){
+		return sql_result;
+	}
+
+
+	rows_view all_rows = result.rows();
+
+	for(auto m:result.meta()){
+		Dictionary column;
+		String column_name = String(m.column_name().data());
+
+		column["column_collation"]			= m.column_collation();
+		column["column_length"]				= m.column_length();
+		column["column_name"]				= column_name;
+		column["database"]					= String(m.database().data());
+		column["decimals"]					= m.decimals();
+		column["has_no_default_value"]		= m.has_no_default_value();
+		column["is_auto_increment"]			= m.is_auto_increment();
+		column["is_multiple_key"]			= m.is_multiple_key();
+		column["is_not_null"]				= m.is_not_null();
+		column["is_primary_key"]			= m.is_primary_key();
+		column["is_set_to_now_on_update"]	= m.is_set_to_now_on_update();
+		column["is_unique_key"]				= m.is_unique_key();
+		column["is_unsigned"]				= m.is_unsigned();
+		column["is_zerofill"]				= m.is_zerofill();
+		column["original_column_name"]		= String(m.original_column_name().data());
+		column["original_table"]			= String(m.original_table().data());
+		column["table"]						= String(m.table().data());
+		column["type"]						= (int)m.type();
+
+		sql_result->meta[column_name] = column;
+	}
+
+	for(size_t row = 0; row < all_rows.size(); row++){
+		Dictionary line = Dictionary();
+		size_t f = 0;
+		for (auto fv : all_rows.at(row).as_vector()) {
+			String column_name = String(result.meta()[f].column_name().data());
+			line[column_name] = field2Var(fv);
+			f++;
+		}
+		sql_result->result[row] = line;
+	}
+
+	return sql_result;
+}
+
+	
+
+Error MySQL::tcp_connect(const String conn_name, String hostname, String port, bool async){
+	auto p_con = connections_holder.find(conn_name);
+	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_DOES_NOT_EXIST, "Connection does not exist!");
 	return std::visit([&](auto c) -> Error {
 		return c->connect(hostname, port, async);
 	}, p_con->second);
 }
 
 
-//TODO: Testar se é UNIX
 Error MySQL::unix_connect(const String conn_name, String p_socket_path, bool async){
-
-//	Error ret = OK;
-//	std::map<String, VariantConn>::iterator p_con;
 	auto p_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
-
+	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_DOES_NOT_EXIST, "Connection does not exist!");
 	return std::visit([&](auto c) -> Error {
 		return c->connect(p_socket_path, async);
 	}, p_con->second);
@@ -31,14 +115,9 @@ Error MySQL::unix_connect(const String conn_name, String p_socket_path, bool asy
 
 
 Dictionary MySQL::get_credentials(const String conn_name){
-
-//	Dictionary ret;
-//	std::map<String, VariantConn>::iterator p_con;
 	auto p_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), Dictionary(), "Connection not found.");
-
+	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), Dictionary(), "Connection does not exist!");
 	return std::visit([](auto c) -> Dictionary {
-
 		Dictionary ret;
 		ret["username"] = String(c->conn_params.username().data());
 		ret["password"] = String(c->conn_params.password().data());
@@ -47,13 +126,8 @@ Dictionary MySQL::get_credentials(const String conn_name){
 		ret["ssl"] = (MySQL::ssl_mode)c->conn_params.ssl();
 		ret["multi_queries"] = c->conn_params.multi_queries();
 		return ret;
-
 	}, p_con->second);
-
-//	return ret;
 }
-
-
 
 
 
@@ -65,25 +139,19 @@ Error MySQL::set_credentials(	const String conn_name,
 								MySQL::ssl_mode p_ssl,
 								bool multi_queries){
 
-	//std::map<String, VariantConn>::iterator p_con;
 	auto p_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
-
+	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_DOES_NOT_EXIST, "Connection does not exist!");
 	std::visit([&](auto c) {
-
 		c->username = copy_string(const_cast<char*>(p_username.utf8().get_data()));
 		c->password = copy_string(const_cast<char*>(p_password.utf8().get_data()));
 		c->database = copy_string(const_cast<char*>(p_database.utf8().get_data()));
-
 		c->conn_params.set_username(c->username);
 		c->conn_params.set_password(c->password);
 		c->conn_params.set_database(c->database);
 		c->conn_params.set_connection_collation(collation);
 		c->conn_params.set_ssl((mysql::ssl_mode)p_ssl);
 		c->conn_params.set_multi_queries(multi_queries);
-	
 	}, p_con->second);
-
 	return OK;
 }
 
@@ -101,7 +169,7 @@ PackedStringArray MySQL::get_connections() const {
 
 Error MySQL::delete_connection(const String conn_name){
 	Error err = MySQL::sql_disconnect(conn_name);
-	ERR_FAIL_COND_V_MSG(err == ERR_CONNECTION_ERROR, ERR_CONNECTION_ERROR, "Connection not found.");
+	ERR_FAIL_COND_V_MSG(err == ERR_CONNECTION_ERROR, ERR_DOES_NOT_EXIST, "Connection does not exist!");
 	connections_holder.erase(conn_name);
 	ERR_FAIL_COND_V_MSG(err != OK, err, "Failed!.");
 	return err;
@@ -110,28 +178,23 @@ Error MySQL::delete_connection(const String conn_name){
 
 
 Error MySQL::sql_disconnect(const String conn_name){
-	//std::map<String, VariantConn>::iterator p_con;
 	auto p_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
-
-	std::visit([](auto& c) -> Error {
+	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_DOES_NOT_EXIST, "Connection does not exist!");
+	return std::visit([](auto& c) -> Error {
 		mysql::error_code ec;
 		diagnostics diag;
 		c->conn.close(ec, diag);
-		HANDLE_SQL_EXCEPTION(ec, diag);
+		SQL_EXCEPTION_ERR(ec, diag);
 		return OK;
 	}, p_con->second);
-
-	return OK;
 }
 
 
 
 Error MySQL::new_connection(const String conn_name, CONN_TYPE type){
 
-	std::map<String, VariantConn>::iterator it_con;
-	it_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(it_con != connections_holder.end(), ERR_ALREADY_EXISTS, "Connection already exists.");
+	auto it_con = connections_holder.find(conn_name);
+	ERR_FAIL_COND_V_MSG(it_con != connections_holder.end(), ERR_ALREADY_EXISTS, "Connection already exists!");
 
 	if (type == TCP){
 		connections_holder[conn_name] = std::make_shared<ConnTcp>();
@@ -150,118 +213,10 @@ Error MySQL::new_connection(const String conn_name, CONN_TYPE type){
 	}
 
 	it_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(it_con==connections_holder.end(), FAILED, "Failed to create the connection!");
+	ERR_FAIL_COND_V_MSG(it_con==connections_holder.end(), ERR_CANT_CREATE, "Failed to create the connection!");
 	return OK;
 
 }
-
-/*
-
-
-
-Ref<SqlResult> MySQL::execute(const String conn_name, String stmt){return _execute(conn_name, stmt, false);}
-//Ref<SqlResult> MySQL::execute_prepared(const String conn_name, String stmt, Array binds){return _execute(conn_name, stmt, true, binds);}
-
-Ref<SqlResult> MySQL::_execute(const String conn_name, String stmt, bool prep, Array binds) {
-
-	Ref<SqlResult> sql_result;
-	std::map<String, ConnBox>::iterator p_con;
-	p_con = connections_holder.find(conn_name);
-
-	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), sql_result, "Connection not found.");
-
-	sql_result = Ref<SqlResult>(memnew(SqlResult()));
-
-	const char* sql = stmt.utf8().get_data();
-	
-	boost::mysql::error_code ec;
-	diagnostics diag;
-	results result;
-
-	p_con->second.conn_ptr->conn.execute(sql, result, ec, diag);
-
-	if (ec){
-		std::cout << "Operation failed with error code: " << ec << '\n';
-		std::cout << "Server diagnostics: " << diag.server_message() << std::endl;
-		_last_error.clear();
-		_last_error["FILE"] = String(__FILE__);
-		_last_error["LINE"] = (int)__LINE__;
-		_last_error["FUNCTION"] = String(__FUNCTION__);
-		_last_error["ERROR"] = diag.what();
-		_last_error["SERVER_MESSAGE"] = diag.diagnostics().server_message().data();
-		_last_error["CLIENT_MESSAGE"] = diag.diagnostics().client_message().data();
-
-		print_line("# EXCEPTION Caught!");
-		print_line("# ERR: SQLException in: " + String(_last_error["FILE"]) + " in function: "+ String(_last_error["FUNCTION"]) +"() on line "+ String(_last_error["LINE"]));
-		print_line("# ERR: " + String(_last_error["ERROR"]));
-		print_line("# Server error: (" + String(_last_error["SERVER_MESSAGE"]) + ")" + "\n# Client Error: (" + String(_last_error["CLIENT_MESSAGE"]) + ")");
-
-		WARN_PRINT(String("ERROR: runtime_error in ") + String(__FILE__));
-		WARN_PRINT(vformat("( %s ) on line ", String(__func__)) + itos(__LINE__));
-		WARN_PRINT(vformat("ERROR: %s", String(diag.what())));
-	
-	}
-
-
-	rows_view all_rows = result.rows();
-
-
-
-	for(size_t m = 0; m < all_rows.size(); m++){
-		Dictionary column;
-		String column_name = String(result.meta()[m].column_name().data());
-
-		column["column_collation"]				= result.meta()[m].column_collation();
-		column["column_length"]					= result.meta()[m].column_length();
-		column["column_name"]					= column_name;
-		column["database"]						= String(result.meta()[m].database().data());
-		column["decimals"]						= result.meta()[m].decimals();
-		column["has_no_default_value"]		= result.meta()[m].has_no_default_value();
-		column["is_auto_increment"]			= result.meta()[m].is_auto_increment();
-		column["is_multiple_key"]				= result.meta()[m].is_multiple_key();
-		column["is_not_null"]					= result.meta()[m].is_not_null();
-		column["is_primary_key"]				= result.meta()[m].is_primary_key();
-		column["is_set_to_now_on_update"]	= result.meta()[m].is_set_to_now_on_update();
-		column["is_unique_key"]					= result.meta()[m].is_unique_key();
-		column["is_unsigned"]					= result.meta()[m].is_unsigned();
-		column["is_zerofill"]					= result.meta()[m].is_zerofill();
-		column["original_column_name"]		= String(result.meta()[m].original_column_name().data());
-		column["original_table"]				= String(result.meta()[m].original_table().data());
-		column["table"]							= String(result.meta()[m].table().data());
-		column["type"]								= (int)result.meta()[m].type();
-
-		sql_result->meta[column_name] = column;
-	}
-
-	for(size_t row = 0; row < all_rows.size(); row++){
-
-		Dictionary line = Dictionary();
-		size_t f = 0;
-		for (auto fv : all_rows.at(row).as_vector()) {
-			String column_name = String(result.meta()[f].column_name().data());
-			line[column_name] = field2Var(fv);
-			f++;
-		}
-		sql_result->result[row] = line;
-	}
-
-
-	return sql_result;
-}
-
-	
-	
-
-
-
-
-
-
-
-*/
-
-
-
 
 
 
@@ -269,7 +224,7 @@ MySQL::MySQL() {
 }
 
 MySQL::~MySQL() {
-	// close connections before empty connections_holder
+	// TODO: terminate/close connections before empty connections_holder
 }
 
 
@@ -286,15 +241,13 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("unix_connect", "connection", "socket path", "async"), &MySQL::unix_connect,  DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("sql_disconnect", "connection"), &MySQL::sql_disconnect);
 
+	ClassDB::bind_method(D_METHOD("get_credentials", "connection"), &MySQL::get_credentials);
 	ClassDB::bind_method(D_METHOD("set_credentials", "connection", "username", "password", "schema", "collation", "ssl_mode", "multi_queries"),&MySQL::set_credentials,\
 	DEFVAL(String()), DEFVAL(handshake_params::default_collation), DEFVAL((int)ssl_mode::require), DEFVAL(false));
 
-
-/*
-	ClassDB::bind_method(D_METHOD("get_credentials", "connection"), &MySQL::get_credentials);
 	ClassDB::bind_method(D_METHOD("execute", "connection", "statement"), &MySQL::execute);
 	ClassDB::bind_method(D_METHOD("execute_prepared", "connection", "statement", "binds"), &MySQL::execute, DEFVAL(Array()));
-*/
+
 
 	BIND_ENUM_CONSTANT(TCP);
 	BIND_ENUM_CONSTANT(TCP_SSL);

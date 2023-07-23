@@ -6,20 +6,15 @@
 
 
 
-
-
 void set_le_dic(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec, const diagnostics diags){
-	Dictionary ret;
-	ret["FILE"] = String(p_file);
-	ret["LINE"] = p_line;
-	ret["FUNCTION"] = String(p_function);
-	ret["ERROR"] = ec.value();
-	ret["SERVER_MESSAGE"] = diags.server_message().data();
-	ret["CLIENT_MESSAGE"] = diags.client_message().data();
-	_last_error = ret;
+	last_error.clear();
+	last_error["FILE"] = String(p_file);
+	last_error["LINE"] = p_line;
+	last_error["FUNCTION"] = String(p_function);
+	last_error["ERROR"] = ec.value();
+	last_error["SERVER_MESSAGE"] = diags.server_message().data();
+	last_error["CLIENT_MESSAGE"] = diags.client_message().data();
 }
-
-
 
 
 void print_sql_exception(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec, const diagnostics diags){

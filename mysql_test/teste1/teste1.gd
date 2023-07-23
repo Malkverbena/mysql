@@ -14,13 +14,22 @@ func _ready():
 	mysql.tcp_connect("polo", "localhost", "3306")
 	print(mysql.get_credentials("polo"))
 
-	#var res : SqlResult = mysql.execute("polo", "SELECT * FROM testes.text01")
+	var res : SqlResult = mysql.execute("polo", "SELECT * FROM testes.text01")
 	
 	#var metadata = res.get_metadata()
-	#for m in metadata:
-		#print(metadata[m])
-
-#	print(res.get_array())
+	#for meta in metadata:
+		#for m in metadata[meta]:
+			#print(m, "=", metadata[meta][m])
+	
+	
+	print("get_last_insert_id: ", res.get_last_insert_id())  
+	print("get_affected_rows: ", res.get_affected_rows())
+	print("get_warning_count: ", res.get_warning_count())
+	
+	#print("\n\n")
+	print(res.get_array())
+	print("\n\n")
+	print(res.get_dictionary())
 
 	#var dic = res.get_dictionary()
 #	print(typeof(dic))

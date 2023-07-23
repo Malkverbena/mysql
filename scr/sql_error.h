@@ -23,6 +23,9 @@
 #include <memory>
 #include <map>
 #include <string.h>
+#include <vector>
+#include <iomanip>
+
 
 
 #include <boost/asio/local/stream_protocol.hpp>
@@ -48,7 +51,7 @@ using namespace boost::mysql;
 #endif
 
 
-static Dictionary _last_error;
+static Dictionary last_error;
 
 
 
@@ -57,17 +60,22 @@ void print_sql_exception(const char *p_function, const char *p_file, int p_line,
 void set_le_dic(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec, const diagnostics diags);
 
 
-#define HANDLE_SQL_EXCEPTION(m_errcode, m_diag)                                             \
-    if (unlikely(m_errcode)) {                                                              \
-        print_sql_exception(FUNC_STR, __FILE__, __LINE__, m_errcode, m_diag);               \
-        set_le_dic(FUNC_STR, __FILE__, __LINE__, m_errcode, m_diag);                        \
-        return (Error)-m_errcode.value();                                                   \
-    }  else                                                                                 \
+#define SQL_EXCEPTION_ERR(m_errcode, m_diag)                                            \
+    if (unlikely(m_errcode)) {                                                          \
+        print_sql_exception(FUNC_STR, __FILE__, __LINE__, m_errcode, m_diag);           \
+        set_le_dic(FUNC_STR, __FILE__, __LINE__, m_errcode, m_diag);                    \
+        return (Error)-m_errcode.value();                                               \
+    }  else                                                                             \
         ((void)0)          
     
 
-
-
+#define SQL_EXCEPTION_VAL(m_errcode, m_diag, m_val)                             \
+    if (unlikely(m_errcode)) {                                                  \
+        print_sql_exception(FUNC_STR, __FILE__, __LINE__, m_errcode, m_diag);   \
+        set_le_dic(FUNC_STR, __FILE__, __LINE__, m_errcode, m_diag);            \
+        return m_val;                                                           \
+    }  else                                                                     \
+        ((void)0)  
 
 
 

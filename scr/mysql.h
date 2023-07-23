@@ -37,9 +37,7 @@ private:
 
 	std::map<String, VariantConn> connections_holder;
 
-	Ref<SqlResult> _execute(const String conn_name, String stmt, bool prep, Array binds = Array());
-
-
+	Ref<SqlResult> _execute(const String conn_name, const String p_stmt, bool prep, Array binds);
 
 
 protected:
@@ -82,19 +80,18 @@ public:
 	Dictionary get_credentials(const String conn_name);
 
 	// Establishes a connection to a MySQL server.
-	Error tcp_connect(const String conn_name, String hostname = "127.0.0.1", String port = "3306", bool async = true);
-	Error unix_connect(const String conn_name, String p_socket_path, bool async = false);
+	Error tcp_connect(const String conn_name, const String p_hostname = "127.0.0.1", const String p_port = "3306", const bool p_async = true);
+	Error unix_connect(const String conn_name, const String p_socket_path, const bool p_async = false);
 
 	// Closes the connection to the server.
 	Error sql_disconnect(const String conn_name);
 
 
-
-// ==== 	QUERY ==== /
-
-	Ref<SqlResult> execute(const String conn_name, String stmt);
-//	Ref<SqlResult> execute_prepared(const String conn_name, String stmt, Array binds = Array());
+	Ref<SqlResult> execute(const String conn_name, const String p_stmt);
+	Ref<SqlResult> execute_prepared(const String conn_name, const String p_stmt, Array binds = Array());
 	
+
+	//Sobrecarregar asgunções execute com void ? ou execute_async?
 
 	MySQL();
 	~MySQL();

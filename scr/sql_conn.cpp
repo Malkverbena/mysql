@@ -20,7 +20,7 @@ Error ConnTcp::connect(const String p_hostname,const String p_port, const bool p
 	conn.set_meta_mode(metadata_mode::full);
 	endpoints = resolver.resolve(p_hostname.utf8().get_data(), p_port.utf8().get_data());
 	conn.connect(*endpoints.begin(), conn_params, ec, diag);
-	HANDLE_SQL_EXCEPTION(ec, diag);
+	SQL_EXCEPTION_ERR(ec, diag);
 	return OK;
 }
 
@@ -41,7 +41,7 @@ Error ConnTcpSsl::connect(const String p_hostname,const String p_port, const boo
 	conn.set_meta_mode(metadata_mode::full);
 	endpoints = resolver.resolve(p_hostname.utf8().get_data(), p_port.utf8().get_data());
 	conn.connect(*endpoints.begin(), conn_params, ec, diag);	
-	HANDLE_SQL_EXCEPTION(ec, diag);
+	SQL_EXCEPTION_ERR(ec, diag);
 	return OK;
 }
 
@@ -61,7 +61,7 @@ Error ConnUnix::connect(String p_socket_path, bool p_async){
 	socket_path = copy_string(const_cast<char*>(p_socket_path.utf8().get_data()));
 	endpoints = local::stream_protocol::endpoint(socket_path);
 	conn.connect(endpoints, conn_params, ec, diag);
-	HANDLE_SQL_EXCEPTION(ec, diag);
+	SQL_EXCEPTION_ERR(ec, diag);
 	return OK;
 }
 
@@ -81,7 +81,7 @@ Error ConnUnixSsl::connect(String p_socket_path, bool p_async){
 	socket_path = copy_string(const_cast<char*>(p_socket_path.utf8().get_data()));
 	endpoints = local::stream_protocol::endpoint(socket_path);
 	conn.connect(endpoints, conn_params, ec, diag);
-	HANDLE_SQL_EXCEPTION(ec, diag);
+	SQL_EXCEPTION_ERR(ec, diag);
 	return OK;
 }
 
