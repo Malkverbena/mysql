@@ -4,10 +4,10 @@
 #define SQL_ERROR_H
 
 
-
 #include "core/object/ref_counted.h"  
 #include "core/core_bind.h"
 #include "core/io/json.h"
+
 
 #include <boost/mysql.hpp>
 #include <boost/asio/io_context.hpp>
@@ -37,6 +37,35 @@ using namespace std;
 using namespace boost;
 using namespace boost::asio;
 using namespace boost::mysql;
+
+
+#define DETAIL_FULL
+
+#ifdef DETAIL_FULL
+#define FUNC_STR __PRETTY_FUNCTION__
+#else
+#define FUNC_STR __FUNCTION__
+#endif
+
+
+static Dictionary _last_error;
+
+
+
+void print_sql_exception(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec, const diagnostics diags);
+
+void set_le_dic(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec, const diagnostics diags);
+
+
+#define HANDLE_SQL_EXCEPTION(m_errcode, m_diag)                                             \
+    if (unlikely(m_errcode)) {                                                              \
+        print_sql_exception(FUNC_STR, __FILE__, __LINE__, m_errcode, m_diag);               \
+        set_le_dic(FUNC_STR, __FILE__, __LINE__, m_errcode, m_diag);                        \
+        return (Error)-m_errcode.value();                                                   \
+    }  else                                                                                 \
+        ((void)0)          
+    
+
 
 
 

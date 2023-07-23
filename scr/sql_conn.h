@@ -4,7 +4,7 @@
 #define SQL_CONN_H
 
 
-#include "sql_result.h"
+#include "helpers.h"
 
 #include <variant>
 #include <typeinfo>
@@ -39,7 +39,7 @@ private:
 
 public:
 	Error connect(const String p_socket_path, const bool p_async);
-	Error connect(const String hostname,const String port, const bool async);
+	Error connect(const String p_hostname,const String p_port, const bool p_async);
 	int conn_type(){return 1;}
 	ConnTcp():
 		conn_params((const char *)&username, (const char *)&password, (const char *)&database),
@@ -68,7 +68,7 @@ private:
 
 public:
 	Error connect(const String p_socket_path, const bool p_async);
-	Error connect(const String hostname,const String port, const bool async);
+	Error connect(const String p_hostname,const String p_port, const bool p_async);
 	int conn_type(){return 2;}
 	ConnTcpSsl():	
 		conn_params((const char *)&username, (const char *)&password, (const char *)&database),
@@ -99,7 +99,7 @@ protected:
 
 public:
 	Error connect(const String p_socket_path, const bool p_async);
-	Error connect(const String hostname,const String port, const bool async);
+	Error connect(const String p_hostname,const String p_port, const bool p_async);
 	int conn_type(){return 3;}
 	ConnUnix():
 		endpoints((const char *)&socket_path),
@@ -130,7 +130,7 @@ protected:
 
 public:
 	Error connect(const String p_socket_path, const bool p_async);
-	Error connect(const String hostname,const String port, const bool async);
+	Error connect(const String p_hostname,const String p_port, const bool p_async);
 	int conn_type(){return 4;}
 	ConnUnixSsl():
 		endpoints(socket_path),
@@ -148,12 +148,12 @@ public:
 //========================================
 
 
-typedef std::shared_ptr<ConnTcp>			conntcp;
+typedef std::shared_ptr<ConnTcp>		conntcp;
 typedef std::shared_ptr<ConnTcpSsl>		conntcpssl;
 typedef std::shared_ptr<ConnUnix>		connunix;
 typedef std::shared_ptr<ConnUnixSsl>	connunixssl;
-using VariantConn = std::variant<conntcp, conntcpssl, connunix, connunixssl>;
 
+using VariantConn = std::variant<conntcp, conntcpssl, connunix, connunixssl>;
 
 
 

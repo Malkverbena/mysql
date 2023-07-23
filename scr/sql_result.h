@@ -3,15 +3,8 @@
 #ifndef SQLRESULT_H
 #define SQLRESULT_H
 
-#include "helpers.h"  
-
-
-
-
-
-//TODO: isolar os get dentro de consts
-
-
+#include "sql_error.h"  
+#pragma once
 
 class SqlResult : public RefCounted {
 	GDCLASS(SqlResult, RefCounted);

@@ -32,12 +32,12 @@ char* copy_string(char s[]){
 }
 
 
-
+/*
 bool is_json(String p_arg ){
 	JSON json;
 	return (json.parse(p_arg) == OK);
 }
-
+*/
 
 
 Variant field2Var(const field_view fv){
@@ -115,37 +115,5 @@ Variant field2Var(const field_view fv){
 	}
 
 	return Variant();
-}
-
-
-
-// TODO: CRIAR MACROS PARA UMA FUNÇAO DE ERRO
-
-void SQLException(const boost::mysql::error_with_diagnostics &err){
-
-	Dictionary _last_error;
-	_last_error["FILE"] = String(__FILE__);
-	_last_error["LINE"] = (int)__LINE__;
-	_last_error["FUNCTION"] = String(__FUNCTION__);
-	_last_error["ERROR"] = err.what();
-	_last_error["SERVER_MESSAGE"] = err.get_diagnostics().server_message().data();
-	_last_error["CLIENT_MESSAGE"] = err.get_diagnostics().client_message().data();
-
-#ifdef TOOLS_ENABLED
-	print_line("# EXCEPTION Caught!");
-	print_line("# ERR: SQLException in: " + String(_last_error["FILE"]) + " in function: "+ String(_last_error["FUNCTION"]) +"() on line "+ String(_last_error["LINE"]));
-	print_line("# ERR: " + String(_last_error["ERROR"]));
-	print_line("# Server error: (" + String(_last_error["SERVER_MESSAGE"]) + ")" + "\n# Client Error: (" + String(_last_error["CLIENT_MESSAGE"]) + ")");
-#endif
-
-
-}
-
-
-
-void _runtime_error(const std::exception& err){
-	WARN_PRINT(String("ERROR: runtime_error in ") + String(__FILE__));
-	WARN_PRINT(vformat("( %s ) on line ", String(__func__)) + itos(__LINE__));
-	WARN_PRINT(vformat("ERROR: %s", String(err.what())));
 }
 

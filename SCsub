@@ -8,11 +8,11 @@ mysql_env = env.Clone()
 
 sources = [
 	"register_types.cpp",
+	"scr/sql_error.cpp",
 	"scr/helpers.cpp",
 	"scr/sql_conn.cpp",
-	"scr/mysql.cpp",
-#	"scr/sql_error.cpp",
 	"scr/sql_result.cpp",
+	"scr/mysql.cpp",
 ]
 
 

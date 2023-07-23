@@ -4,7 +4,7 @@
 #include "register_types.h"
 
 #include "core/object/class_db.h"
-//#include "scr/sql_error.h"
+#include "scr/sql_error.h"
 #include "scr/helpers.h"
 #include "scr/sql_conn.h"
 #include "scr/mysql.h"

@@ -5,82 +5,71 @@
 //TODO: Testar se é TCP
 Error MySQL::tcp_connect(const String conn_name, String hostname, String port, bool async){
 
-	Error ret = OK;
-	std::map<String, VariantConn>::iterator p_con;
-	p_con = connections_holder.find(conn_name);
+//	std::map<String, VariantConn>::iterator p_con;
+	auto p_con = connections_holder.find(conn_name);
 	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
 
-	std::visit([hostname, port, async, &ret](auto c){
-		// FIXME: PONTEIRO DO RET
-		ret = c->connect(hostname, port, async);
+	return std::visit([&](auto c) -> Error {
+		return c->connect(hostname, port, async);
 	}, p_con->second);
-	return ret;
 }
 
 
 //TODO: Testar se é UNIX
 Error MySQL::unix_connect(const String conn_name, String p_socket_path, bool async){
 
-	Error ret = OK;
-	std::map<String, VariantConn>::iterator p_con;
-	p_con = connections_holder.find(conn_name);
+//	Error ret = OK;
+//	std::map<String, VariantConn>::iterator p_con;
+	auto p_con = connections_holder.find(conn_name);
 	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
 
-	std::visit([p_socket_path, async, &ret](auto c){
-		// FIXME: PONTEIRO DO RET
-		ret = c->connect(p_socket_path, async);
+	return std::visit([&](auto c) -> Error {
+		return c->connect(p_socket_path, async);
 	}, p_con->second);
-	return ret;
 }
 
 
 
 Dictionary MySQL::get_credentials(const String conn_name){
 
-	Dictionary ret;
-	std::map<String, VariantConn>::iterator p_con;
-	p_con = connections_holder.find(conn_name);
-	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ret, "Connection not found.");
+//	Dictionary ret;
+//	std::map<String, VariantConn>::iterator p_con;
+	auto p_con = connections_holder.find(conn_name);
+	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), Dictionary(), "Connection not found.");
 
-	std::visit([&ret](auto c){
+	return std::visit([](auto c) -> Dictionary {
 
+		Dictionary ret;
 		ret["username"] = String(c->conn_params.username().data());
 		ret["password"] = String(c->conn_params.password().data());
 		ret["database"] = String(c->conn_params.database().data());
 		ret["connection_collation"] = (int)c->conn_params.connection_collation();
 		ret["ssl"] = (MySQL::ssl_mode)c->conn_params.ssl();
 		ret["multi_queries"] = c->conn_params.multi_queries();
+		return ret;
 
 	}, p_con->second);
 
-
-//	ret["username"] = p_con->second.conn_ptr->conn_params.username().data();
-//	ret["password"] = p_con->second.conn_ptr->conn_params.password().data();
-//	ret["database"] = p_con->second.conn_ptr->conn_params.database().data();
-//	ret["connection_collation"] = (int)p_con->second.conn_ptr->conn_params.connection_collation();
-//	ret["ssl"] = (MySQL::ssl_mode)p_con->second.conn_ptr->conn_params.ssl();
-//	ret["multi_queries"] = p_con->second.conn_ptr->conn_params.multi_queries();
-
-	return ret;
+//	return ret;
 }
 
 
 
 
 
-Error MySQL::set_credentials( const String conn_name,
-										String p_username,
-										String p_password,
-										String p_database,
-										std::uint16_t collation,
-										MySQL::ssl_mode p_ssl,
-										bool multi_queries){
+Error MySQL::set_credentials(	const String conn_name,
+								String p_username,
+								String p_password,
+								String p_database,
+								std::uint16_t collation,
+								MySQL::ssl_mode p_ssl,
+								bool multi_queries){
 
-	std::map<String, VariantConn>::iterator p_con;
-	p_con = connections_holder.find(conn_name);
+	//std::map<String, VariantConn>::iterator p_con;
+	auto p_con = connections_holder.find(conn_name);
 	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
 
-	std::visit([p_username, p_password, p_database, collation, p_ssl, multi_queries](auto c){
+	std::visit([&](auto c) {
 
 		c->username = copy_string(const_cast<char*>(p_username.utf8().get_data()));
 		c->password = copy_string(const_cast<char*>(p_password.utf8().get_data()));
@@ -95,21 +84,6 @@ Error MySQL::set_credentials( const String conn_name,
 	
 	}, p_con->second);
 
-
-//	auto com = std::visit([](auto k){ return k;}, p_con->second);
-//	con->username = copy_string(const_cast<char*>(p_username.utf8().get_data()));
-/*
-	p_con->second->username = copy_string(const_cast<char*>(p_username.utf8().get_data()));
-	p_con->second->password = copy_string(const_cast<char*>(p_password.utf8().get_data()));
-	p_con->second->database = copy_string(const_cast<char*>(p_database.utf8().get_data()));
-
-	p_con->second->conn_params.set_username(p_con->second.conn_ptr->username);
-	p_con->second->conn_params.set_password(p_con->second.conn_ptr->password);
-	p_con->second->conn_params.set_database(p_con->second.conn_ptr->database);
-	p_con->second->conn_params.set_connection_collation(collation);
-	p_con->second->conn_params.set_ssl((mysql::ssl_mode)p_ssl);
-	p_con->second->conn_params.set_multi_queries(multi_queries);
-*/
 	return OK;
 }
 
@@ -136,41 +110,18 @@ Error MySQL::delete_connection(const String conn_name){
 
 
 Error MySQL::sql_disconnect(const String conn_name){
-	std::map<String, VariantConn>::iterator p_con;
-	p_con = connections_holder.find(conn_name);
+	//std::map<String, VariantConn>::iterator p_con;
+	auto p_con = connections_holder.find(conn_name);
 	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_CONNECTION_ERROR, "Connection not found.");
 
-	try{
-	
+	std::visit([](auto& c) -> Error {
+		mysql::error_code ec;
+		diagnostics diag;
+		c->conn.close(ec, diag);
+		HANDLE_SQL_EXCEPTION(ec, diag);
+		return OK;
+	}, p_con->second);
 
-		
-		std::visit([](auto c){c->conn.close();}, p_con->second);
-		
-/*
-		VariantConn	*v = &p_con->second;
-		if (std::holds_alternative<std::shared_ptr<ConnTcp>>(*v)){
-			std::get<1>(*v)->conn.close();
-		}
-		else if (std::holds_alternative<std::shared_ptr<ConnTcpSsl>>(*v)){
-			std::get<2>(*v)->conn.close();
-		}
-		else if (std::holds_alternative<std::shared_ptr<ConnUnix>>(*v)){
-			std::get<3>(*v)->conn.close();
-		}
-		else if (std::holds_alternative<std::shared_ptr<ConnUnixSsl>>(*v)){
-			std::get<4>(*v)->conn.close();
-		}
-*/
-
-	}
-	catch (const error_with_diagnostics& err){
-		SQLException(err);
-		return FAILED;
-	}
-	catch (const std::exception& err){
-		_runtime_error(err);
-		return FAILED;
-	}
 	return OK;
 }
 
@@ -182,22 +133,20 @@ Error MySQL::new_connection(const String conn_name, CONN_TYPE type){
 	it_con = connections_holder.find(conn_name);
 	ERR_FAIL_COND_V_MSG(it_con != connections_holder.end(), ERR_ALREADY_EXISTS, "Connection already exists.");
 
-	switch (type){
-		case TCP:{
-			connections_holder[conn_name] = std::make_shared<ConnTcp>();
-		}
-		case TCP_SSL:{
-			connections_holder[conn_name] = std::make_shared<ConnTcpSsl>();
-		}
-		case UNIX:{
-			connections_holder[conn_name] = std::make_shared<ConnUnix>();
-		}
-		case UNIX_SSL:{
-			connections_holder[conn_name] = std::make_shared<ConnUnixSsl>();
-		}
-		default:
-			// FIXME: Tem que imprimir o erro ERR_V_MSG
-			return FAILED;
+	if (type == TCP){
+		connections_holder[conn_name] = std::make_shared<ConnTcp>();
+	}
+	else if (type == TCP_SSL){
+		connections_holder[conn_name] = std::make_shared<ConnTcpSsl>();
+	}
+	else if (type == UNIX){
+		connections_holder[conn_name] = std::make_shared<ConnUnix>();
+	}
+	else if (type == UNIX_SSL){
+		connections_holder[conn_name] = std::make_shared<ConnUnixSsl>();
+	}
+	else{
+		ERR_FAIL_V_EDMSG(FAILED, "Invalid connection type.");
 	}
 
 	it_con = connections_holder.find(conn_name);

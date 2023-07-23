@@ -4,6 +4,7 @@
 #define MYSQL_H
 
 #include "sql_conn.h"
+#include "sql_result.h"
 
 
 
@@ -34,7 +35,6 @@ public:
 
 private:
 
-	Dictionary _last_error;
 	std::map<String, VariantConn> connections_holder;
 
 	Ref<SqlResult> _execute(const String conn_name, String stmt, bool prep, Array binds = Array());
@@ -45,7 +45,6 @@ private:
 protected:
 
 	static void _bind_methods();
-
 
 
 public:
