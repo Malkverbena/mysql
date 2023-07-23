@@ -4,7 +4,7 @@
 #include "sql_error.h"
 
 
-
+/*
 Dictionary SqlError::SQLException(const boost::mysql::error_with_diagnostics &err){
 
 	Dictionary ret;
@@ -48,4 +48,4 @@ boost::mysql::string_view SqlError::char2sql(String str){
 	return ret;
 }
 
-
+*/

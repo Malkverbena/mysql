@@ -38,8 +38,8 @@ private:
 	tcp_connection conn;
 
 public:
-	Error connect(String p_socket_path, bool p_async){return OK;}
-	Error connect(String hostname, String port, bool p_async);
+	Error connect(const String p_socket_path, const bool p_async);
+	Error connect(const String hostname,const String port, const bool async);
 	int conn_type(){return 1;}
 	ConnTcp():
 		conn_params((const char *)&username, (const char *)&password, (const char *)&database),
@@ -67,8 +67,8 @@ private:
 	tcp_ssl_connection conn;
 
 public:
-	Error connect(String p_socket_path, bool p_async){return OK;}
-	Error connect(String hostname, String port, bool p_async);
+	Error connect(const String p_socket_path, const bool p_async);
+	Error connect(const String hostname,const String port, const bool async);
 	int conn_type(){return 2;}
 	ConnTcpSsl():	
 		conn_params((const char *)&username, (const char *)&password, (const char *)&database),
@@ -98,8 +98,8 @@ protected:
 	const char* socket_path;
 
 public:
-	Error connect(String p_socket_path, bool p_async);
-	Error connect(String hostname, String port, bool p_async){return OK;}
+	Error connect(const String p_socket_path, const bool p_async);
+	Error connect(const String hostname,const String port, const bool async);
 	int conn_type(){return 3;}
 	ConnUnix():
 		endpoints((const char *)&socket_path),
@@ -129,8 +129,8 @@ protected:
 
 
 public:
-	Error connect(String p_socket_path, bool p_async);
-	Error connect(String hostname, String port, bool p_async){return OK;}
+	Error connect(const String p_socket_path, const bool p_async);
+	Error connect(const String hostname,const String port, const bool async);
 	int conn_type(){return 4;}
 	ConnUnixSsl():
 		endpoints(socket_path),

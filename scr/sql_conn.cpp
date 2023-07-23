@@ -4,8 +4,11 @@
 
 
 
+Error ConnTcp::connect(const String p_socket_path, const bool p_async){
+	ERR_FAIL_V_EDMSG(FAILED, "The tcp_connect function was designed to work with TCP connections only. For UNIX connection use unix_connect.");
+}
 
-Error ConnTcp::connect(String hostname, String port, bool async){
+Error ConnTcp::connect(const String hostname,const String port, const bool async){
 
 	// Async cannot use multi_queries.
 	if (async){conn_params.set_multi_queries(false);}
@@ -27,7 +30,11 @@ Error ConnTcp::connect(String hostname, String port, bool async){
 }
 
 
-Error ConnTcpSsl::connect(String hostname, String port, bool async){
+Error ConnTcpSsl::connect(const String p_socket_path, const bool p_async){
+	ERR_FAIL_V_EDMSG(FAILED, "The tcp_connect function was designed to work with TCP connections only. For UNIX connection use unix_connect.");
+}
+
+Error ConnTcpSsl::connect(const String hostname,const String port, const bool async){
 
 	// Async cannot use multi_queries.
 	if (async){conn_params.set_multi_queries(false);}
@@ -48,6 +55,9 @@ Error ConnTcpSsl::connect(String hostname, String port, bool async){
 	return OK;
 }
 
+Error ConnUnix::connect(const String hostname,const String port, const bool async){
+	ERR_FAIL_V_EDMSG(FAILED, "The unix_connect function was designed to work with UNIX connections only. For TCP connection use tcp_connect.");
+}
 
 Error ConnUnix::connect(String p_socket_path, bool async){
 
@@ -71,6 +81,9 @@ Error ConnUnix::connect(String p_socket_path, bool async){
 	}
 
 
+Error ConnUnixSsl::connect(const String hostname,const String port, const bool async){
+	ERR_FAIL_V_EDMSG(FAILED, "The unix_connect function was designed to work with UNIX connections only. For TCP connection use tcp_connect.");
+}
 Error ConnUnixSsl::connect(String p_socket_path, bool async){
 
 	// Async cannot use multi_queries.
