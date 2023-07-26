@@ -17,7 +17,6 @@ Ref<SqlResult> MySQL::execute(const String conn_name, const String p_stmt){
 
 Ref<SqlResult> MySQL::_execute(const String conn_name, const String p_stmt, bool prep, Array binds) {
 
-
 	Ref<SqlResult> sql_result;
 	auto p_con = connections_holder.find(conn_name);
 	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), sql_result, "Connection not found.");
@@ -27,21 +26,47 @@ Ref<SqlResult> MySQL::_execute(const String conn_name, const String p_stmt, bool
 	const char* stmt = p_stmt.utf8().get_data();
 	results result;
 
+
+	// TODO: colocar todos os ec em err temporários.
+	// TODO: Colocar todas as operações assicionas em um try
 	Error err = std::visit([&](auto c) -> Error {
 		mysql::error_code ec;
 		diagnostics diag;
+		if(c->is_async()){
+			if (not prep){
+				c->conn.async_execute(stmt, result, diag, [&](mysql::error_code erro) {
+					mysql::throw_on_error(erro, diag);
+				});
+			}
+			else{
+				statement prep_stmt;
+				c->conn.async_prepare_statement(stmt, diag, [&](mysql::error_code erro, statement temp_stmt) {
+					mysql::throw_on_error(erro, diag);
+					prep_stmt = temp_stmt;
+					std::vector<field> args = binds_to_field(binds);
+					c->conn.async_execute(prep_stmt.bind(args.begin(), args.end()), result, diag, [&](mysql::error_code err0) {
+						mysql::throw_on_error(err0, diag);
+					});
+				});
 
-		if (not prep){
-			c->conn.execute(stmt, result, ec, diag);
-			SQL_EXCEPTION_ERR(ec, diag);
+
+
+			}
 		}
 		else{
-			const statement prep_stmt = c->conn.prepare_statement(stmt);
-			const std::vector<field> args = binds_to_field(binds);
-			c->conn.execute(prep_stmt.bind(args.begin(), args.end()), result);
-			SQL_EXCEPTION_ERR(ec, diag);
+			if (not prep){
+				c->conn.execute(stmt, result, ec, diag);
+				SQL_EXCEPTION_ERR(ec, diag);
+			}
+			else{
+				statement prep_stmt = c->conn.prepare_statement(stmt, ec, diag);
+				SQL_EXCEPTION_ERR(ec, diag);
+				std::vector<field> args = binds_to_field(binds);
+				c->conn.execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
+				SQL_EXCEPTION_ERR(ec, diag);
+			}
+
 		}
-		
 		return OK;
 	}, p_con->second);
 
@@ -49,7 +74,6 @@ Ref<SqlResult> MySQL::_execute(const String conn_name, const String p_stmt, bool
 	if (err){
 		return sql_result;
 	}
-
 
 	rows_view all_rows = result.rows();
 
@@ -156,6 +180,24 @@ Error MySQL::set_credentials(	const String conn_name,
 }
 
 
+Error MySQL::set_certificate(const String conn_name, const String p_certificate_path, const String p_common_name){
+
+	auto p_con = connections_holder.find(conn_name);
+	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), ERR_DOES_NOT_EXIST, "Connection not found.");
+
+	return std::visit([&](auto c) -> Error {
+
+		CONN_TYPE ct = (CONN_TYPE)c->conn_type();
+		bool is_ssl = (ct == TCP_TLS or ct == UNIX_TLS) ? true : false;
+		ERR_FAIL_COND_V_MSG(not is_ssl, ERR_INVALID_PARAMETER, "You can only configure a SSL certificate on SSL connections..");
+		
+		return c->set_cert(p_certificate_path, p_common_name);
+
+	}, p_con->second);
+
+}
+
+
 
 PackedStringArray MySQL::get_connections() const {
 	PackedStringArray ret;
@@ -163,6 +205,7 @@ PackedStringArray MySQL::get_connections() const {
 		ret.append(it.first);
 	}
 	return ret;
+
 }
 
 
@@ -199,14 +242,14 @@ Error MySQL::new_connection(const String conn_name, CONN_TYPE type){
 	if (type == TCP){
 		connections_holder[conn_name] = std::make_shared<ConnTcp>();
 	}
-	else if (type == TCP_SSL){
-		connections_holder[conn_name] = std::make_shared<ConnTcpSsl>();
+	else if (type == TCP_TLS){
+		connections_holder[conn_name] = std::make_shared<ConnTcpTls>();
 	}
 	else if (type == UNIX){
 		connections_holder[conn_name] = std::make_shared<ConnUnix>();
 	}
-	else if (type == UNIX_SSL){
-		connections_holder[conn_name] = std::make_shared<ConnUnixSsl>();
+	else if (type == UNIX_TLS){
+		connections_holder[conn_name] = std::make_shared<ConnUnixTls>();
 	}
 	else{
 		ERR_FAIL_V_EDMSG(FAILED, "Invalid connection type.");
@@ -220,12 +263,7 @@ Error MySQL::new_connection(const String conn_name, CONN_TYPE type){
 
 
 
-MySQL::MySQL() {
-}
 
-MySQL::~MySQL() {
-	// TODO: terminate/close connections before empty connections_holder
-}
 
 
 
@@ -241,18 +279,19 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("unix_connect", "connection", "socket path", "async"), &MySQL::unix_connect,  DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("sql_disconnect", "connection"), &MySQL::sql_disconnect);
 
+	ClassDB::bind_method(D_METHOD("set_certificate", "connection", "certificate path", "common_name"), &MySQL::set_certificate, DEFVAL("mysql"));
 	ClassDB::bind_method(D_METHOD("get_credentials", "connection"), &MySQL::get_credentials);
 	ClassDB::bind_method(D_METHOD("set_credentials", "connection", "username", "password", "schema", "collation", "ssl_mode", "multi_queries"),&MySQL::set_credentials,\
-	DEFVAL(String()), DEFVAL(handshake_params::default_collation), DEFVAL((int)ssl_mode::require), DEFVAL(false));
+	DEFVAL(String()), DEFVAL(handshake_params::default_collation), DEFVAL((int)ssl_mode::enable), DEFVAL(false));
 
 	ClassDB::bind_method(D_METHOD("execute", "connection", "statement"), &MySQL::execute);
 	ClassDB::bind_method(D_METHOD("execute_prepared", "connection", "statement", "binds"), &MySQL::execute, DEFVAL(Array()));
 
 
 	BIND_ENUM_CONSTANT(TCP);
-	BIND_ENUM_CONSTANT(TCP_SSL);
+	BIND_ENUM_CONSTANT(TCP_TLS);
 	BIND_ENUM_CONSTANT(UNIX);
-	BIND_ENUM_CONSTANT(UNIX_SSL);
+	BIND_ENUM_CONSTANT(UNIX_TLS);
 
 	BIND_ENUM_CONSTANT(disable);
 	BIND_ENUM_CONSTANT(enable);
@@ -262,3 +301,9 @@ void MySQL::_bind_methods() {
 
 
 
+MySQL::MySQL() {
+}
+
+MySQL::~MySQL() {
+	// TODO: terminate/close connections before empty connections_holder
+}

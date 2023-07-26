@@ -3,10 +3,10 @@
 #ifndef MYSQL_H
 #define MYSQL_H
 
+
+
 #include "sql_conn.h"
 #include "sql_result.h"
-
-
 
 
 
@@ -16,19 +16,19 @@ class MySQL : public RefCounted {
 
 
 public:
-
+//https://www.boost.org/doc/libs/develop/libs/mysql/doc/html/mysql/ssl.html
 	enum ssl_mode{
-		disable	= (int)boost::mysql::ssl_mode::disable,
-		enable	= (int)boost::mysql::ssl_mode::enable,
-		require	= (int)boost::mysql::ssl_mode::require,
+		disable	= (int)mysql::ssl_mode::disable,
+		enable	= (int)mysql::ssl_mode::enable,
+		require	= (int)mysql::ssl_mode::require,
 	};
 
 	// TODO: Passar para classe conn
 	enum CONN_TYPE{
 		TCP		= 0,
-		TCP_SSL	= 1,
-		UNIX		= 2,
-		UNIX_SSL	= 3
+		TCP_TLS	= 1,
+		UNIX	= 2,
+		UNIX_TLS= 3
 	};
 
 
@@ -51,7 +51,7 @@ public:
 // ==== CONNECTION ==== /
 
 	// Add a new connection to the connection stack.
-	//	CONN_NAME: The name of the connection.
+	// CONN_NAME: The name of the connection.
 	// TYPE: Use TCP or UNIX SOCKET.
 	// ASYNC: Determines that the new connection will be asynchronous.
 	// SSL: Determines how the new connection will use SSL.
@@ -64,8 +64,20 @@ public:
 									String p_password,
 									String p_database			= String(),
 									std::uint16_t collation	= handshake_params::default_collation,
-									MySQL::ssl_mode p_ssl	= MySQL::ssl_mode::disable,
+									MySQL::ssl_mode p_ssl	= MySQL::ssl_mode::enable,
 									bool multi_queries		= false);
+
+
+	/*
+	If it is an SSL connection, it sets the SSL context's verify mode to verify the peer, 
+	adds the certificate authority using the provided certificate, sets the verify callback 
+	to verify the host name using the provided "common name".
+	*/
+	// CONN_NAME: The name of the connection.
+	// CERT PATH: The path to the certificate.
+	// COMMON NAME: The common name of the certificate.
+	Error set_certificate(const String conn_name, const String p_certificate_path, const String p_common_name = String("mysql"));
+
 
 	// Delete a connection from connection stack.
 	//	CONN_NAME: The name of the connection to be deleted.

@@ -39,7 +39,7 @@ Conexão:
 
 	Principais membros:
 		mysql::handshake_params
-		mysql::tcp_ssl_connection conn
+		mysql::tpc_tls_connection conn
 	
 	Funções:
 		set/get param

@@ -24,11 +24,16 @@ void print_sql_exception(const char *p_function, const char *p_file, int p_line,
 	vformat("# ERR: %s\n", ec.value())+\
 	vformat("# Server error: (%s)\n", diags.server_message().data())+\
 	vformat("\n# Client Error: (%s)", diags.client_message().data());
-	//return exc.c_str();
 	ERR_PRINT(exc);
 }
 
 
 
-
+void print_boost_exception(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec){
+	String exc = \
+	vformat("# BOOST Error Caught!\n")+\
+	vformat("# ERR: SQLException in: %s", p_file) + vformat(" in function: %s", p_function) + vformat("() on line %s\n", p_line)+\
+	vformat("# ERR: %s\n", ec.value());
+	ERR_PRINT(exc);
+}
 

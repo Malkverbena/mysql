@@ -1,5 +1,10 @@
 
 
+Baixando o Boost 
+git clone --recurse-submodules --remote-submodules git@github.com:boostorg/boost.git
+
+
+
 COMPILANDO O BOOST:
 ./bootstrap.sh --includedir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost --libdir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost/lib
 
