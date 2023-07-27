@@ -10,6 +10,7 @@ sources = [
 	"register_types.cpp",
 	"scr/sql_error.cpp",
 	"scr/helpers.cpp",
+	"scr/sql_collations.cpp",
 	"scr/sql_conn.cpp",
 	"scr/sql_result.cpp",
 	"scr/mysql.cpp",

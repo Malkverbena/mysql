@@ -3,7 +3,7 @@
 #include "mysql.h"
 
 
-Ref<SqlResult> MySQL::execute_prepared(const String conn_name, const String p_stmt, Array binds){
+Ref<SqlResult> MySQL::execute_prepared(const String conn_name, const String p_stmt, const Array binds){
 	return _execute(conn_name, p_stmt, true, binds);
 }
 
@@ -15,7 +15,7 @@ Ref<SqlResult> MySQL::execute(const String conn_name, const String p_stmt){
 
 
 
-Ref<SqlResult> MySQL::_execute(const String conn_name, const String p_stmt, bool prep, Array binds) {
+Ref<SqlResult> MySQL::_execute(const String conn_name, const String p_stmt, const bool prep, const Array binds) {
 
 	Ref<SqlResult> sql_result;
 	auto p_con = connections_holder.find(conn_name);
@@ -147,7 +147,7 @@ Dictionary MySQL::get_credentials(const String conn_name){
 		ret["password"] = String(c->conn_params.password().data());
 		ret["database"] = String(c->conn_params.database().data());
 		ret["connection_collation"] = (int)c->conn_params.connection_collation();
-		ret["ssl"] = (MySQL::ssl_mode)c->conn_params.ssl();
+		ret["ssl"] = (SqlCollations::ssl_mode)c->conn_params.ssl();
 		ret["multi_queries"] = c->conn_params.multi_queries();
 		return ret;
 	}, p_con->second);
@@ -160,7 +160,7 @@ Error MySQL::set_credentials(	const String conn_name,
 								String p_password,
 								String p_database,
 								std::uint16_t collation,
-								MySQL::ssl_mode p_ssl,
+								SqlCollations::ssl_mode p_ssl,
 								bool multi_queries){
 
 	auto p_con = connections_holder.find(conn_name);
@@ -187,8 +187,8 @@ Error MySQL::set_certificate(const String conn_name, const String p_certificate_
 
 	return std::visit([&](auto c) -> Error {
 
-		CONN_TYPE ct = (CONN_TYPE)c->conn_type();
-		bool is_ssl = (ct == TCP_TLS or ct == UNIX_TLS) ? true : false;
+		SqlCollations::CONN_TYPE ct = (SqlCollations::CONN_TYPE)c->conn_type();
+		bool is_ssl = (ct == SqlCollations::TCP_TLS or ct == SqlCollations::UNIX_TLS) ? true : false;
 		ERR_FAIL_COND_V_MSG(not is_ssl, ERR_INVALID_PARAMETER, "You can only configure a SSL certificate on SSL connections..");
 		
 		return c->set_cert(p_certificate_path, p_common_name);
@@ -234,21 +234,21 @@ Error MySQL::sql_disconnect(const String conn_name){
 
 
 
-Error MySQL::new_connection(const String conn_name, CONN_TYPE type){
+Error MySQL::new_connection(const String conn_name, SqlCollations::CONN_TYPE type){
 
 	auto it_con = connections_holder.find(conn_name);
 	ERR_FAIL_COND_V_MSG(it_con != connections_holder.end(), ERR_ALREADY_EXISTS, "Connection already exists!");
 
-	if (type == TCP){
+	if (type == SqlCollations::TCP){
 		connections_holder[conn_name] = std::make_shared<ConnTcp>();
 	}
-	else if (type == TCP_TLS){
+	else if (type == SqlCollations::TCP_TLS){
 		connections_holder[conn_name] = std::make_shared<ConnTcpTls>();
 	}
-	else if (type == UNIX){
+	else if (type == SqlCollations::UNIX){
 		connections_holder[conn_name] = std::make_shared<ConnUnix>();
 	}
-	else if (type == UNIX_TLS){
+	else if (type == SqlCollations::UNIX_TLS){
 		connections_holder[conn_name] = std::make_shared<ConnUnixTls>();
 	}
 	else{
@@ -271,7 +271,7 @@ Error MySQL::new_connection(const String conn_name, CONN_TYPE type){
 void MySQL::_bind_methods() {
 
 	// ==== CONNECTION ==== /
-	ClassDB::bind_method(D_METHOD("new_connection", "connection", "type"), &MySQL::new_connection, DEFVAL(TCP));
+	ClassDB::bind_method(D_METHOD("new_connection", "connection", "type"), &MySQL::new_connection, DEFVAL(SqlCollations::TCP));
 	ClassDB::bind_method(D_METHOD("get_connections"), &MySQL::get_connections);
 	ClassDB::bind_method(D_METHOD("delete_connection", "connection"), &MySQL::delete_connection);
 	
@@ -285,17 +285,7 @@ void MySQL::_bind_methods() {
 	DEFVAL(String()), DEFVAL(handshake_params::default_collation), DEFVAL((int)ssl_mode::enable), DEFVAL(false));
 
 	ClassDB::bind_method(D_METHOD("execute", "connection", "statement"), &MySQL::execute);
-	ClassDB::bind_method(D_METHOD("execute_prepared", "connection", "statement", "binds"), &MySQL::execute, DEFVAL(Array()));
-
-
-	BIND_ENUM_CONSTANT(TCP);
-	BIND_ENUM_CONSTANT(TCP_TLS);
-	BIND_ENUM_CONSTANT(UNIX);
-	BIND_ENUM_CONSTANT(UNIX_TLS);
-
-	BIND_ENUM_CONSTANT(disable);
-	BIND_ENUM_CONSTANT(enable);
-	BIND_ENUM_CONSTANT(require);
+	ClassDB::bind_method(D_METHOD("execute_prepared", "connection", "statement", "binds"), &MySQL::execute_prepared, DEFVAL(Array()));
 
 }
 

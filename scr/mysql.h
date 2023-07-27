@@ -7,6 +7,7 @@
 
 #include "sql_conn.h"
 #include "sql_result.h"
+#include "sql_collations.h"
 
 
 
@@ -15,29 +16,11 @@ class MySQL : public RefCounted {
 	GDCLASS(MySQL, RefCounted);
 
 
-public:
-//https://www.boost.org/doc/libs/develop/libs/mysql/doc/html/mysql/ssl.html
-	enum ssl_mode{
-		disable	= (int)mysql::ssl_mode::disable,
-		enable	= (int)mysql::ssl_mode::enable,
-		require	= (int)mysql::ssl_mode::require,
-	};
-
-	// TODO: Passar para classe conn
-	enum CONN_TYPE{
-		TCP		= 0,
-		TCP_TLS	= 1,
-		UNIX	= 2,
-		UNIX_TLS= 3
-	};
-
-
-
 private:
 
 	std::map<String, VariantConn> connections_holder;
 
-	Ref<SqlResult> _execute(const String conn_name, const String p_stmt, bool prep, Array binds);
+	Ref<SqlResult> _execute(const String conn_name, const String p_stmt, const bool prep, const Array binds);
 
 
 protected:
@@ -47,24 +30,21 @@ protected:
 
 public:
 
-
-// ==== CONNECTION ==== /
-
 	// Add a new connection to the connection stack.
 	// CONN_NAME: The name of the connection.
 	// TYPE: Use TCP or UNIX SOCKET.
 	// ASYNC: Determines that the new connection will be asynchronous.
 	// SSL: Determines how the new connection will use SSL.
-	Error new_connection(const String conn_name, CONN_TYPE type = TCP);   //****
+	Error new_connection(const String conn_name, SqlCollations::CONN_TYPE type = SqlCollations::CONN_TYPE::TCP);   //****
 
 
 	// Setup new connections.  >> https://www.boost.org/doc/libs/develop/libs/mysql/doc/html/mysql/ref/boost__mysql__handshake_params.html
 	Error set_credentials(const String conn_name,
 									String p_username,
 									String p_password,
-									String p_database			= String(),
-									std::uint16_t collation	= handshake_params::default_collation,
-									MySQL::ssl_mode p_ssl	= MySQL::ssl_mode::enable,
+									String p_database		= String(),
+									std::uint16_t collation	= SqlCollations::default_collation,
+									SqlCollations::ssl_mode p_ssl	= SqlCollations::ssl_mode::enable,
 									bool multi_queries		= false);
 
 
@@ -98,21 +78,14 @@ public:
 	// Closes the connection to the server.
 	Error sql_disconnect(const String conn_name);
 
-
 	Ref<SqlResult> execute(const String conn_name, const String p_stmt);
-	Ref<SqlResult> execute_prepared(const String conn_name, const String p_stmt, Array binds = Array());
-	
+	Ref<SqlResult> execute_prepared(const String conn_name, const String p_stmt, const Array binds = Array());
 
-	//Sobrecarregar asgunções execute com void ? ou execute_async?
 
 	MySQL();
 	~MySQL();
 
 };
-
-
-VARIANT_ENUM_CAST(MySQL::CONN_TYPE);
-VARIANT_ENUM_CAST(MySQL::ssl_mode);
 
 
 

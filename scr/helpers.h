@@ -5,7 +5,6 @@
 
 
 #include "sql_error.h"
-#pragma once
 
 
 //static const PackedStringArray param_names = {String("connection_collation"), String("ssl"), String("database"), String("multi_queries"), String("password"), String("username")};

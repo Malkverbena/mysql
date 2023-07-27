@@ -5,6 +5,8 @@
 
 
 #include "helpers.h"
+#include "sql_collations.h"
+
 
 #include <variant>
 #include <typeinfo>
@@ -19,14 +21,6 @@ using namespace boost::asio::ip;
 
 class Conn{
 friend class MySQL;
-
-public:
-	enum {
-		TCP		= 0,
-		TCP_TLS	= 1,
-		UNIX	= 2,
-		UNIX_TLS= 3
-	};
 
 protected:
 	io_context ctx;
@@ -51,7 +45,7 @@ private:
 	tcp_connection conn;
 
 public:
-	int conn_type(){return TCP;}
+	int conn_type(){return SqlCollations::CONN_TYPE::TCP;}
 	bool is_async(){return async;}
 
 	Error set_cert(const String cert_path, const String p_common_name);
@@ -85,7 +79,7 @@ private:
 	tcp_ssl_connection conn;
 
 public:
-	int conn_type(){return TCP_TLS;}
+	int conn_type(){return SqlCollations::CONN_TYPE::TCP_TLS;}
 	bool is_async(){return async;}
 
 	Error set_cert(const String cert_path, const String p_common_name);
@@ -119,7 +113,7 @@ private:
 
 //protected:
 public:
-	int conn_type(){return UNIX;}
+	int conn_type(){return SqlCollations::CONN_TYPE::UNIX;}
 	bool is_async(){return async;}
 
 	Error set_cert(const String cert_path, const String p_common_name);
@@ -157,7 +151,7 @@ private:
 
 //protected:
 public:
-	int conn_type(){return UNIX_TLS;}
+	int conn_type(){return SqlCollations::CONN_TYPE::UNIX_TLS;}
 	bool is_async(){return async;}
 
 	Error set_cert(const String cert_path, const String p_common_name);
