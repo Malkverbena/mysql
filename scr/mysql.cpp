@@ -136,6 +136,13 @@ Error MySQL::unix_connect(const String conn_name, String p_socket_path, bool asy
 	}, p_con->second);
 }
 
+SqlCollations::CONN_TYPE MySQL::get_connection_type(const String conn_name){
+	auto p_con = connections_holder.find(conn_name);
+	ERR_FAIL_COND_V_MSG(p_con==connections_holder.end(), SqlCollations::NONE, "Connection does not exist!");
+	return std::visit([](auto c) -> SqlCollations::CONN_TYPE {
+		return c->conn_type();
+	}, p_con->second);
+}
 
 
 Dictionary MySQL::get_credentials(const String conn_name){
@@ -271,7 +278,7 @@ Error MySQL::new_connection(const String conn_name, SqlCollations::CONN_TYPE typ
 void MySQL::_bind_methods() {
 
 	// ==== CONNECTION ==== /
-	ClassDB::bind_method(D_METHOD("new_connection", "connection", "type"), &MySQL::new_connection, DEFVAL(SqlCollations::TCP));
+	ClassDB::bind_method(D_METHOD("new_connection", "connection", "type"), &MySQL::new_connection);
 	ClassDB::bind_method(D_METHOD("get_connections"), &MySQL::get_connections);
 	ClassDB::bind_method(D_METHOD("delete_connection", "connection"), &MySQL::delete_connection);
 	
@@ -282,7 +289,7 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_certificate", "connection", "certificate path", "common_name"), &MySQL::set_certificate, DEFVAL("mysql"));
 	ClassDB::bind_method(D_METHOD("get_credentials", "connection"), &MySQL::get_credentials);
 	ClassDB::bind_method(D_METHOD("set_credentials", "connection", "username", "password", "schema", "collation", "ssl_mode", "multi_queries"),&MySQL::set_credentials,\
-	DEFVAL(String()), DEFVAL(handshake_params::default_collation), DEFVAL((int)ssl_mode::enable), DEFVAL(false));
+	DEFVAL(String()), DEFVAL(SqlCollations::default_collation), DEFVAL((int)ssl_mode::enable), DEFVAL(false));
 
 	ClassDB::bind_method(D_METHOD("execute", "connection", "statement"), &MySQL::execute);
 	ClassDB::bind_method(D_METHOD("execute_prepared", "connection", "statement", "binds"), &MySQL::execute_prepared, DEFVAL(Array()));

@@ -45,7 +45,7 @@ private:
 	tcp_connection conn;
 
 public:
-	int conn_type(){return SqlCollations::CONN_TYPE::TCP;}
+	SqlCollations::CONN_TYPE conn_type(){return SqlCollations::CONN_TYPE::TCP;}
 	bool is_async(){return async;}
 
 	Error set_cert(const String cert_path, const String p_common_name);
@@ -79,7 +79,7 @@ private:
 	tcp_ssl_connection conn;
 
 public:
-	int conn_type(){return SqlCollations::CONN_TYPE::TCP_TLS;}
+	SqlCollations::CONN_TYPE conn_type(){return SqlCollations::CONN_TYPE::TCP_TLS;}
 	bool is_async(){return async;}
 
 	Error set_cert(const String cert_path, const String p_common_name);
@@ -113,7 +113,7 @@ private:
 
 //protected:
 public:
-	int conn_type(){return SqlCollations::CONN_TYPE::UNIX;}
+	SqlCollations::CONN_TYPE conn_type(){return SqlCollations::CONN_TYPE::UNIX;}
 	bool is_async(){return async;}
 
 	Error set_cert(const String cert_path, const String p_common_name);
@@ -151,7 +151,7 @@ private:
 
 //protected:
 public:
-	int conn_type(){return SqlCollations::CONN_TYPE::UNIX_TLS;}
+	SqlCollations::CONN_TYPE conn_type(){return SqlCollations::CONN_TYPE::UNIX_TLS;}
 	bool is_async(){return async;}
 
 	Error set_cert(const String cert_path, const String p_common_name);

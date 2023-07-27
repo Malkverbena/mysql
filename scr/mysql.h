@@ -35,7 +35,7 @@ public:
 	// TYPE: Use TCP or UNIX SOCKET.
 	// ASYNC: Determines that the new connection will be asynchronous.
 	// SSL: Determines how the new connection will use SSL.
-	Error new_connection(const String conn_name, SqlCollations::CONN_TYPE type = SqlCollations::CONN_TYPE::TCP);   //****
+	Error new_connection(const String conn_name, SqlCollations::CONN_TYPE type);   //****
 
 
 	// Setup new connections.  >> https://www.boost.org/doc/libs/develop/libs/mysql/doc/html/mysql/ref/boost__mysql__handshake_params.html
@@ -70,6 +70,8 @@ public:
 
 	// Get handshake parameters
 	Dictionary get_credentials(const String conn_name);
+
+	SqlCollations::CONN_TYPE get_connection_type(const String conn_name);
 
 	// Establishes a connection to a MySQL server.
 	Error tcp_connect(const String conn_name, const String p_hostname = "127.0.0.1", const String p_port = "3306", const bool p_async = true);

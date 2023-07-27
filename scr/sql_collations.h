@@ -31,7 +31,8 @@ protected:
 public:
 
     enum CONN_TYPE{
-		TCP,
+		NONE,
+        TCP,
 		TCP_TLS,
 		UNIX,
 		UNIX_TLS,
