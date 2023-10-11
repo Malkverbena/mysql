@@ -12,7 +12,7 @@ func _ready():
 	mysql.unix_connect("unix", db.unix_socket)
 	print(mysql.get_credentials("unix"))
 
-	var unix_res : SqlResult = mysql.execute("unix", "SELECT * FROM testes.text01")
+	var unix_res : Ref<SqlResult> = mysql.execute("unix", "SELECT * FROM testes.text01")
 	var unix_arr = unix_res.get_array()
 	for a in unix_arr:
 		print(a)

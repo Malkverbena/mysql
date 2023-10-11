@@ -5,8 +5,8 @@ extends Node
 var username : String = "cleber"
 var password : String = "jeovaerei"
 var database : String = "testes"
-var collation : int = SqlCollations.default_collation
-var ssl: SqlCollations.ssl_mode = SqlCollations.enable
+var collation : SqlConnection.MysqlCollations = SqlConnection.default_collation
+var ssl: SqlConnection.ssl_mode = SqlConnection.enable
 var multi_queries : bool = true
 
 

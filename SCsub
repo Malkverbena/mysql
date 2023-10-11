@@ -1,49 +1,62 @@
 #!/usr/bin/env python
 # SCsub
 
+import os
+import subprocess
+from tools import helpers
+
 
 Import('env')
 mysql_env = env.Clone()
 
 
+# Use absolut paths to avoid problem between platforms.
+dep_path = os.path.join(os.getcwd(), "3party")
+
+# Update and compile thirdparty.
+helpers.apply_config(env)
+
+
 sources = [
 	"register_types.cpp",
-	"scr/sql_error.cpp",
 	"scr/helpers.cpp",
-	"scr/sql_collations.cpp",
-	"scr/sql_conn.cpp",
 	"scr/sql_result.cpp",
 	"scr/mysql.cpp",
 ]
 
 
+#env.Append(CPPDEFINES=[
+#	"__EXCEPTIONS",
+#	"BOOST_NO_EXCEPTIONS",
+#	"BOOST_EXCEPTION_DISABLE",
+# ])
 
-mysql_env.Append(CXXFLAGS='-std=c++20')
+
+mysql_env.Append(CPPFLAGS =[
+	'-fexceptions',
+	'-std=c++20',
+])
 
 
 # INCLUDE:
-#mysql_env.Prepend(CPPPATH=["/media/cleber/DATA/COMPILATIONS/dependencies/boost/libs/mysql/include/boost"])  FUNCIONA!
-mysql_env.Prepend(CPPPATH=["#/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost"]) 
-
+mysql_env.Prepend(CPPPATH=[
+	os.path.join(dep_path, "boost"),
+	os.path.join(dep_path, "boost/boost"),
+	os.path.join(dep_path, "openssl"),
+	os.path.join(dep_path, "openssl/include"),
+])
 
 # LIB
-#env.Append(LIBPATH=["#/media/cleber/DATA/COMPILATIONS/dependencies/boost/stage/lib"]) FUNCIONA!
-env.Append(LIBPATH=["#/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/boost/lib", '#/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/deb/ssl/lib64'])
+env.Append(LIBPATH=[
+	os.path.join(dep_path, "boost/stage/lib"),
+	os.path.join(dep_path, "openssl"),
+	os.path.join(dep_path, "openssl/apps"),
+	os.path.join(dep_path, "openssl/providers"),
+])
 
-
-env.Append(LIBS=["libcrypto", "libssl", "libboost_thread"])
 
 
 mysql_env.add_source_files(env.modules_sources, sources)
 
-
-
-# REFERENCES
-#	project(boost_mysql_example LANGUAGES CXX)
-
-#	find_package(Boost REQUIRED COMPONENTS headers)
-#	find_package(Threads REQUIRED)
-#	find_package(OpenSSL REQUIRED)
-
-#	add_executable(main main.cpp)
-#	target_link_libraries(main PRIVATE Boost::headers Threads::Threads OpenSSL::Crypto OpenSSL::SSL)
+# "libboost_system", "libboost_exception", 
+env.Append(LIBS=["libssl", "libcrypto", "libboost_thread", ])

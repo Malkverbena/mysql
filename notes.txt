@@ -1,27 +1,8 @@
 
-int *pnum;	// Declara o ponteiro
-int num;		// Declara o valor
-
-num = 10;
-pnum = &num
-&num	// Endereço
-
-*pnum; //Imprime o 
-
-delete pnum; OBRIGATÓRIO 
-
-
-
 Trabalhando com unique_ptr:
 https://learn.microsoft.com/pt-br/cpp/cpp/how-to-create-and-use-unique-ptr-instances?view=msvc-170
 
 
-new_connection = Instancia nova conexão
-
-
-set_credeltials = configura a conexão
-
-get/set_param = Mudaparametros
 
 //		std::string std_string = gdt_data.utf8().get_data();
 
@@ -70,7 +51,7 @@ result:
 		warning_count
 		
 		
-Error MySQL::set_credentials(String conn_name, String hostname, String user, String password, String schema, int port){
+Error MySQL::set_credentials(String conn_name, String hostname, String user, String password, String schema, int port) {
 	ERR_FAIL_COND_V_MSG(connections_holder[conn_name].set_param("hostname", hostname), ERR_INVALID_PARAMETER, vformat("%s is an invalid parameter: hostname "));
 	ERR_FAIL_COND_V_MSG(connections_holder[conn_name].set_param("username", user), ERR_INVALID_PARAMETER, vformat("%s is an invalid parameter: user "));
 	ERR_FAIL_COND_V_MSG(connections_holder[conn_name].set_param("password", password), ERR_INVALID_PARAMETER, vformat("%s is an invalid parameter: password"));
@@ -79,3 +60,32 @@ Error MySQL::set_credentials(String conn_name, String hostname, String user, Str
 	return OK;
 }
 */
+
+
+
+./bootstrap.sh \
+--libdir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/thirdparty/thdpt/boost/lib \
+--includedir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/thirdparty/thdpt/boost/include \
+
+
+The following directory should be added to compiler include paths:
+	/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/thirdparty/boost
+The following directory should be added to linker library paths:
+	/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/thirdparty/thdpt/boost/stage/lib
+
+
+./b2 -j30 \
+--libdir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/thirdparty/thdpt/boost/lib \
+--includedir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/thirdparty/thdpt/boost/include \
+--stagedir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/thirdparty/thdpt/boost/stage \
+--build-dir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/thirdparty/boost/build \
+variant=debug \
+link=static \
+threading=multi \
+runtime-link=static \
+toolset=gcc \
+architecture=x86 \
+target-os=linux \
+address-model=64
+
+--toolset=msvc

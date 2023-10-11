@@ -1,15 +1,15 @@
-/* register_types.cpp MySQL */
+
+/* register_types.cpp */
 
 
 #include "register_types.h"
-
 #include "core/object/class_db.h"
-#include "scr/sql_error.h"
+
+
+#include "scr/headers_and_constants.h"
 #include "scr/helpers.h"
-#include "scr/sql_conn.h"
-#include "scr/mysql.h"
 #include "scr/sql_result.h"
-#include "scr/sql_collations.h"
+#include "scr/mysql.h"
 
 
 void initialize_mysql_module(ModuleInitializationLevel p_level) {
@@ -17,12 +17,11 @@ void initialize_mysql_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 
-	ClassDB::register_class<MySQL>();
-	ClassDB::register_class<SqlResult>();
-	ClassDB::register_class<SqlCollations>();
+	GDREGISTER_CLASS(MySQL);
+	GDREGISTER_CLASS(SqlResult);
+	GDREGISTER_CLASS(SqlConnection);
 
 }
-
 
 
 void uninitialize_mysql_module(ModuleInitializationLevel p_level) {
