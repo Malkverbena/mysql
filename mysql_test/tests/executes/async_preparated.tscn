@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://b1g1tk878hpcd"]
+
+[ext_resource type="Script" path="res://tests/executes/async_preparated.gd" id="1_tk5q7"]
+
+[node name="async_preparated" type="Node"]
+script = ExtResource("1_tk5q7")

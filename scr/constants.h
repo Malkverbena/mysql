@@ -1,96 +1,26 @@
 
-/* headers_and_constants.h */
+/* constants.h */
 
-#ifndef HEADERS_AND_CONSTANTS_H
-#define HEADERS_AND_CONSTANTS_H
-
-
-
-#include "core/object/ref_counted.h" 
-#include "core/core_bind.h"
+#ifndef DEFINITIONS_H
+#define DEFINITIONS_H
 
 
-#include <fstream>
-#include <stdexcept>
-#include <cstddef>
+#include <string_view>
 #include <iostream>
-#include <string>
-#include <memory>
-#include <map>
-#include <tuple>
-#include <exception>
 
 
-//#include <boost/mysql.hpp>
+#ifdef BOOST_MYSQL_SEPARATE_COMPILATION
+#include <boost/mysql/src.hpp>
+#endif
 
 
 
-
-//#include <boost/mysql/bad_field_access.hpp>
-//#include <boost/mysql/blob.hpp>
-//#include <boost/mysql/blob_view.hpp>
-//#include <boost/mysql/buffer_params.hpp>
-//#include <boost/mysql/client_errc.hpp>
-//#include <boost/mysql/column_type.hpp>
-//#include <boost/mysql/common_server_errc.hpp>
-//#include <boost/mysql/connection.hpp>
-//#include <boost/mysql/date.hpp>
-//#include <boost/mysql/datetime.hpp>
-//#include <boost/mysql/days.hpp>
-#include <boost/mysql/diagnostics.hpp>
-#include <boost/mysql/error_categories.hpp>
-#include <boost/mysql/error_code.hpp>
-#include <boost/mysql/error_with_diagnostics.hpp>
-//#include <boost/mysql/execution_state.hpp>
-//#include <boost/mysql/field.hpp>
-//#include <boost/mysql/field_kind.hpp>
-//#include <boost/mysql/field_view.hpp>
-//#include <boost/mysql/handshake_params.hpp>
-//#include <boost/mysql/mariadb_collations.hpp>
-//#include <boost/mysql/mariadb_server_errc.hpp>
-//#include <boost/mysql/metadata.hpp>
-//#include <boost/mysql/metadata_collection_view.hpp>
-//#include <boost/mysql/metadata_mode.hpp>
+#include <boost/mysql/mariadb_collations.hpp>
 #include <boost/mysql/mysql_collations.hpp>
-//#include <boost/mysql/mysql_server_errc.hpp>
-//#include <boost/mysql/results.hpp>
-//#include <boost/mysql/resultset.hpp>
-//#include <boost/mysql/resultset_view.hpp>
-//#include <boost/mysql/row.hpp>
-//#include <boost/mysql/row_view.hpp>
-//#include <boost/mysql/rows.hpp>
-//#include <boost/mysql/rows_view.hpp>
 #include <boost/mysql/ssl_mode.hpp>
-//#include <boost/mysql/statement.hpp>
-//#include <boost/mysql/static_execution_state.hpp>
-//#include <boost/mysql/static_results.hpp>
-#include <boost/mysql/string_view.hpp>
-#include <boost/mysql/tcp.hpp>
-#include <boost/mysql/tcp_ssl.hpp>
-#include <boost/mysql/throw_on_error.hpp>
-//#include <boost/mysql/time.hpp>
-#include <boost/mysql/unix.hpp>
-#include <boost/mysql/unix_ssl.hpp>
 
 
-#include <boost/asio/buffer.hpp>
-#include <boost/asio/io_context.hpp>
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/ssl/context.hpp>
-#include <boost/asio/ssl/host_name_verification.hpp>
-#include <boost/asio/local/stream_protocol.hpp>
-//#include <boost/system/system_error.hpp>
-//#include <boost/exception/exception.hpp>
-
-
-// ---ASYNC---
-#include <boost/asio/as_tuple.hpp>
-#include <boost/asio/awaitable.hpp>
-#include <boost/asio/co_spawn.hpp>
-#include <boost/asio/use_awaitable.hpp>
-
-
-#include <boost/asio/detached.hpp>
+using namespace boost;
 
 
 #ifdef TOOLS_ENABLED
@@ -98,14 +28,6 @@
 #else
 #define FUNCTION_NAME __FUNCTION__
 #endif
-
-
-using namespace std;
-using namespace boost;
-using namespace boost::asio;
-
-
-
 
 
 enum CONN_TYPE{
@@ -116,9 +38,8 @@ enum CONN_TYPE{
 	UNIXSSL
 };
 
-
-enum COLLATIONS {
-	default_collation			= mysql::mysql_collations::utf8_general_ci, // 45
+enum MYSQLCOLLATIONS {
+	default_collation			= mysql::mysql_collations::utf8mb4_general_ci, // 45
 	big5_chinese_ci				= mysql::mysql_collations::big5_chinese_ci,
 	latin2_czech_cs				= mysql::mysql_collations::latin2_czech_cs,
 	dec8_swedish_ci				= mysql::mysql_collations::dec8_swedish_ci,
@@ -395,7 +316,7 @@ enum COLLATIONS {
 
 
 
+#endif  // DEFINITIONS_H
 
 
 
-#endif  // HEADERS_AND_CONSTANTS_H

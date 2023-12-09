@@ -3,13 +3,18 @@
 
 
 #include "register_types.h"
-#include "core/object/class_db.h"
 
 
-#include "scr/headers_and_constants.h"
+#ifdef BOOST_MYSQL_SEPARATE_COMPILATION
+#include <boost/mysql/src.hpp>
+#endif
+
+
+#include "scr/constants.h"
 #include "scr/helpers.h"
 #include "scr/sql_result.h"
 #include "scr/mysql.h"
+
 
 
 void initialize_mysql_module(ModuleInitializationLevel p_level) {
@@ -19,7 +24,6 @@ void initialize_mysql_module(ModuleInitializationLevel p_level) {
 
 	GDREGISTER_CLASS(MySQL);
 	GDREGISTER_CLASS(SqlResult);
-	GDREGISTER_CLASS(SqlConnection);
 
 }
 

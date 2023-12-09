@@ -3,175 +3,174 @@
 #ifndef MYSQL_H
 #define MYSQL_H
 
+
 #include "helpers.h"
+#include "sql_result.h"
+
+#include <memory>
+
+#include <core/config/project_settings.h>
+
+
+#include <boost/mysql/unix.hpp>
+#include <boost/mysql/unix_ssl.hpp>
+#include <boost/mysql/tcp.hpp>
+#include <boost/mysql/tcp_ssl.hpp>
+
+#include <boost/mysql/handshake_params.hpp>
+#include <boost/mysql/row_view.hpp>
+
+#include <boost/asio/ssl/host_name_verification.hpp>
+#include <boost/asio/local/stream_protocol.hpp>
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/ssl/context.hpp>
 
 
 
-class SqlConnection : public RefCounted {
-	GDCLASS(SqlConnection, RefCounted);
-
-friend class MySQL;
-
-
-public:
-
-	using MysqlCollations = COLLATIONS;
-	using ConnType = CONN_TYPE;
-	
-	enum ssl_mode {
-		disable	= (int)mysql::ssl_mode::disable,
-		enable	= (int)mysql::ssl_mode::enable,
-		require	= (int)mysql::ssl_mode::require,
-	};
-
-protected:
-
-	static void _bind_methods();
-
-
-private:
-	static constexpr auto tuple_awaitable = asio::as_tuple(asio::use_awaitable);
-
-	std::shared_ptr<asio::io_context> ctx;
-	String ID;
-	bool async = false;
-	bool busy = false;
-	ConnType conn_type;
-	char *username;
-	char *password;
-	char *database;
-	mysql::handshake_params conn_params;
-
-	std::shared_ptr<asio::ip::tcp::resolver> resolver = nullptr;
-	std::shared_ptr<asio::ssl::context> ssl_ctx = nullptr;
-
-	std::shared_ptr<mysql::tcp_connection> tcp_conn = nullptr;
-	std::shared_ptr<mysql::tcp_ssl_connection> tcp_ssl_conn = nullptr;
-	std::shared_ptr<mysql::unix_connection> unix_conn = nullptr;
-	std::shared_ptr<mysql::unix_ssl_connection> unix_ssl_conn = nullptr;
-
-
-public:
-
-	SqlConnection():
-		conn_params((const char *)&username, (const char *)&password, (const char *)&database)
-	{}
-
-	void initialize() {
-		if (conn_type == TCP) {
-			resolver = std::make_shared<asio::ip::tcp::resolver>(ctx->get_executor());
-			tcp_conn = std::make_shared<mysql::tcp_connection>(ctx->get_executor());
-			tcp_conn->set_meta_mode(mysql::metadata_mode::full);
-		}else if (conn_type == TCPSSL) {
-			ssl_ctx = std::make_shared<asio::ssl::context>(ssl::context::tls_client);
-			resolver = std::make_shared<asio::ip::tcp::resolver>(ctx->get_executor());
-			tcp_ssl_conn = std::make_shared<mysql::tcp_ssl_connection>(ctx->get_executor(), *ssl_ctx);
-			tcp_ssl_conn->set_meta_mode(mysql::metadata_mode::full);
-		}
-		else if (conn_type == UNIX) {
-			unix_conn = std::make_shared<mysql::unix_connection>(*ctx);
-			tcp_ssl_conn->set_meta_mode(mysql::metadata_mode::full);
-		}
-		else if (conn_type == UNIXSSL) {
-			ssl_ctx = std::make_shared<asio::ssl::context>(ssl::context::tls_client);
-			unix_ssl_conn = std::make_shared<mysql::unix_ssl_connection>(*ctx, *ssl_ctx);
-			tcp_ssl_conn->set_meta_mode(mysql::metadata_mode::full);
-		}
-	}
-
-
-};
-
+using namespace boost::asio;
 
 
 class MySQL : public RefCounted {
 	GDCLASS(MySQL, RefCounted);
 
 
-private:
-
-	Dictionary last_sql_exception;
-	Dictionary last_boost_exception;
-	Dictionary last_std_exception;
-
-
-	std::map<String, std::shared_ptr<SqlConnection>> connectionMap;
-
-	boost::asio::awaitable<void> coro_connect_tcp(std::shared_ptr<SqlConnection>& conn, const char* hostname, const char* port);
-
-	boost::asio::awaitable<void> coro_connect_unix(std::shared_ptr<SqlConnection>& conn, const char* socket);
-
-	Ref<SqlResult> _execute(const String conn_name, const String p_stmt, const bool prep, const Array binds);
-
-	void _async_execute(const String conn_name, const String p_stmt, const bool prep, const Array binds);
-
-	Ref<SqlResult> make_godot_result(mysql::results result);
-
-	boost::asio::awaitable<void> coro_execute(
-		std::shared_ptr<SqlConnection> conn, const char* s_stmt, std::vector<mysql::field> *args, const bool prep
-	);
-
-
 protected:
-
 	static void _bind_methods();
 
 
 public:
-	Error new_connection(const String conn_name, SqlConnection::ConnType type = TCPSSL);
 
-	Error delete_connection(const String conn_name);
+	using ConnType = CONN_TYPE;
+	using MysqlCollations = MYSQLCOLLATIONS;
 
-	PackedStringArray get_connections() const;
+	enum SslMode {
+		ssl_disable	= (int)mysql::ssl_mode::disable,
+		ssl_enable	= (int)mysql::ssl_mode::enable,
+		ssl_require	= (int)mysql::ssl_mode::require,
+	};
 
-	SqlConnection::ConnType get_connection_type(const String conn_name) const;
 
-	bool is_async(const String conn_name) const;
+private:
 
-	Error set_certificate(const String conn_name, const String p_cert_file, const String p_host_name = "mysql");
+	//Error
+	Dictionary last_error;
 
-	Dictionary get_credentials(const String conn_name) const;
+	// Status
+	ConnType type = TCPSSL;
+	bool async = false;
 
+	// Params
+	char *username;
+	char *password;
+	char *database;
+	mysql::handshake_params conn_params;
+
+	// Aux
+	std::shared_ptr<asio::io_context> ctx = nullptr;
+	std::shared_ptr<asio::ssl::context> ssl_ctx = nullptr;
+	std::shared_ptr<asio::ip::tcp::resolver> resolver = nullptr;
+
+
+	// Connection
+	std::shared_ptr<mysql::tcp_connection> tcp_conn = nullptr;
+	std::shared_ptr<mysql::tcp_ssl_connection> tcp_ssl_conn = nullptr;
+	std::shared_ptr<mysql::unix_connection> unix_conn = nullptr;
+	std::shared_ptr<mysql::unix_ssl_connection> unix_ssl_conn = nullptr;
+
+
+private:
+
+	Ref<SqlResult> build_godot_result(mysql::results result);
+
+	Error set_certificate(std::shared_ptr<asio::ssl::context>, const String p_cert_file, const String p_host_name);
+
+	void build_result(mysql::results raw_result, Ref<SqlResult> *gdt_result);
+
+	Dictionary get_metadata(mysql::results result);
+
+	Dictionary get_raw(mysql::results result);
+
+
+public:
+
+	// The define method will configure a connection.
+	// If there is already an active connection, it will be disconnected and reseted.
+	// The path to the certificate and hostname are intended for use with TLS connections only.
+	// In non-TLS connections the certificate  and the hostname will be ignored.
+	// If the user wishes to modify the certificate, the connection must be reseted.
+	// Resetting the connection does not reset the credentials.
+	Error define(const ConnType _type = TCPSSL, const String p_cert_file = "", const String p_host_name = "mysql");//////
+
+	// Retrieves the connection type.
+	ConnType get_connection_type() const { return type;};//////
+
+	// Method used to initiate a TCP connection.
+	// It will not work with UNIX-type connections.
+	Error tcp_connect(const String p_hostname = "127.0.0.1", const String p_port = "3306", const bool p_async = false);//////
+
+	// Method used to connect to the database via Socket.
+	// It will not work with TCP-type connections.
+	Error unix_connect(const String p_socket_path = "/var/run/mysqld/mysqld.sock", const bool p_async = false);//////
+
+	// Close the connection.
+	Error close_connection();//////
+
+	// Returns a dictionary with the last exception that occurred.
+	Dictionary get_last_error() const {return last_error.duplicate(true);};//////
+
+	// Checks whether there is an active connection to the server.
+	bool is_server_alive();//////
+
+	// Returns whether the connection is synchronous or asynchronous.
+	bool is_async() const {return async;};//////
+
+	// Execute queries.
+	Ref<SqlResult> execute(const String p_stmt);
+
+	// Execute prepared queries.
+	Ref<SqlResult> execute_prepared(const String p_stmt, const Array binds = Array());
+
+	// Execute queries on asynchronous connections.
+//	Ref<SqlResult> async_execute(const String p_stmt);
+
+	// Execute prepared queries on asynchronous connections.
+//	Ref<SqlResult> async_execute_prepared(const String p_stmt, const Array binds = Array());
+
+	// Execute sql scripts.
+	// This function perform multi-queries, because this the "multi_queries" option must be true in the connection credentials,
+	// otherwise this function won'tbe executed.
+	// Be extremely careful with this function.
+//	void execute_sql(String p_path_to_file);
+
+	// Returns a dictionary with the connection credentials.
+	Dictionary get_credentials() const;//////
+
+	// Configure connection credentials.//////
 	Error set_credentials(
-		const String conn_name,
-		const String p_username,
-		const String p_password,
-		const String p_database							= "",
-		const SqlConnection::MysqlCollations collation	= SqlConnection::MysqlCollations::default_collation,
-		const SqlConnection::ssl_mode p_ssl				= SqlConnection::ssl_mode::enable,
-		const bool multi_queries						= true
+			String p_username,
+			String p_password,
+			String p_database		= String(),
+			std::uint16_t collation	= default_collation,
+			SslMode p_ssl			= ssl_enable,
+			bool multi_queries		= false
 	);
 
-	
-	Error initialize_connection(const String conn_name);
 
-	// "/var/run/mysqld/mysqld.sock"
-	Error connect_unix(const String conn_name, const String p_socket_path = "/tmp/mysql.sock", bool p_async = false);
+	MySQL():
+		conn_params((const char *)&username, (const char *)&password, (const char *)&database)
+	{}
+	~MySQL(){
+		close_connection();
+	}
 
-	Error connect_tcp(const String conn_name, const String p_hostname = "127.0.0.1", const String p_port = "3306", bool p_async = false);
-
-	Error close_connection(const String conn_name);
-
-	bool is_connectioin_alive(const String conn_name) const;
-
-	Ref<SqlResult> execute(const String conn_name, const String p_stmt);
-
-	Ref<SqlResult> execute_prepared(const String conn_name, const String p_stmt, const Array binds = Array());
-
-	void async_execute(const String conn_name, const String p_stmt);
-
-	void async_execute_prepared(const String conn_name, const String p_stmt, const Array binds = Array());
-
-	MySQL();
-	~MySQL();
 
 };
 
 
-VARIANT_ENUM_CAST(SqlConnection::MysqlCollations);
-VARIANT_ENUM_CAST(SqlConnection::ConnType);
-VARIANT_ENUM_CAST(SqlConnection::ssl_mode);
+VARIANT_ENUM_CAST(MySQL::MysqlCollations);
+VARIANT_ENUM_CAST(MySQL::ConnType);
+VARIANT_ENUM_CAST(MySQL::SslMode);
 
 
 #endif // MYSQL_H
-

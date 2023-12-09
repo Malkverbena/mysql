@@ -3,35 +3,39 @@ extends Node
 var mysql = MySQL.new()
 
 func _ready():
-	
-	mysql.new_connection("marco")
-	mysql.new_connection("polo")
-	print(mysql.get_connections())
-	mysql.delete_connection("marco")
-	print(mysql.get_connections())
-	
-	mysql.set_credentials("polo", db.username, db.password, db.database, db.collation, db.ssl, db.multi_queries)
-	mysql.tcp_connect("polo", db.hostname, db.port)
-	print(mysql.get_credentials("polo"))
 
-	var res : SqlResult = mysql.execute("polo", "SELECT * FROM testes.text01")
+	var define_err : Error = mysql.define(MySQL.TCP)
+	print("\ndefine ERROR: ",  define_err)
+	if define_err:
+		print("Last Error from connect:")
+		db.print_error(mysql.get_last_error())
 	
-	var metadata = res.get_metadata()
-	for meta in metadata:
-		for m in metadata[meta]:
-			print(m, "=", metadata[meta][m])
+	
+	var set_credentials_err : Error = mysql.set_credentials(db.username, db.password, db.database, db.collation, db.ssl, db.multi_queries)
+	print("\nset_credentials ERROR: ",  set_credentials_err)
+	if set_credentials_err:
+		print("Last Error from set_credentials: ")
+		db.print_error(mysql.get_last_error())
 	
 	
-	print("get_last_insert_id: ", res.get_last_insert_id())  
-	print("get_affected_rows: ", res.get_affected_rows())
-	print("get_warning_count: ", res.get_warning_count())
+	print("\nGET CREDENTIALS:",  mysql.get_credentials())
+	print("\nGET CONNECTION TYPE: ",  mysql.get_connection_type())
+	print("\nIS ASYNC: ",  mysql.is_async())
 	
-	var dic = res.get_dictionary()
-	for row in dic: 
-		print(dic[row])
+	
+	
+	var tcp_connect_err : Error = mysql.tcp_connect(db.hostname, db.port, false)
+	print("\ntcp_connect ERROR: ",  tcp_connect_err)
+	if tcp_connect_err:
+		print("Last Error from tcp_connect:\n")
+		db.print_error(mysql.get_last_error())
+	
+	print("\nis_server_alive: ", mysql.is_server_alive())
 
-	var arr = res.get_array()
-	for a in arr:
-		print(a)
-
+	var close_connection_err : Error = mysql.close_connection()
+	print("\nclose_connection ERROR: ",  close_connection_err)
+	if close_connection_err:
+		print("Last Error from close_connection:\n")
+		db.print_error(mysql.get_last_error())
+	
 	get_tree().quit()

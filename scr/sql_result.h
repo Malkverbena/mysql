@@ -3,14 +3,13 @@
 #ifndef SQLRESULT_H
 #define SQLRESULT_H
 
-
-#include "core/object/ref_counted.h" 
+#include "core/object/ref_counted.h"
 #include "core/core_bind.h"
+
 
 
 class SqlResult : public RefCounted {
 	GDCLASS(SqlResult, RefCounted);
-
 
 friend class MySQL;
 
@@ -30,13 +29,11 @@ protected:
 
 
 public:
-	// Retrieves the query content as an array.
-	Array get_array() const ;
 
-	// Retrieves the query content as an dictionary.
-	Dictionary get_dictionary() const {return result;}
+	// Retrieve the query content as an array.
+	Array get_array() const;
 
-	// Retrieves a specific row.		
+	// Retrieves a specific row.
 	Variant get_row(int row, bool as_array = true) const;
 
 	// Retrieves a specific column by searching for the column name.
@@ -46,14 +43,19 @@ public:
 	Array get_column_by_id(int column, bool as_string = false) const;
 
 	// Returns metadata from a specific column.
-	Dictionary get_metadata() const {return meta;}
+	Dictionary get_metadata() const {return meta;};
 
-	int get_affected_rows() const {return affected_rows;}
+	// Retrieves the query content as an dictionary.
+	Dictionary get_dictionary() const {return result;};
 
-	int get_last_insert_id() const {return last_insert_id;}
+	// Retrieves the number of affected rows by the query.
+	int get_affected_rows() const {return affected_rows;};
 
-	int get_warning_count() const {return warning_count;}
+	// Retrieves the last insert id by the query.
+	int get_last_insert_id() const {return last_insert_id;};
 
+	// Retrieves the number of warnings.
+	int get_warning_count() const {return warning_count;};
 
 	SqlResult();
 	~SqlResult();

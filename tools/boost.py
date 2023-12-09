@@ -95,6 +95,9 @@ def execute(env, commands, tool):
 	]
 
 
+	print("==============================================================")
+	print(configure_command)
+
 	try:
 		subprocess.check_call(configure_command)
 	except subprocess.CalledProcessError as e:
@@ -103,6 +106,7 @@ def execute(env, commands, tool):
 
 
 	cmd_b2 = [b2] + commands
+	print("==============================================================")
 	print(cmd_b2)
 
 	os.chdir(caminho_executavel)
@@ -110,6 +114,8 @@ def execute(env, commands, tool):
 
 	cmd_b2.append("headers")
 	subprocess.run(cmd_b2)
+
+	subprocess.run([b2, "headers"])
 
 
 
@@ -144,16 +150,11 @@ def compile_boost(env):
 
 	target_platform = get_target_platform(env["platform"])
 
-	architecture = f"architecture={target_architecture}"
-	address_model = f"address-model={target_bits}"
-	variant = f"variant={target_variant}"
-	target_os = f"target-os={target_platform}" 
-	user_config = "--user-config=../godot-config.jam"
-
-
 	host = get_host()
 
 	tool = ""
+	b2tool = ""
+
 
 	commands = [f"-j{jobs}"]
 
@@ -162,9 +163,11 @@ def compile_boost(env):
 
 		if env["platform"] == "linuxbsd":
 			tool = "clang" if env["use_llvm"] else "gcc"
+			b2tool = "clang" if env["use_llvm"] else "gcc"
 
 		elif env["platform"] == "windows":
-			tool = "gcc"
+			tool = "clang" if env["use_llvm"] else "gcc"
+			b2tool = "clang" if env["use_llvm"] else "gcc"  
 
 		elif env["platform"] == "macos":
 			pass
@@ -172,12 +175,27 @@ def compile_boost(env):
 	if host == "windows":
 		if env["platform"] == "linuxbsd":
 			tool = "clang" if env["use_llvm"] else "gcc"
+			b2tool = "clang-linux" if env["use_llvm"] else "gcc"
 
 		elif env["platform"] == "windows":
-			tool = "msvc"
+			tool = "clang" if env["use_llvm"] else "gcc"
+			b2tool = "clang-win" if env["use_llvm"] else "gcc-mingw"
 
 		elif env["platform"] == "macos":
 			pass
+
+
+
+	
+
+
+	architecture = f"architecture={target_architecture}"
+	address_model = f"address-model={target_bits}"
+	variant = f"variant={target_variant}"
+	target_os = f"target-os={target_platform}" 
+	#user_config = "--user-config=../godot-config.jam"
+	jobs = env.GetOption("num_jobs")
+
 
 
 	print(target_os)
@@ -187,8 +205,9 @@ def compile_boost(env):
 		architecture,
 		address_model,
 		variant,
-		user_config,
+	#	user_config,
 		f"toolset={tool}",
+		f"-j{jobs}",
 	])
 	
 	commands +=	boost_cmd

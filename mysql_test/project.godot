@@ -11,9 +11,9 @@ config_version=5
 [application]
 
 config/name="Mysql 3 Tests"
-config/tags=PackedStringArray("test")
-run/main_scene="res://tests/basics/basic.tscn"
-config/features=PackedStringArray("4.2", "Double Precision", "Forward Plus")
+config/tags=PackedStringArray("mysql", "test")
+run/main_scene="res://tests/executes/async.tscn"
+config/features=PackedStringArray("4.3", "Double Precision", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]

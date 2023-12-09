@@ -18,12 +18,11 @@ def ssl_platform_options(env):
 		"no-tests",
 	]
 
-#	if debug:
-#		ssl_config_options.append("-d")
+	if debug:
+		ssl_config_options.append("-d")
 
-#	if env["platform"] == "windows":
-#		ssl_config_options.append("enable-capieng")
-
+	if env["platform"] == "windows":
+		ssl_config_options.append("enable-capieng")
 
 	return ssl_config_options
 
@@ -86,13 +85,16 @@ def get_platform_target(env):
 
 
 
+
 def update_openssl():
 	git_cmd = ["git pull", "--recurse-submodules"]
 	subprocess.run(git_cmd, shell=True, cwd="3party/openssl")
 
+#./Configure --cross-compile-prefix=x86_64-w64-mingw32- mingw64
 
 
 def compile_openssl(env):
+	print()
 #	make dclean
 #	./Configure
 #	make depend
