@@ -1,6 +1,0 @@
-[submodule "3party/openssl"]
-	path = 3party/openssl
-	url = git@github.com:openssl/openssl.git
-[submodule "3party/boost"]
-	path = 3party/boost
-	url = git@github.com:boostorg/boost.git

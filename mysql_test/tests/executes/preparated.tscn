@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://cqnr5ua8pv7n5"]
-
-[ext_resource type="Script" path="res://tests/executes/preparated.gd" id="1_cxhws"]
-
-[node name="preparated" type="Node"]
-script = ExtResource("1_cxhws")

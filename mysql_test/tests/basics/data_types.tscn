@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://dlrni2dymi4km"]
-
-[ext_resource type="Script" path="res://tests/basics/data_types.gd" id="1_7ptev"]
-
-[node name="data_types" type="Node"]
-script = ExtResource("1_7ptev")

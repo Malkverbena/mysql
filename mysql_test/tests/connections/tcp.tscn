@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://cfb5lkh1sxtq3"]
-
-[ext_resource type="Script" path="res://tests/connections/tcp.gd" id="1_clnup"]
-
-[node name="tcp" type="Node"]
-script = ExtResource("1_clnup")
