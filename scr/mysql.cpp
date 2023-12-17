@@ -1,3 +1,5 @@
+
+
 /* mysql.cpp */
 
 
@@ -17,9 +19,9 @@ Error MySQL::define(const ConnType _type, const String p_cert_file, const String
 	ssl_ctx.reset();
 	ctx.reset();
 
-	bool is_ssl = (type == TCPSSL or type == UNIXSSL);
+	bool is_ssl = (type == TCPTLS or type == UNIXTLS);
 	if (is_ssl and not p_cert_file.is_empty()){
-		WARN_PRINT("Connection type is not TCPSSL or UNIXSSL! The certificate ill be ignorated.");
+		WARN_PRINT("Connection type is not TCPTLS or UNIXTLS! The certificate ill be ignorated.");
 	}
 
 	if (type == TCP){
@@ -29,7 +31,7 @@ Error MySQL::define(const ConnType _type, const String p_cert_file, const String
 		tcp_conn->set_meta_mode(mysql::metadata_mode::full);
 	}
 
-	else if (type == TCPSSL){
+	else if (type == TCPTLS){
 		ctx = std::make_shared<asio::io_context>();
 		ssl_ctx = std::make_shared<asio::ssl::context>(asio::ssl::context::tls_client);
 		if (is_ssl and not p_cert_file.is_empty()){
@@ -49,7 +51,7 @@ Error MySQL::define(const ConnType _type, const String p_cert_file, const String
 		unix_conn->set_meta_mode(mysql::metadata_mode::full);
 	}
 
-	else if (type == UNIXSSL){
+	else if (type == UNIXTLS){
 		ctx = std::make_shared<asio::io_context>();
 		ssl_ctx = std::make_shared<asio::ssl::context>(asio::ssl::context::tls_client);
 		if (is_ssl and not p_cert_file.is_empty()){
@@ -121,7 +123,7 @@ Error MySQL::set_credentials(String p_username, String p_password, String p_data
 Error MySQL::tcp_connect(const String p_hostname, const String p_port) {
 
 	last_error.clear();
-	bool is_tcp = (type == TCP or type == TCPSSL);
+	bool is_tcp = (type == TCP or type == TCPTLS);
 	ERR_FAIL_COND_V_EDMSG(not is_tcp, ERR_INVALID_PARAMETER,\
 	"The tcp_connect function was designed to work with TCP connections only. For UNIX connections use unix_connect method.");
 
@@ -148,7 +150,7 @@ Error MySQL::tcp_connect(const String p_hostname, const String p_port) {
 Error MySQL::unix_connect(const String p_socket_path) {
 
 	last_error.clear();
-	bool is_unix = (type == UNIX or type == UNIXSSL);
+	bool is_unix = (type == UNIX or type == UNIXTLS);
 	ERR_FAIL_COND_V_EDMSG(not is_unix, ERR_INVALID_PARAMETER, "The unix_connect function was designed to work with UNIX connections only. For TCP connections use tcp_connect method.");
 
 	const char * socket = p_socket_path.utf8().get_data();
@@ -178,13 +180,13 @@ Error MySQL::close_connection() {
 	if (type == TCP){
 		tcp_conn->close(ec, diag);
 	}
-	else if (type == TCPSSL){
+	else if (type == TCPTLS){
 		tcp_ssl_conn->close(ec, diag);
 	}
 	else if (type == UNIX){
 		unix_conn->close(ec, diag);
 	}
-	else if (type == UNIXSSL){
+	else if (type == UNIXTLS){
 		unix_ssl_conn->close(ec, diag);
 	}
 
@@ -202,13 +204,13 @@ bool MySQL::is_server_alive() {
 	if (type == TCP){
 		tcp_conn->ping(ec, diag);
 	}
-	else if (type == TCPSSL){
+	else if (type == TCPTLS){
 		tcp_ssl_conn->ping(ec, diag);
 	}
 	else if (type == UNIX){
 		unix_conn->ping(ec, diag);
 	}
-	else if (type == UNIXSSL){
+	else if (type == UNIXTLS){
 		unix_ssl_conn->ping(ec, diag);
 	}
 
@@ -261,13 +263,13 @@ Ref<SqlResult> MySQL::execute(const String p_stmt) {
 	if (type == TCP){
 		tcp_conn->execute(query, result, ec, diag);
 	}
-	else if (type == TCPSSL){
+	else if (type == TCPTLS){
 		tcp_ssl_conn->execute(query, result, ec, diag);
 	}
 	else if (type == UNIX){
 		unix_conn->execute(query, result, ec, diag);
 	}
-	else if (type == UNIXSSL){
+	else if (type == UNIXTLS){
 		unix_ssl_conn->execute(query, result, ec, diag);
 	}
 	SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
@@ -291,7 +293,7 @@ Ref<SqlResult> MySQL::execute_prepared(const String p_stmt, const Array binds) {
 		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
 	}
-	else if (type == TCPSSL){
+	else if (type == TCPTLS){
 		mysql::statement prep_stmt = tcp_conn->prepare_statement(query, ec, diag);
 		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
@@ -301,7 +303,7 @@ Ref<SqlResult> MySQL::execute_prepared(const String p_stmt, const Array binds) {
 		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
 		}
-	else if (type == UNIXSSL){
+	else if (type == UNIXTLS){
 		mysql::statement prep_stmt = tcp_conn->prepare_statement(query, ec, diag);
 		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
@@ -313,7 +315,7 @@ Ref<SqlResult> MySQL::execute_prepared(const String p_stmt, const Array binds) {
 }
 
 
-Array MySQL::execute_sql(String p_path_to_file){
+Array MySQL::execute_sql(const String p_path_to_file){
 
 	ERR_FAIL_COND_V_EDMSG(not conn_params.multi_queries(), Array(), "This function requires that credentials.multi_queries be enable, once it's uses using multi-queries");
 
@@ -332,15 +334,17 @@ Array MySQL::execute_sql(String p_path_to_file){
 	for (std::size_t resultset_number = 0; !st.complete(); ++resultset_number) {
 		if (st.should_read_head()) {
 			if (type == TCP){
-				tcp_conn->start_execution(script_contents, st);
+				tcp_conn->start_execution(script_contents, st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
 				tcp_conn->read_resultset_head(st, ec, diag);
 				SQL_EXCEPTION(ec, diag, &last_error, ret);
 				mysql::rows_view batch = tcp_conn->read_some_rows(st, ec, diag);
 				SQL_EXCEPTION(ec, diag, &last_error, ret);
 				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
 			}
-			else if (type == TCPSSL){
-				tcp_ssl_conn->start_execution(script_contents, st);
+			else if (type == TCPTLS){
+				tcp_ssl_conn->start_execution(script_contents, st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
 				tcp_ssl_conn->read_resultset_head(st, ec, diag);
 				SQL_EXCEPTION(ec, diag, &last_error, ret);
 				mysql::rows_view batch = tcp_ssl_conn->read_some_rows(st, ec, diag);
@@ -348,15 +352,17 @@ Array MySQL::execute_sql(String p_path_to_file){
 				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
 			}
 			else if (type == UNIX){
-				unix_conn->start_execution(script_contents, st);
+				unix_conn->start_execution(script_contents, st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
 				unix_conn->read_resultset_head(st, ec, diag);
 				SQL_EXCEPTION(ec, diag, &last_error, ret);
 				mysql::rows_view batch = unix_conn->read_some_rows(st, ec, diag);
 				SQL_EXCEPTION(ec, diag, &last_error, ret);
 				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
 			}
-			else if (type == UNIXSSL){
-				unix_ssl_conn->start_execution(script_contents, st);
+			else if (type == UNIXTLS){
+				unix_ssl_conn->start_execution(script_contents, st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
 				unix_ssl_conn->read_resultset_head(st, ec, diag);
 				SQL_EXCEPTION(ec, diag, &last_error, ret);
 				mysql::rows_view batch = unix_ssl_conn->read_some_rows(st, ec, diag);
@@ -369,6 +375,63 @@ Array MySQL::execute_sql(String p_path_to_file){
 }
 
 
+Array MySQL::execute_multi(const String p_queries){
+
+	ERR_FAIL_COND_V_EDMSG(not conn_params.multi_queries(), Array(), "This function requires that credentials.multi_queries be enable, once it's uses using multi-queries");
+
+	const char* queries = p_queries.utf8().get_data();
+	mysql::execution_state st;
+	mysql::diagnostics diag;
+	mysql::error_code ec;
+	last_error.clear();
+	Array ret;
+
+
+	for (std::size_t resultset_number = 0; !st.complete(); ++resultset_number) {
+		if (st.should_read_head()) {
+			if (type == TCP){
+				tcp_conn->start_execution(queries, st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				tcp_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = tcp_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == TCPTLS){
+				tcp_ssl_conn->start_execution(queries, st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				tcp_ssl_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = tcp_ssl_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == UNIX){
+				unix_conn->start_execution(queries, st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				unix_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = unix_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == UNIXTLS){
+				unix_ssl_conn->start_execution(queries, st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				unix_ssl_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = unix_ssl_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+		}
+	}
+	return ret;
+
+}
+
+
 boost::asio::awaitable<void> MySQL::coro_execute(const char* query, std::shared_ptr<mysql::results> result){
 
 	mysql::diagnostics diag;
@@ -378,7 +441,7 @@ boost::asio::awaitable<void> MySQL::coro_execute(const char* query, std::shared_
 		std::tie(ec) = co_await tcp_conn->async_execute(query, *result, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 	}
-	else if (type == TCPSSL){
+	else if (type == TCPTLS){
 		std::tie(ec) = co_await tcp_ssl_conn->async_execute(query, *result, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 	}
@@ -386,7 +449,7 @@ boost::asio::awaitable<void> MySQL::coro_execute(const char* query, std::shared_
 		std::tie(ec) = co_await unix_conn->async_execute(query, *result, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 	}
-	else if (type == UNIXSSL){
+	else if (type == UNIXTLS){
 		std::tie(ec) = co_await unix_ssl_conn->async_execute(query, *result, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 	}
@@ -423,7 +486,7 @@ boost::asio::awaitable<void> MySQL::coro_execute_prepared(const char* query, std
 		std::tie(ec) = co_await tcp_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 	}
-	else if (type == TCPSSL){
+	else if (type == TCPTLS){
 		std::tie(ec, prep_stmt) = co_await tcp_ssl_conn->async_prepare_statement(query, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 		std::tie(ec) = co_await tcp_ssl_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
@@ -435,7 +498,7 @@ boost::asio::awaitable<void> MySQL::coro_execute_prepared(const char* query, std
 		std::tie(ec) = co_await unix_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 	}
-	else if (type == UNIXSSL){
+	else if (type == UNIXTLS){
 		std::tie(ec, prep_stmt) = co_await unix_ssl_conn->async_prepare_statement(query, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 		std::tie(ec) = co_await unix_ssl_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
@@ -464,7 +527,7 @@ Ref<SqlResult> MySQL::async_execute_prepared(const String p_stmt, const Array bi
 
 void MySQL::_bind_methods() {
 
-	ClassDB::bind_method(D_METHOD("define", "connection type", "certificate file", "hostname verification"), &MySQL::define, DEFVAL(ConnType::TCPSSL), DEFVAL(""), DEFVAL("mysql"));
+	ClassDB::bind_method(D_METHOD("define", "connection type", "certificate file", "hostname verification"), &MySQL::define, DEFVAL(ConnType::TCPTLS), DEFVAL(""), DEFVAL("mysql"));
 	ClassDB::bind_method(D_METHOD("get_credentials"), &MySQL::get_credentials);
 	ClassDB::bind_method(D_METHOD("set_credentials", "username", "password", "database", "collation", "ssl_mode", "multi_queries"),\
 	&MySQL::set_credentials, DEFVAL(""), DEFVAL(default_collation), DEFVAL(ssl_enable), DEFVAL(false));
@@ -480,6 +543,7 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("execute", "query"), &MySQL::execute);
 	ClassDB::bind_method(D_METHOD("execute_prepared", "statement", "values"), &MySQL::execute_prepared, DEFVAL(Array()));
 	ClassDB::bind_method(D_METHOD("execute_sql", "sql path"), &MySQL::execute_sql);
+	ClassDB::bind_method(D_METHOD("execute_multi", "queries"), &MySQL::execute_multi);
 
 	ClassDB::bind_method(D_METHOD("async_execute", "query"), &MySQL::async_execute);
 	ClassDB::bind_method(D_METHOD("async_execute_prepared", "query", "values"), &MySQL::async_execute_prepared, DEFVAL(Array()));
@@ -487,9 +551,9 @@ void MySQL::_bind_methods() {
 
 
 	BIND_ENUM_CONSTANT(TCP);
-	BIND_ENUM_CONSTANT(TCPSSL);
+	BIND_ENUM_CONSTANT(TCPTLS);
 	BIND_ENUM_CONSTANT(UNIX);
-	BIND_ENUM_CONSTANT(UNIXSSL);
+	BIND_ENUM_CONSTANT(UNIXTLS);
 
 	BIND_ENUM_CONSTANT(ssl_disable);
 	BIND_ENUM_CONSTANT(ssl_enable);

@@ -33,9 +33,9 @@ using namespace boost;
 enum CONN_TYPE{
 	NONE,
 	TCP,
-	TCPSSL,
+	TCPTLS,
 	UNIX,
-	UNIXSSL
+	UNIXTLS
 };
 
 enum MYSQLCOLLATIONS {

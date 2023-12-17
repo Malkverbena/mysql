@@ -34,10 +34,8 @@
 
 using namespace boost::asio;
 
-
-#ifdef BOOST_ASIO_HAS_CO_AWAIT
 constexpr auto tuple_awaitable = as_tuple(use_awaitable);
-#endif
+
 
 
 class MySQL : public RefCounted {
@@ -66,7 +64,7 @@ private:
 	Dictionary last_error;
 
 	// Status
-	ConnType type = TCPSSL;
+	ConnType type = TCPTLS;
 
 	// Params
 	char *username;
@@ -85,10 +83,8 @@ private:
 	std::shared_ptr<mysql::unix_connection> unix_conn = nullptr;
 	std::shared_ptr<mysql::unix_ssl_connection> unix_ssl_conn = nullptr;
 
-#ifdef BOOST_ASIO_HAS_CO_AWAIT
 	asio::awaitable<void> coro_execute(const char* query, std::shared_ptr<mysql::results> result);
 	asio::awaitable<void> coro_execute_prepared(const char* query, std::vector<mysql::field> args, std::shared_ptr<mysql::results> result);
-#endif
 
 
 private:
@@ -117,7 +113,7 @@ public:
 	// In non-TLS connections the certificate  and the hostname will be ignored.
 	// If the user wishes to modify the certificate, the connection must be reseted.
 	// Resetting the connection does not reset the credentials.
-	Error define(const ConnType _type = TCPSSL, const String p_cert_file = "", const String p_host_name = "mysql");//////
+	Error define(const ConnType _type = TCPTLS, const String p_cert_file = "", const String p_host_name = "mysql");//////
 
 	// Retrieves the connection type.
 	ConnType get_connection_type() const { return type;};//////
@@ -150,7 +146,12 @@ public:
 	// This function perform multi-queries, because this the "multi_queries" option must be true in the connection credentials,
 	// otherwise this function won'tbe executed.
 	// Be extremely careful with this function.
-	Array execute_sql(String p_path_to_file);
+	Array execute_sql(const String p_path_to_file);
+
+	// Execute Multi-function operations.
+	// You can use multi-function operations to execute several function text queries.
+	// This function return an Array with a SqlResult for each query executed.
+	Array execute_multi(const String p_queries);
 
 	// Returns a dictionary with the connection credentials.
 	Dictionary get_credentials() const;//////
@@ -166,15 +167,11 @@ public:
 	);
 
 
-#ifdef BOOST_ASIO_HAS_CO_AWAIT
-
 	// Execute queries on asynchronous connections.
 	Ref<SqlResult> async_execute(const String p_stmt);
 
 	// Execute prepared queries on asynchronous connections.
 	Ref<SqlResult> async_execute_prepared(const String p_stmt, const Array binds = Array());
-
-#endif
 
 
 	MySQL():
