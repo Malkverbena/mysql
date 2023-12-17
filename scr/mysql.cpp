@@ -214,8 +214,6 @@ bool MySQL::is_server_alive() {
 		unix_ssl_conn->ping(ec, diag);
 	}
 
-	print_line("IS SERVER ALIVE RETURN NORMAL");
-
 	if (ec){
 		return false;
 	}
@@ -315,123 +313,6 @@ Ref<SqlResult> MySQL::execute_prepared(const String p_stmt, const Array binds) {
 }
 
 
-Array MySQL::execute_sql(const String p_path_to_file){
-
-	ERR_FAIL_COND_V_EDMSG(not conn_params.multi_queries(), Array(), "This function requires that credentials.multi_queries be enable, once it's uses using multi-queries");
-
-	ProjectSettings &ps = *ProjectSettings::get_singleton();
-	const char *path_to_file = ps.globalize_path(p_path_to_file).utf8().get_data();
-	std::ifstream ifs(path_to_file);
-	ERR_FAIL_COND_V_EDMSG(not ifs, Array(), "Cannot open file: " + p_path_to_file);
-	std::string script_contents = std::string(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
-
-	mysql::execution_state st;
-	mysql::diagnostics diag;
-	mysql::error_code ec;
-	last_error.clear();
-	Array ret;
-
-	for (std::size_t resultset_number = 0; !st.complete(); ++resultset_number) {
-		if (st.should_read_head()) {
-			if (type == TCP){
-				tcp_conn->start_execution(script_contents, st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				tcp_conn->read_resultset_head(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				mysql::rows_view batch = tcp_conn->read_some_rows(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
-			}
-			else if (type == TCPTLS){
-				tcp_ssl_conn->start_execution(script_contents, st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				tcp_ssl_conn->read_resultset_head(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				mysql::rows_view batch = tcp_ssl_conn->read_some_rows(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
-			}
-			else if (type == UNIX){
-				unix_conn->start_execution(script_contents, st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				unix_conn->read_resultset_head(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				mysql::rows_view batch = unix_conn->read_some_rows(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
-			}
-			else if (type == UNIXTLS){
-				unix_ssl_conn->start_execution(script_contents, st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				unix_ssl_conn->read_resultset_head(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				mysql::rows_view batch = unix_ssl_conn->read_some_rows(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
-			}
-		}
-	}
-	return ret;
-}
-
-
-Array MySQL::execute_multi(const String p_queries){
-
-	ERR_FAIL_COND_V_EDMSG(not conn_params.multi_queries(), Array(), "This function requires that credentials.multi_queries be enable, once it's uses using multi-queries");
-
-	const char* queries = p_queries.utf8().get_data();
-	mysql::execution_state st;
-	mysql::diagnostics diag;
-	mysql::error_code ec;
-	last_error.clear();
-	Array ret;
-
-
-	for (std::size_t resultset_number = 0; !st.complete(); ++resultset_number) {
-		if (st.should_read_head()) {
-			if (type == TCP){
-				tcp_conn->start_execution(queries, st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				tcp_conn->read_resultset_head(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				mysql::rows_view batch = tcp_conn->read_some_rows(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
-			}
-			else if (type == TCPTLS){
-				tcp_ssl_conn->start_execution(queries, st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				tcp_ssl_conn->read_resultset_head(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				mysql::rows_view batch = tcp_ssl_conn->read_some_rows(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
-			}
-			else if (type == UNIX){
-				unix_conn->start_execution(queries, st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				unix_conn->read_resultset_head(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				mysql::rows_view batch = unix_conn->read_some_rows(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
-			}
-			else if (type == UNIXTLS){
-				unix_ssl_conn->start_execution(queries, st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				unix_ssl_conn->read_resultset_head(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				mysql::rows_view batch = unix_ssl_conn->read_some_rows(st, ec, diag);
-				SQL_EXCEPTION(ec, diag, &last_error, ret);
-				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
-			}
-		}
-	}
-	return ret;
-
-}
-
-
 boost::asio::awaitable<void> MySQL::coro_execute(const char* query, std::shared_ptr<mysql::results> result){
 
 	mysql::diagnostics diag;
@@ -522,6 +403,142 @@ Ref<SqlResult> MySQL::async_execute_prepared(const String p_stmt, const Array bi
 	);
 	ctx->run();
 	return build_godot_result(*result);
+}
+
+
+
+Array MySQL::execute_sql(const String p_path_to_file){
+
+	ERR_FAIL_COND_V_EDMSG(not conn_params.multi_queries(), Array(), "This function requires that credentials.multi_queries be enable, once it's uses using multi-queries");
+
+	ProjectSettings &ps = *ProjectSettings::get_singleton();
+	const char *path_to_file = ps.globalize_path(p_path_to_file).utf8().get_data();
+	std::ifstream ifs(path_to_file);
+	ERR_FAIL_COND_V_EDMSG(not ifs, Array(), "Cannot open file: " + p_path_to_file);
+	std::string script_contents = std::string(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+
+	mysql::execution_state st;
+	mysql::diagnostics diag;
+	mysql::error_code ec;
+	last_error.clear();
+	Array ret;
+
+
+	if (type == TCP){
+		tcp_conn->start_execution(script_contents, st, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, ret);
+	}
+	else if (type == TCPTLS){
+		tcp_ssl_conn->start_execution(script_contents, st, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, ret);
+	}
+	else if (type == UNIX){
+		unix_conn->start_execution(script_contents, st, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, ret);
+	}
+	else if (type == UNIXTLS){
+		unix_ssl_conn->start_execution(script_contents, st, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, ret);
+	}
+
+	for (std::size_t resultset_number = 0; not st.complete(); ++resultset_number) {
+		if (st.should_read_head()) {
+			if (type == TCP){
+				tcp_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = tcp_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == TCPTLS){
+				tcp_ssl_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = tcp_ssl_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == UNIX){
+				unix_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = unix_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == UNIXTLS){
+				unix_ssl_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = unix_ssl_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+		}
+	}
+	return ret;
+}
+
+
+Array MySQL::execute_multi(const String p_queries){
+
+	ERR_FAIL_COND_V_EDMSG(not conn_params.multi_queries(), Array(), "This function requires that credentials.multi_queries be enable, once it's uses using multi-queries");
+
+	const char* queries = p_queries.utf8().get_data();
+	mysql::execution_state st;
+	mysql::diagnostics diag;
+	mysql::error_code ec;
+	last_error.clear();
+	Array ret;
+
+	if (type == TCP){
+		tcp_conn->start_execution(queries, st, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, ret);
+	}
+	else if (type == TCPTLS){
+		tcp_ssl_conn->start_execution(queries, st, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, ret);
+	}
+	else if (type == UNIX){
+		unix_conn->start_execution(queries, st, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, ret);
+	}
+	else if (type == UNIXTLS){
+		unix_ssl_conn->start_execution(queries, st, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, ret);
+	}
+
+	for (std::size_t resultset_number = 0; !st.complete(); ++resultset_number) {
+		if (st.should_read_head()) {
+			if (type == TCP){
+				tcp_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = tcp_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == TCPTLS){
+				tcp_ssl_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = tcp_ssl_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == UNIX){
+				unix_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = unix_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == UNIXTLS){
+				unix_ssl_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = unix_ssl_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+		}
+	}
+	return ret;
+
 }
 
 

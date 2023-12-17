@@ -181,10 +181,6 @@ public:
 		close_connection();
 	}
 
-
-
-
-
 };
 
 
