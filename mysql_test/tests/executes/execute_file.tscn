@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://bbnny8u7yy7eo"]
+
+[ext_resource type="Script" path="res://tests/executes/execute_file.gd" id="1_iwqac"]
+
+[node name="ExecuteFile" type="Node"]
+script = ExtResource("1_iwqac")

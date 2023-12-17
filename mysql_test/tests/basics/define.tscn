@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://dv8fwlq8345ru"]
+
+[ext_resource type="Script" path="res://tests/basics/define.gd" id="1_12vbw"]
+
+[node name="define" type="Node"]
+script = ExtResource("1_12vbw")
