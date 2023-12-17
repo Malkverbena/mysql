@@ -2,7 +2,7 @@ extends Node
 
 var username : String = "cleber"
 var password : String = "jeovaerei"
-var database : String = "testes"
+var database : String = ""
 var collation : MySQL.MysqlCollations = MySQL.default_collation
 var ssl: MySQL.SslMode = MySQL.ssl_enable
 var multi_queries : bool = false
@@ -35,7 +35,7 @@ func print_metadata(result: SqlResult) -> void:
 
 func print_result(result: SqlResult) -> void:
 	print()
-	if not result:
+	if result.get_dictionary().is_empty():
 		print("\nEMPTY SQL RESULT")
 		return
 	var res : Dictionary = result.get_dictionary()

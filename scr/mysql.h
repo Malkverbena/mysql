@@ -8,17 +8,16 @@
 #include "sql_result.h"
 
 #include <memory>
+#include <fstream>
+#include <stdexcept>
 
 #include <core/config/project_settings.h>
 
-
+#include <boost/mysql/handshake_params.hpp>
 #include <boost/mysql/unix.hpp>
 #include <boost/mysql/unix_ssl.hpp>
 #include <boost/mysql/tcp.hpp>
 #include <boost/mysql/tcp_ssl.hpp>
-
-#include <boost/mysql/handshake_params.hpp>
-#include <boost/mysql/row_view.hpp>
 
 #include <boost/asio/ssl/host_name_verification.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
@@ -26,9 +25,19 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl/context.hpp>
 
+#include <boost/asio/as_tuple.hpp>
+#include <boost/asio/awaitable.hpp>
+#include <boost/asio/co_spawn.hpp>
+#include <boost/asio/use_awaitable.hpp>
+#include <boost/asio/detached.hpp>
 
 
 using namespace boost::asio;
+
+
+#ifdef BOOST_ASIO_HAS_CO_AWAIT
+constexpr auto tuple_awaitable = as_tuple(use_awaitable);
+#endif
 
 
 class MySQL : public RefCounted {
@@ -58,7 +67,6 @@ private:
 
 	// Status
 	ConnType type = TCPSSL;
-	bool async = false;
 
 	// Params
 	char *username;
@@ -71,25 +79,34 @@ private:
 	std::shared_ptr<asio::ssl::context> ssl_ctx = nullptr;
 	std::shared_ptr<asio::ip::tcp::resolver> resolver = nullptr;
 
-
 	// Connection
 	std::shared_ptr<mysql::tcp_connection> tcp_conn = nullptr;
 	std::shared_ptr<mysql::tcp_ssl_connection> tcp_ssl_conn = nullptr;
 	std::shared_ptr<mysql::unix_connection> unix_conn = nullptr;
 	std::shared_ptr<mysql::unix_ssl_connection> unix_ssl_conn = nullptr;
 
+#ifdef BOOST_ASIO_HAS_CO_AWAIT
+	asio::awaitable<void> coro_execute(const char* query, std::shared_ptr<mysql::results> result);
+	asio::awaitable<void> coro_execute_prepared(const char* query, std::vector<mysql::field> args, std::shared_ptr<mysql::results> result);
+#endif
+
 
 private:
 
-	Ref<SqlResult> build_godot_result(mysql::results result);
-
-	Error set_certificate(std::shared_ptr<asio::ssl::context>, const String p_cert_file, const String p_host_name);
+	Error set_certificate(const String p_cert_file, const String p_host_name);
 
 	void build_result(mysql::results raw_result, Ref<SqlResult> *gdt_result);
 
 	Dictionary get_metadata(mysql::results result);
 
 	Dictionary get_raw(mysql::results result);
+
+	Ref<SqlResult> build_godot_result(mysql::results result);
+
+	Ref<SqlResult> build_godot_result(
+		mysql::rows_view batch, mysql::metadata_collection_view meta_collection,
+		std::uint64_t affected_rows, std::uint64_t last_insert_id, unsigned warning_count
+	);
 
 
 public:
@@ -107,11 +124,11 @@ public:
 
 	// Method used to initiate a TCP connection.
 	// It will not work with UNIX-type connections.
-	Error tcp_connect(const String p_hostname = "127.0.0.1", const String p_port = "3306", const bool p_async = false);//////
+	Error tcp_connect(const String p_hostname = "127.0.0.1", const String p_port = "3306");//////
 
 	// Method used to connect to the database via Socket.
 	// It will not work with TCP-type connections.
-	Error unix_connect(const String p_socket_path = "/var/run/mysqld/mysqld.sock", const bool p_async = false);//////
+	Error unix_connect(const String p_socket_path = "/var/run/mysqld/mysqld.sock");//////
 
 	// Close the connection.
 	Error close_connection();//////
@@ -122,8 +139,6 @@ public:
 	// Checks whether there is an active connection to the server.
 	bool is_server_alive();//////
 
-	// Returns whether the connection is synchronous or asynchronous.
-	bool is_async() const {return async;};//////
 
 	// Execute queries.
 	Ref<SqlResult> execute(const String p_stmt);
@@ -131,17 +146,11 @@ public:
 	// Execute prepared queries.
 	Ref<SqlResult> execute_prepared(const String p_stmt, const Array binds = Array());
 
-	// Execute queries on asynchronous connections.
-//	Ref<SqlResult> async_execute(const String p_stmt);
-
-	// Execute prepared queries on asynchronous connections.
-//	Ref<SqlResult> async_execute_prepared(const String p_stmt, const Array binds = Array());
-
 	// Execute sql scripts.
 	// This function perform multi-queries, because this the "multi_queries" option must be true in the connection credentials,
 	// otherwise this function won'tbe executed.
 	// Be extremely careful with this function.
-//	void execute_sql(String p_path_to_file);
+	Array execute_sql(String p_path_to_file);
 
 	// Returns a dictionary with the connection credentials.
 	Dictionary get_credentials() const;//////
@@ -157,12 +166,26 @@ public:
 	);
 
 
+#ifdef BOOST_ASIO_HAS_CO_AWAIT
+
+	// Execute queries on asynchronous connections.
+	Ref<SqlResult> async_execute(const String p_stmt);
+
+	// Execute prepared queries on asynchronous connections.
+	Ref<SqlResult> async_execute_prepared(const String p_stmt, const Array binds = Array());
+
+#endif
+
+
 	MySQL():
 		conn_params((const char *)&username, (const char *)&password, (const char *)&database)
 	{}
 	~MySQL(){
 		close_connection();
 	}
+
+
+
 
 
 };

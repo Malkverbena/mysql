@@ -8,17 +8,17 @@
 
 #include "constants.h"
 
-
 #include "core/object/ref_counted.h"
 #include "core/core_bind.h"
-
 
 #include <boost/mysql/error_with_diagnostics.hpp>
 #include <boost/mysql/field.hpp>
 #include <boost/mysql/time.hpp>
 #include <boost/mysql/column_type.hpp>
-
-
+#include <boost/mysql/metadata_collection_view.hpp>
+#include <boost/mysql/metadata_mode.hpp>
+#include <boost/mysql/rows_view.hpp>
+#include <boost/mysql/row_view.hpp>
 
 
 void boost_dictionary(Dictionary *dic, const char *p_function, const char *p_file, int p_line, const mysql::error_code ec);
@@ -27,14 +27,13 @@ void print_boost_exception(const char *p_function, const char *p_file, int p_lin
 void sql_dictionary(Dictionary *dic, const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec);
 void print_sql_exception(const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec);
 
-
 void print_std_exception(const char *p_function, const char *p_file, int p_line, std::exception err);
-
 
 
 char* copy_string(char s[]);
 String SqlStr2GdtStr(mysql::string_view s);
 mysql::string_view GdtStr2SqlStr(String s);
+
 
 bool is_date(Dictionary d);
 bool is_datetime(Dictionary dt);
@@ -42,6 +41,9 @@ bool is_time(Dictionary t);
 
 std::vector<mysql::field> binds_to_field(const Array args);
 Variant field2Var(const mysql::field_view fv, mysql::column_type column_type);
+
+Dictionary make_metadata_result(mysql::metadata_collection_view meta_collection);
+Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_view meta_coll);
 
 
 
@@ -78,8 +80,6 @@ Variant field2Var(const mysql::field_view fv, mysql::column_type column_type);
 		co_return;															\
 	} else																			\
 		((void)0)
-
-
 
 
 #endif  // HELPERS_H

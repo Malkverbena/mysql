@@ -19,8 +19,3 @@ config/icon="res://icon.svg"
 [autoload]
 
 db="*res://dbtest.gd"
-
-[filesystem]
-
-import/blender/enabled=false
-import/fbx/enabled=false

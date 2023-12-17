@@ -1,15 +1,13 @@
 /* mysql.cpp */
 
+
 #include "mysql.h"
-
-
 
 
 Error MySQL::define(const ConnType _type, const String p_cert_file, const String p_host_name) {
 
 	last_error.clear();
 	type = _type;
-	async = false;
 
 	tcp_conn.reset();
 	tcp_ssl_conn.reset();
@@ -35,7 +33,7 @@ Error MySQL::define(const ConnType _type, const String p_cert_file, const String
 		ctx = std::make_shared<asio::io_context>();
 		ssl_ctx = std::make_shared<asio::ssl::context>(asio::ssl::context::tls_client);
 		if (is_ssl and not p_cert_file.is_empty()){
-			Error err = set_certificate(ssl_ctx, p_cert_file, p_host_name);
+			Error err = set_certificate(p_cert_file, p_host_name);
 			if (err){
 				return err;
 			}
@@ -55,7 +53,7 @@ Error MySQL::define(const ConnType _type, const String p_cert_file, const String
 		ctx = std::make_shared<asio::io_context>();
 		ssl_ctx = std::make_shared<asio::ssl::context>(asio::ssl::context::tls_client);
 		if (is_ssl and not p_cert_file.is_empty()){
-			Error err = set_certificate(ssl_ctx, p_cert_file, p_host_name);
+			Error err = set_certificate(p_cert_file, p_host_name);
 			if (err){
 				return err;
 			}
@@ -69,7 +67,7 @@ Error MySQL::define(const ConnType _type, const String p_cert_file, const String
 }
 
 
-Error MySQL::set_certificate(std::shared_ptr<asio::ssl::context> ssl_ctx, const String p_cert_file, const String p_host_name){
+Error MySQL::set_certificate(const String p_cert_file, const String p_host_name){
 
 	const std::string& cert_path = p_cert_file.utf8().get_data();
 	const std::string& host = p_host_name.utf8().get_data();
@@ -120,7 +118,7 @@ Error MySQL::set_credentials(String p_username, String p_password, String p_data
 }
 
 
-Error MySQL::tcp_connect(const String p_hostname, const String p_port, const bool p_async) {
+Error MySQL::tcp_connect(const String p_hostname, const String p_port) {
 
 	last_error.clear();
 	bool is_tcp = (type == TCP or type == TCPSSL);
@@ -129,7 +127,6 @@ Error MySQL::tcp_connect(const String p_hostname, const String p_port, const boo
 
 	const char * hostname = p_hostname.utf8().get_data();
 	const char * port = p_port.utf8().get_data();
-	async = p_async;
 
 	mysql::error_code ec;
 	mysql::diagnostics diag;
@@ -144,18 +141,17 @@ Error MySQL::tcp_connect(const String p_hostname, const String p_port, const boo
 	SQL_EXCEPTION(ec, diag, &last_error, FAILED);
 	return OK;
 
-	
+
 }
 
 
-Error MySQL::unix_connect(const String p_socket_path, const bool p_async) {
+Error MySQL::unix_connect(const String p_socket_path) {
 
 	last_error.clear();
 	bool is_unix = (type == UNIX or type == UNIXSSL);
 	ERR_FAIL_COND_V_EDMSG(not is_unix, ERR_INVALID_PARAMETER, "The unix_connect function was designed to work with UNIX connections only. For TCP connections use tcp_connect method.");
 
 	const char * socket = p_socket_path.utf8().get_data();
-	async = p_async;
 
 	mysql::error_code ec;
 	mysql::diagnostics diag;
@@ -168,7 +164,7 @@ Error MySQL::unix_connect(const String p_socket_path, const bool p_async) {
 		unix_ssl_conn->connect(endpoints, conn_params, ec, diag);
 	}
 	SQL_EXCEPTION(ec, diag, &last_error, FAILED);
-	
+
 	return OK;
 }
 
@@ -191,7 +187,7 @@ Error MySQL::close_connection() {
 	else if (type == UNIXSSL){
 		unix_ssl_conn->close(ec, diag);
 	}
-	
+
 	SQL_EXCEPTION(ec, diag, &last_error, FAILED);
 	return OK;
 }
@@ -215,7 +211,7 @@ bool MySQL::is_server_alive() {
 	else if (type == UNIXSSL){
 		unix_ssl_conn->ping(ec, diag);
 	}
-	
+
 	print_line("IS SERVER ALIVE RETURN NORMAL");
 
 	if (ec){
@@ -226,92 +222,41 @@ bool MySQL::is_server_alive() {
 }
 
 
-
-
-/*
-Ref<SqlResult> MySQL::async_execute(const String p_stmt) {
-	return _async_execute(p_stmt, Array(), false);
-}
-
-Ref<SqlResult> MySQL::async_execute_prepared(const String p_stmt, const Array binds) {
-	return _async_execute(p_stmt, binds, true);
-}
-
-Ref<SqlResult> MySQL::_async_execute(const String p_stmt, const Array binds, bool is_prepareted){}
-*/
-
-
-
-
 Ref<SqlResult> MySQL::build_godot_result(mysql::results result){
 
-	Dictionary meta;
-
-	for(auto m:result.meta()) {
-		Dictionary column;
-		String column_name = String(m.column_name().data());
-
-		column["column_collation"]			= m.column_collation();
-		column["column_length"]				= m.column_length();
-		column["column_name"]				= column_name;
-		column["database"]					= String(m.database().data());
-		column["decimals"]					= m.decimals();
-		column["has_no_default_value"]		= m.has_no_default_value();
-		column["is_auto_increment"]			= m.is_auto_increment();
-		column["is_multiple_key"]			= m.is_multiple_key();
-		column["is_not_null"]				= m.is_not_null();
-		column["is_primary_key"]			= m.is_primary_key();
-		column["is_set_to_now_on_update"]	= m.is_set_to_now_on_update();
-		column["is_unique_key"]				= m.is_unique_key();
-		column["is_unsigned"]				= m.is_unsigned();
-		column["is_zerofill"]				= m.is_zerofill();
-		column["original_column_name"]		= String(m.original_column_name().data());
-		column["original_table"]			= String(m.original_table().data());
-		column["table"]						= String(m.table().data());
-		column["type"]						= (int)m.type();
-
-		meta[column_name] = column;
-	}
-
-	Dictionary querty_result;
-	mysql::rows_view all_rows = result.rows();
-
-	for(size_t row = 0; row < all_rows.size(); row++) {
-		Dictionary line = Dictionary();
-		size_t f = 0;
-		for (auto fv : all_rows.at(row).as_vector()) {
-			String column_name = String(result.meta()[f].column_name().data());
-			mysql::column_type column_type = result.meta()[f].type();
-			line[column_name] = field2Var(fv, column_type);
-			f++;
-		}
-		querty_result[row] = line;
-	}
-
 	Ref<SqlResult> gdt_result = Ref<SqlResult>(memnew(SqlResult()));
-
-	gdt_result->result = querty_result;
-	gdt_result->meta = meta;
+	gdt_result->result = make_raw_result(result.rows(), result.meta());
+	gdt_result->meta = make_metadata_result(result.meta());
 	gdt_result->affected_rows = result.affected_rows();
 	gdt_result->last_insert_id = result.last_insert_id();
 	gdt_result->warning_count = result.warning_count();
-
 	return gdt_result;
 
 }
 
+Ref<SqlResult> MySQL::build_godot_result(
+	mysql::rows_view batch, mysql::metadata_collection_view meta_collection,
+	std::uint64_t affected_rows, std::uint64_t last_insert_id, unsigned warning_count
+	)
+{
+	Ref<SqlResult> gdt_result = Ref<SqlResult>(memnew(SqlResult()));
+	gdt_result->result = make_raw_result(batch, meta_collection);
+	gdt_result->meta = make_metadata_result(meta_collection);
+	gdt_result->affected_rows = affected_rows;
+	gdt_result->last_insert_id = last_insert_id;
+	gdt_result->warning_count = warning_count;
+	return gdt_result;
+}
+
+
 
 Ref<SqlResult> MySQL::execute(const String p_stmt) {
-
-	last_error.clear();
-	Ref<SqlResult> sql_result;
-	ERR_FAIL_COND_V_EDMSG(async, sql_result,
-	"This method only works with synchronous connections. For asynchronous connections use async_execute function.");
 
 	const char* query = p_stmt.utf8().get_data();
 	boost::mysql::results result;
 	mysql::error_code ec;
 	mysql::diagnostics diag;
+	last_error.clear();
 
 	if (type == TCP){
 		tcp_conn->execute(query, result, ec, diag);
@@ -325,59 +270,196 @@ Ref<SqlResult> MySQL::execute(const String p_stmt) {
 	else if (type == UNIXSSL){
 		unix_ssl_conn->execute(query, result, ec, diag);
 	}
-	SQL_EXCEPTION(ec, diag, &last_error, sql_result);
+	SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 
 	return build_godot_result(result);
 
 }
-
 
 
 Ref<SqlResult> MySQL::execute_prepared(const String p_stmt, const Array binds) {
 
-	last_error.clear();
-	Ref<SqlResult> sql_result;
-	ERR_FAIL_COND_V_EDMSG(async, sql_result, "This method only works with synchronous connections. For asynchronous connections use async_execute function.");
-
 	std::vector<mysql::field> args = binds_to_field(binds);
 	const char* query = p_stmt.utf8().get_data();
-
 	mysql::error_code ec;
 	mysql::diagnostics diag;
-	boost::mysql::results result;
+	mysql::results result;
+	last_error.clear();
 
 	if (type == TCP){
 		mysql::statement prep_stmt = tcp_conn->prepare_statement(query, ec, diag);
-		SQL_EXCEPTION(ec, diag, &last_error, sql_result);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
 	}
 	else if (type == TCPSSL){
 		mysql::statement prep_stmt = tcp_conn->prepare_statement(query, ec, diag);
-		SQL_EXCEPTION(ec, diag, &last_error, sql_result);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
 	}
 	else if (type == UNIX){
 		mysql::statement prep_stmt = tcp_conn->prepare_statement(query, ec, diag);
-		SQL_EXCEPTION(ec, diag, &last_error, sql_result);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
 		}
 	else if (type == UNIXSSL){
 		mysql::statement prep_stmt = tcp_conn->prepare_statement(query, ec, diag);
-		SQL_EXCEPTION(ec, diag, &last_error, sql_result);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
 	}
 
-	SQL_EXCEPTION(ec, diag, &last_error, sql_result);
+	SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 
 	return build_godot_result(result);
-
 }
 
 
+Array MySQL::execute_sql(String p_path_to_file){
+
+	ERR_FAIL_COND_V_EDMSG(not conn_params.multi_queries(), Array(), "This function requires that credentials.multi_queries be enable, once it's uses using multi-queries");
+
+	ProjectSettings &ps = *ProjectSettings::get_singleton();
+	const char *path_to_file = ps.globalize_path(p_path_to_file).utf8().get_data();
+	std::ifstream ifs(path_to_file);
+	ERR_FAIL_COND_V_EDMSG(not ifs, Array(), "Cannot open file: " + p_path_to_file);
+	std::string script_contents = std::string(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+
+	mysql::execution_state st;
+	mysql::diagnostics diag;
+	mysql::error_code ec;
+	last_error.clear();
+	Array ret;
+
+	for (std::size_t resultset_number = 0; !st.complete(); ++resultset_number) {
+		if (st.should_read_head()) {
+			if (type == TCP){
+				tcp_conn->start_execution(script_contents, st);
+				tcp_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = tcp_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == TCPSSL){
+				tcp_ssl_conn->start_execution(script_contents, st);
+				tcp_ssl_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = tcp_ssl_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == UNIX){
+				unix_conn->start_execution(script_contents, st);
+				unix_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = unix_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+			else if (type == UNIXSSL){
+				unix_ssl_conn->start_execution(script_contents, st);
+				unix_ssl_conn->read_resultset_head(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				mysql::rows_view batch = unix_ssl_conn->read_some_rows(st, ec, diag);
+				SQL_EXCEPTION(ec, diag, &last_error, ret);
+				ret.append(build_godot_result(batch, st.meta(), st.affected_rows(), st.last_insert_id(), st.warning_count()));
+			}
+		}
+	}
+	return ret;
+}
 
 
+boost::asio::awaitable<void> MySQL::coro_execute(const char* query, std::shared_ptr<mysql::results> result){
+
+	mysql::diagnostics diag;
+	mysql::error_code ec;
+
+	if (type == TCP){
+		std::tie(ec) = co_await tcp_conn->async_execute(query, *result, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+	}
+	else if (type == TCPSSL){
+		std::tie(ec) = co_await tcp_ssl_conn->async_execute(query, *result, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+	}
+	else if (type == UNIX){
+		std::tie(ec) = co_await unix_conn->async_execute(query, *result, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+	}
+	else if (type == UNIXSSL){
+		std::tie(ec) = co_await unix_ssl_conn->async_execute(query, *result, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+	}
 
 
+//	this->emit_signal("querty_complete", build_godot_result(result));
+}
+
+
+Ref<SqlResult> MySQL::async_execute(const String p_stmt){
+
+	const char* query = p_stmt.utf8().get_data();
+	std::shared_ptr<mysql::results> result = std::make_shared<mysql::results>();
+
+	boost::asio::co_spawn(
+		ctx->get_executor(),
+		[query, result, this]  { return coro_execute(query, result); },
+		boost::asio::detached
+	);
+	ctx->run();
+	return build_godot_result(*result);
+}
+
+
+boost::asio::awaitable<void> MySQL::coro_execute_prepared(const char* query, std::vector<mysql::field> args, std::shared_ptr<mysql::results> result){
+
+	mysql::diagnostics diag;
+	mysql::error_code ec;
+	mysql::statement prep_stmt;
+
+	if (type == TCP){
+		std::tie(ec, prep_stmt) = co_await tcp_conn->async_prepare_statement(query, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+		std::tie(ec) = co_await tcp_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+	}
+	else if (type == TCPSSL){
+		std::tie(ec, prep_stmt) = co_await tcp_ssl_conn->async_prepare_statement(query, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+		std::tie(ec) = co_await tcp_ssl_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+	}
+	else if (type == UNIX){
+		std::tie(ec, prep_stmt) = co_await unix_conn->async_prepare_statement(query, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+		std::tie(ec) = co_await unix_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+	}
+	else if (type == UNIXSSL){
+		std::tie(ec, prep_stmt) = co_await unix_ssl_conn->async_prepare_statement(query, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+		std::tie(ec) = co_await unix_ssl_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
+		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+	}
+
+//	this->emit_signal("querty_complete", build_godot_result(result));
+}
+
+
+Ref<SqlResult> MySQL::async_execute_prepared(const String p_stmt, const Array binds){
+
+	const char* query = p_stmt.utf8().get_data();
+	std::vector<mysql::field> args = binds_to_field(binds);
+	std::shared_ptr<mysql::results> result = std::make_shared<mysql::results>();
+
+	boost::asio::co_spawn(
+		ctx->get_executor(),
+		[query, args, result, this]  { return coro_execute_prepared(query, args, result); },
+		boost::asio::detached
+	);
+	ctx->run();
+	return build_godot_result(*result);
+}
 
 
 void MySQL::_bind_methods() {
@@ -387,21 +469,20 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_credentials", "username", "password", "database", "collation", "ssl_mode", "multi_queries"),\
 	&MySQL::set_credentials, DEFVAL(""), DEFVAL(default_collation), DEFVAL(ssl_enable), DEFVAL(false));
 
-	ClassDB::bind_method(D_METHOD("tcp_connect", "hostname", "port", "async"), &MySQL::tcp_connect, DEFVAL("127.0.0.1"), DEFVAL("3306"), DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("unix_connect", "socket_path", "async"), &MySQL::unix_connect, DEFVAL("/var/run/mysqld/mysqld.sock"), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("tcp_connect", "hostname", "port"), &MySQL::tcp_connect, DEFVAL("127.0.0.1"), DEFVAL("3306"));
+	ClassDB::bind_method(D_METHOD("unix_connect", "socket_path"), &MySQL::unix_connect, DEFVAL("/var/run/mysqld/mysqld.sock"));
 	ClassDB::bind_method(D_METHOD("close_connection"), &MySQL::close_connection);
 	ClassDB::bind_method(D_METHOD("is_server_alive"), &MySQL::is_server_alive);
 
 	ClassDB::bind_method(D_METHOD("get_connection_type"), &MySQL::get_connection_type);
 	ClassDB::bind_method(D_METHOD("get_last_error"), &MySQL::get_last_error);
-	ClassDB::bind_method(D_METHOD("is_async"), &MySQL::is_async);
 
 	ClassDB::bind_method(D_METHOD("execute", "query"), &MySQL::execute);
 	ClassDB::bind_method(D_METHOD("execute_prepared", "statement", "values"), &MySQL::execute_prepared, DEFVAL(Array()));
-//	ClassDB::bind_method(D_METHOD("execute_sql", "sql path"), &MySQL::execute_sql);
-//	ClassDB::bind_method(D_METHOD("async_execute", "query"), &MySQL::async_execute);
-//	ClassDB::bind_method(D_METHOD("async_execute_prepared", "query", "values"), &MySQL::async_execute_prepared, DEFVAL(Array()));
+	ClassDB::bind_method(D_METHOD("execute_sql", "sql path"), &MySQL::execute_sql);
 
+	ClassDB::bind_method(D_METHOD("async_execute", "query"), &MySQL::async_execute);
+	ClassDB::bind_method(D_METHOD("async_execute_prepared", "query", "values"), &MySQL::async_execute_prepared, DEFVAL(Array()));
 
 
 
@@ -689,4 +770,3 @@ void MySQL::_bind_methods() {
 	BIND_ENUM_CONSTANT(utf8mb4_0900_bin);
 
 }
-

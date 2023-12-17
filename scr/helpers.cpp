@@ -74,6 +74,59 @@ void print_sql_exception(const char *p_function, const char *p_file, int p_line,
 }
 
 
+
+Dictionary make_metadata_result(mysql::metadata_collection_view meta_collection) {
+
+	Dictionary meta;
+
+	for(auto m:meta_collection) {
+		Dictionary column;
+		String column_name = String(m.column_name().data());
+
+		column["column_collation"]			= m.column_collation();
+		column["column_length"]				= m.column_length();
+		column["column_name"]				= column_name;
+		column["database"]					= String(m.database().data());
+		column["decimals"]					= m.decimals();
+		column["has_no_default_value"]		= m.has_no_default_value();
+		column["is_auto_increment"]			= m.is_auto_increment();
+		column["is_multiple_key"]			= m.is_multiple_key();
+		column["is_not_null"]				= m.is_not_null();
+		column["is_primary_key"]			= m.is_primary_key();
+		column["is_set_to_now_on_update"]	= m.is_set_to_now_on_update();
+		column["is_unique_key"]				= m.is_unique_key();
+		column["is_unsigned"]				= m.is_unsigned();
+		column["is_zerofill"]				= m.is_zerofill();
+		column["original_column_name"]		= String(m.original_column_name().data());
+		column["original_table"]			= String(m.original_table().data());
+		column["table"]						= String(m.table().data());
+		column["type"]						= (int)m.type();
+
+		meta[column_name] = column;
+	}
+
+	return meta;
+}
+
+
+Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_view meta_coll) {
+
+	Dictionary querty_result;
+	for(size_t row = 0; row < batch.size(); row++) {
+		Dictionary line = Dictionary();
+		size_t f = 0;
+		for (auto fv : batch.at(row).as_vector()) {
+			String column_name = String(meta_coll[f].column_name().data());
+			mysql::column_type column_type = meta_coll[f].type();
+			line[column_name] = field2Var(fv, column_type);
+			f++;
+		}
+		querty_result[row] = line;
+	}
+	return querty_result;
+}
+
+
 bool is_date(Dictionary d) {
 	if (d.has("day") and d["day"].get_type() == Variant::INT) {
 		return true;
@@ -173,10 +226,7 @@ std::vector<mysql::field> binds_to_field(const Array arguments) {
 				int hour		= ts.has("hour")		? (int)ts["hour"] : 0;
 				int minute		= ts.has("minute")		? (int)ts["minute"] : 0;
 				int second		= ts.has("second")		? (int)ts["second"] : 0;
-				std::chrono::microseconds val =\
-						std::chrono::hours(hour) +
-						std::chrono::minutes(minute) +
-						std::chrono::seconds(second);
+				microseconds val = hours(hour) + minutes(minute) + seconds(second);
 				a_field = val;
 			}
 			//else{//Variant General}
@@ -272,11 +322,11 @@ Variant field2Var(const mysql::field_view fv, mysql::column_type column_type) {
 		Dictionary gdt_time;
 		time_point<system_clock> point_time = time_point<system_clock>(fv.get_time());
 
-		auto t_hour = duration_cast<std::chrono::hours>(point_time.time_since_epoch());
+		auto t_hour = duration_cast<hours>(point_time.time_since_epoch());
 		point_time -= t_hour;
-		auto t_minutes = duration_cast<std::chrono::minutes>(point_time.time_since_epoch());
+		auto t_minutes = duration_cast<minutes>(point_time.time_since_epoch());
 		point_time -= t_minutes;
-		auto t_second = duration_cast<std::chrono::seconds>(point_time.time_since_epoch());
+		auto t_second = duration_cast<seconds>(point_time.time_since_epoch());
 		point_time -= t_second;
 
 		gdt_time["hour"]	= t_hour.count();

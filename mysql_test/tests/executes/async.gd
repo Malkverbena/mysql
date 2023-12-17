@@ -4,6 +4,8 @@ extends Node
 var mysql = MySQL.new()
 
 func _ready():
+	
+	mysql.querty_complete.connect(print_result)
 
 	print(" ======= TCP ASYNC ======= ")
 	if mysql.define(MySQL.TCP):
@@ -17,14 +19,15 @@ func _ready():
 	print("is connected: ", mysql.is_server_alive())
 
 	print("BEFORE EXECUTE @@@@@@@@@@")
-	var result = mysql.async_execute("SELECT * FROM testes.basic_query")
+	mysql.async_execute("SELECT * FROM testes.basic_query")
 	print("AFTER EXECUTE @@@@@@@@@@@")
 	print("======")
+
+
+
+func print_result(result: SqlResult) -> void:
+	print("SIGNAL ONNNNNN")
 	db.print_digest(result)
 	db.print_exception(mysql.get_last_error())
 	db.print_result(result)
-
-
-
-
 	get_tree().quit()
