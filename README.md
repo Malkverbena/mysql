@@ -7,6 +7,8 @@
 ### This module works only with Godot 4.
 ### If you use this module, let me know it. Leave a star. 
 
+### Old version note:
+Version 2.0 uses C++ MySQL Connector Library. You can find it here: [**Godot MySQL 2.0**](https://github.com/Malkverbena/mysql/tree/2.0)
 
 ## Features:
 - Supports TCP and UNIX SOCKET connections.
