@@ -89,6 +89,7 @@ private:
 
 private:
 
+
 	Error set_certificate(const String p_cert_file, const String p_host_name);
 
 	void build_result(mysql::results raw_result, Ref<SqlResult> *gdt_result);
@@ -96,6 +97,8 @@ private:
 	Dictionary get_metadata(mysql::results result);
 
 	Dictionary get_raw(mysql::results result);
+
+	Array multiqueries(std::string queries);
 
 	Ref<SqlResult> build_godot_result(mysql::results result);
 
