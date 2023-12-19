@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://bwq87y8focrjy"]
+
+[ext_resource type="Script" path="res://tests/executes/async_execute.gd" id="1_fkswl"]
+
+[node name="AsyncExecute" type="Node"]
+script = ExtResource("1_fkswl")
