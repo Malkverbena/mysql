@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://du4fx20lgndxp"]
-
-[ext_resource type="Script" path="res://tests/basics/blob.gd" id="1_5p6v0"]
-
-[node name="Blob" type="Node"]
-script = ExtResource("1_5p6v0")

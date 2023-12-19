@@ -37,6 +37,7 @@ void boost_dictionary(Dictionary *dic, const char *p_function, const char *p_fil
 	(*dic)["DESCRIPTION"] = ec.what().data();
 }
 
+
 void print_boost_exception(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec) {
 	String exc = \
 	String("\n# BOOST Error Caught!\n") + \
@@ -46,7 +47,6 @@ void print_boost_exception(const char *p_function, const char *p_file, int p_lin
 	vformat("# ERR: %s\n", ec.value());
 	WARN_PRINT(exc);
 }
-
 
 
 void sql_dictionary(Dictionary *dic, const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec) {
@@ -61,7 +61,6 @@ void sql_dictionary(Dictionary *dic, const char *p_function, const char *p_file,
 }
 
 
-
 void print_sql_exception(const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec) {
 	String exc = \
 	String("\n# SQL EXCEPTION Caught!\n") +\
@@ -72,7 +71,6 @@ void print_sql_exception(const char *p_function, const char *p_file, int p_line,
 	vformat("# Client Error: %s\n", diag.client_message().data());
 	WARN_PRINT(exc);
 }
-
 
 
 Dictionary make_metadata_result(mysql::metadata_collection_view meta_collection) {
@@ -104,7 +102,6 @@ Dictionary make_metadata_result(mysql::metadata_collection_view meta_collection)
 
 		meta[column_name] = column;
 	}
-
 	return meta;
 }
 
@@ -171,6 +168,7 @@ std::vector<mysql::field> binds_to_field(const Array arguments) {
 	std::vector<mysql::field> ret;
 
 	for (int arg = 0; arg < arguments.size(); arg++) {
+
 		mysql::field a_field;
 		int type = arguments[arg].get_type();
 
@@ -206,12 +204,12 @@ std::vector<mysql::field> binds_to_field(const Array arguments) {
 		else if (type == Variant::DICTIONARY) {
 			Dictionary ts = arguments[arg];
 			if (is_datetime(ts)) {
-				uint16_t year		 = ts.has("year")		? (uint16_t)ts["year"] : 0;
-				uint8_t month		 = ts.has("month")		? (uint8_t)ts["month"] : 0;
-				uint8_t day			 = ts.has("day")		? (uint8_t)ts["day"] : 0;
-				uint16_t hour		 = ts.has("hour")		? (uint16_t)ts["hour"] : 0;
-				uint16_t minute		 = ts.has("minute")		? (uint16_t)ts["minute"] : 0;
-				uint16_t second		 = ts.has("second")		? (uint16_t)ts["second"] : 0;
+				uint16_t year	 = ts.has("year")	? (uint16_t)ts["year"] : 0;
+				uint8_t month	 = ts.has("month")	? (uint8_t)ts["month"] : 0;
+				uint8_t day		 = ts.has("day")	? (uint8_t)ts["day"] : 0;
+				uint16_t hour	 = ts.has("hour")	? (uint16_t)ts["hour"] : 0;
+				uint16_t minute	 = ts.has("minute")	? (uint16_t)ts["minute"] : 0;
+				uint16_t second	 = ts.has("second")	? (uint16_t)ts["second"] : 0;
 				mysql::datetime val(year, month, day, hour, minute, second);
 				a_field = val;
 			}
@@ -223,13 +221,13 @@ std::vector<mysql::field> binds_to_field(const Array arguments) {
 				a_field = val;
 			}
 			else if (is_time(ts)) {
-				int hour		= ts.has("hour")		? (int)ts["hour"] : 0;
-				int minute		= ts.has("minute")		? (int)ts["minute"] : 0;
-				int second		= ts.has("second")		? (int)ts["second"] : 0;
+				int hour	= ts.has("hour")	? (int)ts["hour"] : 0;
+				int minute	= ts.has("minute")	? (int)ts["minute"] : 0;
+				int second	= ts.has("second")	? (int)ts["second"] : 0;
 				microseconds val = hours(hour) + minutes(minute) + seconds(second);
 				a_field = val;
 			}
-			//else{//Variant General}
+			//TODO: else{Throw error}
 		}
 
 		ret.push_back(a_field);
@@ -243,7 +241,6 @@ std::vector<mysql::field> binds_to_field(const Array arguments) {
 
 
 Variant field2Var(const mysql::field_view fv, mysql::column_type column_type) {
-
 
 	if (fv.is_null()) {
 		Variant n = Variant();
@@ -275,7 +272,6 @@ Variant field2Var(const mysql::field_view fv, mysql::column_type column_type) {
 		return d;
 	}
 
-
 	else if (column_type == mysql::column_type::set){
 		String s;
 		s = String(fv.get_string().data());
@@ -287,7 +283,6 @@ Variant field2Var(const mysql::field_view fv, mysql::column_type column_type) {
 		s = String(fv.get_string().data());
 		return s;
 	}
-
 
 	else if (fv.is_blob()) {
 		mysql::blob_view bw = fv.get_blob();

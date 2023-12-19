@@ -14,7 +14,6 @@
 #endif
 
 
-
 #include <boost/mysql/mariadb_collations.hpp>
 #include <boost/mysql/mysql_collations.hpp>
 #include <boost/mysql/ssl_mode.hpp>
@@ -37,6 +36,7 @@ enum CONN_TYPE{
 	UNIX,
 	UNIXTLS
 };
+
 
 enum MYSQLCOLLATIONS {
 	default_collation			= mysql::mysql_collations::utf8mb4_general_ci, // 45

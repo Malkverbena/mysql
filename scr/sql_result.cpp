@@ -46,8 +46,6 @@ Array SqlResult::get_column(String column, bool as_array) const {
 }
 
 
-//TODO:
-/*
 Array SqlResult::get_column_by_id(int column, bool as_array) const {
 	Array ret;
 	for (int col = 0; col < result.size(); col++) {
@@ -63,8 +61,6 @@ Array SqlResult::get_column_by_id(int column, bool as_array) const {
 	}
 	return ret;
 }
-*/
-
 
 
 void SqlResult::_bind_methods() {
@@ -85,11 +81,9 @@ void SqlResult::_bind_methods() {
 }
 
 SqlResult::SqlResult(){
-
 }
 
 
 SqlResult::~SqlResult(){
-
 }
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #SCsub
 
+
 import os
 import subprocess
 from tools import helpers
@@ -10,13 +11,19 @@ Import('env')
 mysql_env = env.Clone()
 
 
+# Enable Boost separate compilation mode
+#mysql_env.Append(CPPDEFINES=["BOOST_MYSQL_SEPARATE_COMPILATION"])
 
+
+# Build with exceptions!
+"""
 if env["disable_exceptions"]:
 	if env.msvc and ("_HAS_EXCEPTIONS", 0) in mysql_env["CPPDEFINES"]:
 		mysql_env["CPPDEFINES"].remove(("_HAS_EXCEPTIONS", 0))
 		mysql_env.AppendUnique(CPPFLAGS=["/EHsc"])
 	elif not env.msvc and "-fno-exceptions" in mysql_env["CPPFLAGS"]:
 		mysql_env["CPPFLAGS"].remove("-fno-exceptions")
+"""
 
 
 # Use absolut paths to avoid problem between platforms.
@@ -40,11 +47,6 @@ env.Append(LIBPATH=[
 	os.path.join(dep_path, "openssl/apps"),
 	os.path.join(dep_path, "openssl/providers"),
 ])
-
-
-
-# Separate compilation mode
-#mysql_env.Append(CPPDEFINES=["BOOST_MYSQL_SEPARATE_COMPILATION"])
 
 
 # Update and compile thirdparty.

@@ -1,7 +1,6 @@
 /* helpers.h */
 
 
-
 #ifndef HELPERS_H
 #define HELPERS_H
 
@@ -21,12 +20,11 @@
 #include <boost/mysql/row_view.hpp>
 
 
+
 void boost_dictionary(Dictionary *dic, const char *p_function, const char *p_file, int p_line, const mysql::error_code ec);
-void print_boost_exception(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec);
-
 void sql_dictionary(Dictionary *dic, const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec);
+void print_boost_exception(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec);
 void print_sql_exception(const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec);
-
 void print_std_exception(const char *p_function, const char *p_file, int p_line, std::exception err);
 
 
@@ -38,10 +36,8 @@ mysql::string_view GdtStr2SqlStr(String s);
 bool is_date(Dictionary d);
 bool is_datetime(Dictionary dt);
 bool is_time(Dictionary t);
-
 std::vector<mysql::field> binds_to_field(const Array args);
 Variant field2Var(const mysql::field_view fv, mysql::column_type column_type);
-
 Dictionary make_metadata_result(mysql::metadata_collection_view meta_collection);
 Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_view meta_coll);
 
@@ -55,7 +51,6 @@ Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_vi
 	} else																		\
 		((void)0)
 
-
 #define SQL_EXCEPTION(m_errcode, m_diag, m_dic, m_ret)								\
 	if (unlikely(m_errcode)) {														\
 		sql_dictionary(m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);\
@@ -64,14 +59,12 @@ Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_vi
 	} else																			\
 		((void)0)
 
-
 #define CORO_SQL_EXCEPTION(m_errcode, m_diag, m_dic, m_ret)							\
 	if (unlikely(m_errcode)) {														\
 		sql_dictionary(m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);\
 		print_sql_exception(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);	\
 	} else																			\
 		((void)0)
-
 
 #define CORO_SQL_EXCEPTION_VOID(m_errcode, m_diag, m_dic)							\
 	if (unlikely(m_errcode)) {														\

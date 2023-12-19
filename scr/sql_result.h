@@ -3,16 +3,15 @@
 #ifndef SQLRESULT_H
 #define SQLRESULT_H
 
+
 #include "core/object/ref_counted.h"
 #include "core/core_bind.h"
-
 
 
 class SqlResult : public RefCounted {
 	GDCLASS(SqlResult, RefCounted);
 
 friend class MySQL;
-
 
 private:
 
