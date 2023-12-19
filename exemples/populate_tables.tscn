@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://dyb1x36r10o5"]
+
+[ext_resource type="Script" path="res://populate_tables.gd" id="1_kqbw3"]
+
+[node name="PopulateTables" type="Node"]
+script = ExtResource("1_kqbw3")

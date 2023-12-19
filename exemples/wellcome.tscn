@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://tjyn6iqvcwrj"]
+
+[ext_resource type="Script" path="res://wellcome.gd" id="1_h0rc1"]
+
+[node name="Wellcome" type="Node"]
+script = ExtResource("1_h0rc1")
