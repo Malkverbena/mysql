@@ -1,9 +1,38 @@
 #!/usr/bin/env python3
 # helpers.py
 
-import os, subprocess, platform
+import os, subprocess, platform, sys
 from tools import boost
 from tools import openssl
+
+
+
+def get_host_bits():
+	my_arch = platform.architecture()
+	return my_arch[0]
+
+
+
+
+# Allowed platforms: ["linuxbsd", "macos", "windows"]
+def get_host():
+
+	if sys.platform in ["win32", "msys", "cygwin"]:
+		return "windows"
+
+	elif sys.platform in ["macos", "osx", "darwin"]:
+		return "macos"
+
+	elif ( sys.platform in ["linux", "linux2"] 
+		or sys.platform.startswith("linux")
+		or sys.platform.startswith("dragonfly")
+		or sys.platform.startswith("freebsd")
+		or sys.platform.startswith("netbsd")
+		or sys.platform.startswith("openbsd")):
+		return "linuxbsd"
+	
+	return "unknown"
+
 
 
 def get_config():

@@ -1,0 +1,11 @@
+libdir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/3party/bin/windows/x86_64/openssl/lib64
+includedir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/3party/bin/windows/x86_64/openssl/include
+enginesdir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/3party/bin/windows/x86_64/openssl/lib64/engines-3
+modulesdir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/3party/bin/windows/x86_64/openssl/lib64/ossl-modules
+
+Name: OpenSSL-libcrypto
+Description: OpenSSL cryptography library
+Version: 3.3.0-dev
+Libs: -L${libdir} -lcrypto
+Libs.private: -lws2_32 -lgdi32 -lcrypt32
+Cflags: -I${includedir}

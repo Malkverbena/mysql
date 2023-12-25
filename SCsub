@@ -53,10 +53,6 @@ env.Append(LIBPATH=[
 helpers.apply_config(mysql_env)
 
 
-print(os.path.join(dep_path, "boost"))
-
-
-
 sources = [
 	"register_types.cpp",
 	"scr/helpers.cpp",

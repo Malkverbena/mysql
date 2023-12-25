@@ -1,0 +1,7 @@
+libdir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/3party/bin/windows/x86_64/openssl/lib64
+includedir=/media/cleber/DATA/COMPILATIONS/godot_modules/mysql/3party/bin/windows/x86_64/openssl/include
+
+Name: OpenSSL
+Description: Secure Sockets Layer and cryptography libraries and tools
+Version: 3.3.0-dev
+Requires: libssl libcrypto
