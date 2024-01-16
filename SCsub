@@ -3,8 +3,7 @@
 
 
 import os
-import subprocess
-from tools import helpers
+from tools import helpers, openssl, boost
 
 
 Import('env')
@@ -16,41 +15,42 @@ mysql_env = env.Clone()
 
 
 # Build with exceptions!
-"""
-if env["disable_exceptions"]:
-	if env.msvc and ("_HAS_EXCEPTIONS", 0) in mysql_env["CPPDEFINES"]:
-		mysql_env["CPPDEFINES"].remove(("_HAS_EXCEPTIONS", 0))
-		mysql_env.AppendUnique(CPPFLAGS=["/EHsc"])
-	elif not env.msvc and "-fno-exceptions" in mysql_env["CPPFLAGS"]:
-		mysql_env["CPPFLAGS"].remove("-fno-exceptions")
-"""
-
-
-# Use absolut paths to avoid problem between platforms.
-dep_path = os.path.join(os.getcwd(), "3party")
-
-
-# INCLUDE:
-mysql_env.Prepend(CPPPATH=[
-	os.path.join(dep_path, "boost"),
-	os.path.join(dep_path, "boost/boost"),
-	os.path.join(dep_path, "openssl"),
-	os.path.join(dep_path, "openssl/include"),
-])
-
-
-# LIB
-env.Append(LIBPATH=[
-	os.path.join(dep_path, "boost/stage/lib"),
-	os.path.join(dep_path, "boost/boost"),
-	os.path.join(dep_path, "openssl"),
-	os.path.join(dep_path, "openssl/apps"),
-	os.path.join(dep_path, "openssl/providers"),
-])
+#if env["disable_exceptions"]:
+#	if env.msvc and ("_HAS_EXCEPTIONS", 0) in mysql_env["CPPDEFINES"]:
+#		mysql_env["CPPDEFINES"].remove(("_HAS_EXCEPTIONS", 0))
+#		mysql_env.AppendUnique(CPPFLAGS=["/EHsc"])
+#	elif not env.msvc and "-fno-exceptions" in mysql_env["CPPFLAGS"]:
+#		mysql_env["CPPFLAGS"].remove("-fno-exceptions")
 
 
 # Update and compile thirdparty.
 helpers.apply_config(mysql_env)
+
+
+openssl_path = openssl.get_boost_install_path(mysql_env)
+openssl_include_path = openssl_path + "/include"
+openssl_lib_path = openssl_path + "/lib64"
+boost_path = boost.get_boost_install_path(mysql_env)
+boost_include_path = boost_path + "/include"
+boost_lib_path = boost_path + "/stage/lib"
+
+
+# Use absolut paths to avoid problem between platforms.
+# dep_path = os.path.join(os.getcwd(), "3party")
+
+
+# INCLUDE:
+mysql_env.Prepend(CPPPATH=[
+	openssl_include_path,
+	boost_include_path,
+])
+
+
+# LIB
+env.Prepend(LIBPATH=[
+	openssl_lib_path,
+	boost_lib_path,
+])
 
 
 sources = [

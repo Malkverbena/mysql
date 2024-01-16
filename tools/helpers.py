@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # helpers.py
 
-import os, subprocess, platform, sys
-from tools import boost
-from tools import openssl
+import platform, sys
+from tools import boost, openssl
 
 
 
 def get_host_bits():
 	my_arch = platform.architecture()
-	return my_arch[0]
+	bits = "64" if  my_arch[0] == "64bit" else "32"
+	return bits
 
 
 
@@ -75,64 +75,33 @@ def apply_config(env):
 		print("Updating openssl", config["update_openssl"])
 		openssl.update_openssl()
 
-	if config["compile_boost"] == True:
-		print("Compiling boost", config["compile_boost"])
-		boost.compile_boost(env)
-
 	if config["compile_openssl"] == True:
 		print("Compiling openssl", config["compile_openssl"])
 		openssl.compile_openssl(env)
 
-
-
-def detect_gcc_version():
-	system = platform.system()
-	try:
-		# Tenta obter a versão do GCC no Linux usando o comando "gcc --version"
-		if system == 'Linux':
-			output = subprocess.check_output(['gcc', '--version'], stderr=subprocess.STDOUT, text=True)
-			print(output)
-			return output
-
-		# Tenta obter a versão do GCC no Windows usando o comando "gcc --version"
-		elif system == 'Windows':
-			output = subprocess.check_output(['gcc', '--version'], stderr=subprocess.STDOUT, text=True)
-			print(output)
-			return output
-
-	except FileNotFoundError:
-		print("GCC not found. Make sure GCC is installed and configured on your system.")
+	if config["compile_boost"] == True:
+		print("Compiling boost", config["compile_boost"])
+		boost.compile_boost(env)
 
 
 
-def detect_clang_version():
-	system = platform.system()
-	
-	if system == 'Linux':
-		try:
-			# Executa o comando 'clang --version' no terminal
-			result = subprocess.check_output(['clang', '--version'], stderr=subprocess.STDOUT, text=True)
-			
-			# Analisa a saída para extrair a versão do Clang
-			lines = result.strip().split('\n')
-			for line in lines:
-				if line.startswith('clang version'):
-					return line.split(' ')[2]
-		except FileNotFoundError:
-			print("Clang not found on Linux system.")
 
-	elif system == 'Windows':
-		try:
-			# Executa o comando 'clang --version' no prompt de comando
-			result = subprocess.check_output(['clang', '--version'], stderr=subprocess.STDOUT, text=True, shell=True)
-			
-			# Analisa a saída para extrair a versão do Clang
-			lines = result.strip().split('\n')
-			for line in lines:
-				if line.startswith('clang version'):
-					return line.split(' ')[2]
-		except FileNotFoundError:
-			return "Clang not found on Windows system."
-	else:
-		return "Operating system not supported."
+
+
+def get_compiller(env):
+
+	host_platform = get_host()
+	if env["platform"] == "linuxbsd":
+		return "clang" if env["use_llvm"] else "gcc"
+	if env["platform"] == "windows":
+		if not env["use_mingw"]:
+			return "msvc"
+		else:
+			if host_platform == "linuxbsd":
+				return "clang" if env["use_llvm"] else "gcc"
+			else:
+				# Compilador rodando no MacOS
+				pass
+
+	return ""
 

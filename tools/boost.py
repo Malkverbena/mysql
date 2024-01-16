@@ -1,63 +1,162 @@
 #!/usr/bin/env python3
 # boost.py
 
-import os, subprocess, sys
+
+# https://www.boost.org/build/tutorial.html
 
 
-boost_cmd = [
-	"-a",
-	"link=static",
-	"threading=multi",
-	"runtime-link=static",
-]
+import os, subprocess
+from tools import helpers
 
 
-# Allowed platforms: ["linuxbsd", "macos", "windows"]
-def get_host():
+def compile_boost(env):
 
-	if sys.platform in ["win32", "msys", "cygwin"]:
-		return "windows"
-
-	elif sys.platform in ["macos", "osx", "darwin"]:
-		return "macos"
-
-	elif ( sys.platform in ["linux", "linux2"] 
-		or sys.platform.startswith("linux")
-		or sys.platform.startswith("dragonfly")
-		or sys.platform.startswith("freebsd")
-		or sys.platform.startswith("netbsd")
-		or sys.platform.startswith("openbsd")):
-		return "linuxbsd"
+	jobs = "-j" + str(env.GetOption("num_jobs"))
+	boost_path = f"{os.getcwd()}/3party/boost"
 	
-	return "unknown"
+	boost_prefix = get_boost_install_path(env)		# --exec-prefix=
+	boost_stage_dir = f"{boost_prefix}/stage"		# --exec-prefix=
+	boost_lib_dir = f"{boost_stage_dir}/lib"		# --libdir=
+	boost_include_dir = f"{boost_prefix}/include"	# --includedir=
+	build_dir = f"{boost_prefix}/build"				# --build-dir=
+
+
+	is_win_host = (helpers.get_host() == "windows")
+	bootstrap = "bootstrap.bat" if is_win_host else "bootstrap.sh"
+	b2 = "b2.exe" if is_win_host else "b2"
+
+	bootstrap_command = [
+		"bash", bootstrap,
+		f"--prefix={boost_prefix}",
+		f"--libdir={boost_lib_dir}",
+		f"--includedir={boost_include_dir}"
+	]
+	compiller = helpers.get_compiller(env)
+	if compiller == "clang":
+		bootstrap_command.append("--with-toolset=clang")
+
+	if not os.path.exists(boost_prefix):
+		os.makedirs(boost_prefix)
+
+
+	try:
+		subprocess.check_call(bootstrap_command, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+	except subprocess.CalledProcessError as e:
+		print(f"Erro ao configurar o Boost: {e}")
+		exit(1)
 
 
 
-def update_boost():
-	git_cmd = ["git pull", "--recurse-submodules"]
-	subprocess.run(git_cmd, shell=True, cwd="3party/boost")
+	is_cross_compilation = is_cross_compile(env)
+	if is_cross_compilation:
+		project_comp = get_project_set(env)
+		with open('project-config.jam', 'a') as arquivo:
+			arquivo.write(project_comp + "\n")
 
 
-def get_variant(env):
-	if env["target"] == "editor":
-		return "debug"
-	elif env["target"] == "template_debug":
-		return "profile"
-	elif env["target"] == "template_release":
-		return "release"
+	bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
+	cmd_b2 = [b2]
+	cmd_b2 += [
+		jobs,
+		"-a",
+		"link=static",
+		"threading=multi",
+		"runtime-link=static",
+		"variant=release",
+		f"--build-dir={build_dir}",
+		f"--exec-prefix={boost_prefix}",
+		f"--stagedir={boost_stage_dir}",
+		f"toolset={get_toolset(env)}",
+		f"address-model={bits}",
+		f"architecture={get_architecture(env)}",
+		f"target-os={get_target_os(env)}",
+		"headers"
+	]
+
+
+	try:
+		print(" Diretoriio atua: " + os.getcwd() )
+		subprocess.check_call(cmd_b2, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+		cmd_b2.pop()
+		print(cmd_b2)
+		subprocess.check_call(cmd_b2, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+		subprocess.check_call([b2, "install"], cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+	except subprocess.CalledProcessError as e:
+		print(f"Erro ao Compilar o Boost: {e}")
+	except Exception as e:
+		print(f"Outro erro: {e}")
+		exit(1)
+
+	return 0
 
 
 
-def get_lto(env):
-	if env["lto"] == "none":
-		return "fat"
-	elif env["lto"] == "thin":
-		return "thin"		
-	elif env["lto"] == "full":
-		return "full"
+def get_project_set(env):
+	target_platform = env["platform"]
+	host_platform = helpers.get_host()
+	target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
+	compiller = helpers.get_compiller(env)
+
+	if host_platform == "linuxbsd":
+		if target_platform ==  "windows":
+			if compiller == "gcc":
+				if target_bits == "64":
+					"using gcc : mingw : x86_64-w64-mingw32-g++ ;"
+				else:
+					"using gcc : mingw : i686-w64-mingw32-g++ ;"
+			elif compiller == "clang":
+				if target_bits == "64":
+					"using clang : : x86_64-w64-mingw32-clang++ ;"
+				else:
+					"using clang : : i686-w64-mingw32-clang++ ;"
+
+	if host_platform == "windows":
+		#TODO:
+		pass
 
 
-# Allowed boot values: x86, ia64, sparc, power, mips, mips1, mips2, mips3, mips4, mips32, mips32r2, mips64, parisc, arm, s390x, loongarch.
+
+
+def is_cross_compile(env):
+	host_bits = helpers.get_host_bits()
+	host_platform = helpers.get_host()
+	target_platform = env["platform"]
+	target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
+	return (host_platform != target_platform or host_bits != target_bits)
+
+
+
+def get_target_os(env):
+	if env["platform"] == "windows":
+		return "windows"
+	elif env["platform"] == "linuxbsd":
+		return "linux"
+	else:
+		return ""
+
+
+
+
+def get_toolset(env):
+	compiller = helpers.get_compiller(env)
+	if compiller == "":
+		return ""
+
+	if env["platform"] == "windows":
+		if compiller == "gcc":
+			return "gcc-mingw"
+		elif compiller == "clang":
+			return "clang-mingw"
+		else:
+			return ""
+
+	if env["platform"] == "linuxbsd":
+		return compiller
+
+	return ""
+
+
+
 # Supports ["x86", "arm", "power", riscv"] for now
 def get_architecture(env):
 	godot_target = env["arch"]
@@ -73,147 +172,13 @@ def get_architecture(env):
 		return "????"
 
 
-def execute(env, commands, tool):
-	print(commands)
-	host = get_host()
-	print("HOST:" + host + " Base system: " + sys.platform + " Target platform: " + env["platform"])
-	print("###############################")
-	comp = f"--with-toolset={tool}"
 
-	caminho_executavel = f"{os.getcwd()}/3party/boost"
-	os.chdir(caminho_executavel)
-
-	is_win_host = sys.platform in ["win32", "msys", "cygwin"]
-
-	print("SYS PLATFORM: ", sys.platform)
-	bootstrap = "bootstrap.bat" if is_win_host else "bootstrap.sh"
-	b2 = "b2.exe" if is_win_host else "./b2"
-
-	configure_command = [
-		"bash", os.path.join(caminho_executavel, bootstrap),
-		f"--with-toolset={tool}",
-	]
-
-
-	print("==============================================================")
-	print(configure_command)
-
-	try:
-		subprocess.check_call(configure_command)
-	except subprocess.CalledProcessError as e:
-		print(f"Erro ao configurar o Boost: {e}")
-		exit(1)
-
-
-	cmd_b2 = [b2] + commands
-	print("==============================================================")
-	print(cmd_b2)
-
-	os.chdir(caminho_executavel)
-	subprocess.run(cmd_b2)
-
-	cmd_b2.append("headers")
-	subprocess.run(cmd_b2)
-
-	subprocess.run([b2, "headers"])
-
-
-
-# Allowed platforms:  ["linuxbsd", "macos", "windows", "ios", "android", "web"]
-def	get_target_platform(plat):
-	print("PLATFORM: ", plat)
-	if plat == "linuxbsd":
-		return "linux"
-	elif plat == "macos" or plat == "ios":
-		return "darwin"
-	elif plat == "windows":
-		return "windows"
-	elif plat == "android":
-		return "android"
-
-
-
-
-def compile_boost(env):
-
-	jobs = "30" 
-
-	target_bits = "64" if "64" in env["arch"] else "32"
-
-	target_architecture = get_architecture(env) 
-
-	target_variant = get_variant(env)
-
-#	lto = env["use_lld"]
-
-	lto_mode = get_lto(env)
-
-	target_platform = get_target_platform(env["platform"])
-
-	host = get_host()
-
-	tool = ""
-	b2tool = ""
-
-
-	commands = [f"-j{jobs}"]
-
-
-	if host == "linuxbsd":
-
-		if env["platform"] == "linuxbsd":
-			tool = "clang" if env["use_llvm"] else "gcc"
-			b2tool = "clang" if env["use_llvm"] else "gcc"
-
-		elif env["platform"] == "windows":
-			tool = "clang" if env["use_llvm"] else "gcc"
-			b2tool = "clang" if env["use_llvm"] else "gcc"  
-
-		elif env["platform"] == "macos":
-			pass
-
-	if host == "windows":
-		if env["platform"] == "linuxbsd":
-			tool = "clang" if env["use_llvm"] else "gcc"
-			b2tool = "clang-linux" if env["use_llvm"] else "gcc"
-
-		elif env["platform"] == "windows":
-			tool = "clang" if env["use_llvm"] else "gcc"
-			b2tool = "clang-win" if env["use_llvm"] else "gcc-mingw"
-
-		elif env["platform"] == "macos":
-			pass
-
-
-
-	
-
-
-	architecture = f"architecture={target_architecture}"
-	address_model = f"address-model={target_bits}"
-	variant = f"variant={target_variant}"
-	target_os = f"target-os={target_platform}" 
-	#user_config = "--user-config=../godot-config.jam"
-	jobs = env.GetOption("num_jobs")
-
-
-
-	print(target_os)
-
-	commands.extend([
-		target_os,
-		architecture,
-		address_model,
-		variant,
-	#	user_config,
-		f"toolset={tool}",
-		f"-j{jobs}",
-	])
-	
-	commands +=	boost_cmd
-
-
-	execute(env, commands, tool)
-
-
+def get_boost_install_path(env):
+	bin_path = f"{os.getcwd()}/3party/bin"
+	_lib_path = [bin_path, env["platform"], env["arch"]]
+	if env["use_llvm"]:
+		_lib_path.append("llvm")
+	_lib_path.append("boost")
+	lib_path = "/".join(_lib_path)
+	return lib_path
 
