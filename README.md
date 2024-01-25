@@ -28,6 +28,7 @@ Version 2.0 uses C++ MySQL Connector Library. You can find it here: [**Godot MyS
 
 ## Requirements: 
 - A C++20 capable compiler as GCC, Clang (x11) , Visual C++ (Windows) or Apple Clang (Apple).
+- [**NASM - Only for Windows**](https://www.nasm.us/pub/nasm/releasebuilds/)
 - Git
 - All requirements to compile Godot.
 

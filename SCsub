@@ -5,14 +5,15 @@
 import os
 from tools import helpers, openssl, boost
 
-
 Import('env')
 mysql_env = env.Clone()
 
 
+
+##### FLAGS #####
+
 # Enable Boost separate compilation mode
 #mysql_env.Append(CPPDEFINES=["BOOST_MYSQL_SEPARATE_COMPILATION"])
-
 
 # Build with exceptions!
 #if env["disable_exceptions"]:
@@ -22,10 +23,17 @@ mysql_env = env.Clone()
 #	elif not env.msvc and "-fno-exceptions" in mysql_env["CPPFLAGS"]:
 #		mysql_env["CPPFLAGS"].remove("-fno-exceptions")
 
+mysql_env.Append(CPPFLAGS=[
+	'-fexceptions',
+	'-std=c++20',
+])
 
-# Update and compile thirdparty.
-helpers.apply_config(mysql_env)
 
+
+##### PATHS #####
+
+# Use absolut paths to avoid problem between platforms.
+# dep_path = os.path.join(os.getcwd(), "3party")
 
 openssl_path = openssl.get_boost_install_path(mysql_env)
 openssl_include_path = openssl_path + "/include"
@@ -35,38 +43,38 @@ boost_include_path = boost_path + "/include"
 boost_lib_path = boost_path + "/stage/lib"
 
 
-# Use absolut paths to avoid problem between platforms.
-# dep_path = os.path.join(os.getcwd(), "3party")
 
+##### THIRDPARTY COMPILATION #####
+
+# Update and compile thirdparty.
+helpers.apply_config(mysql_env)
+
+
+
+##### GODOT MODULE #####
 
 # INCLUDE:
 mysql_env.Prepend(CPPPATH=[
 	openssl_include_path,
 	boost_include_path,
+    openssl_path
 ])
-
 
 # LIB
 env.Prepend(LIBPATH=[
 	openssl_lib_path,
 	boost_lib_path,
+    openssl_path
 ])
 
-
-sources = [
-	"register_types.cpp",
-	"scr/helpers.cpp",
-	"scr/sql_result.cpp",
-	"scr/mysql.cpp",
-]
-
-mysql_env.Append(CPPFLAGS=[
-	'-fexceptions',
-	'-std=c++20',
-])
+mysql_env.add_source_files(env.modules_sources, "*.cpp")
+mysql_env.add_source_files(env.modules_sources, "scr/**.cpp")
 
 
 env.Prepend(LIBS=["libboost_thread", "libcrypto", "libssl"])
 
-mysql_env.add_source_files(env.modules_sources, sources)
+
+
+
+
 

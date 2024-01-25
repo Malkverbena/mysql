@@ -73,14 +73,13 @@ def compile_boost(env):
 		"headers"
 	]
 
+	print(cmd_b2)
 
 	try:
-		print(" Diretoriio atua: " + os.getcwd() )
 		subprocess.check_call(cmd_b2, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
 		cmd_b2.pop()
-		print(cmd_b2)
 		subprocess.check_call(cmd_b2, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
-		subprocess.check_call([b2, "install"], cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+	#	subprocess.check_call([b2, "install"], cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
 	except subprocess.CalledProcessError as e:
 		print(f"Erro ao Compilar o Boost: {e}")
 	except Exception as e:
