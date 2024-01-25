@@ -36,30 +36,17 @@ def compile_openssl(env):
 	if cross_compilation_param != "":
 		cmd_config.append(cross_compilation_param)
 
-
 	openssl_path = get_openssl_path(env)
 	lib_path = get_boost_install_path(env)
 	cmd_config.append("--prefix=" + lib_path)
 	cmd_config.append("--openssldir=" + lib_path)
 	cmd_config.append("-Wl,-rpath=" + lib_path + "/lib64")
 
-
-
 	if not os.path.exists(lib_path):
 		os.makedirs(lib_path)
 	
-	print(cmd_config)
-	print(cmd_depend)
-	print(cmd_compile)
-	print(cmd_install)
-
 	subprocess.check_call(cmd_config, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-	#	subprocess.check_call(cmd_depend, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-	#subprocess.run(cmd_compile, cwd=openssl_path)
-	#subprocess.check_call(cmd_compile, cwd=openssl_path)
 	subprocess.check_call(cmd_install, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-
-
 
 	return 0
 
@@ -72,8 +59,6 @@ def is_win_host(env):
 	return sys.platform in ["win32", "msys", "cygwin"]
 
 
-
-
 def get_cross_compilation_param(env):
 
 	platform = env["platform"]
@@ -81,9 +66,6 @@ def get_cross_compilation_param(env):
 	target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
 	host_bits =  helpers.get_host_bits()
 	is_cross_compile = (host != platform or host_bits != target_bits)
-
-
-	print("host_bits: ========", str(host_bits))
 
 	if not is_cross_compile:
 		return ""
@@ -113,12 +95,9 @@ def get_boost_install_path(env):
 	lib_path = ""
 	if is_win_host(env):
 		lib_path = "\\-=-".join(_lib_path)
-		print("====================WINDOWS HOST")
 		lib_path = lib_path.replace("-=-", "")
 	else:
 		lib_path = "/".join(_lib_path)
-		print("====================LINUXBSD HOST")
-	print(lib_path)
 	return lib_path
 
 
@@ -128,11 +107,8 @@ def get_openssl_path(env):
 	if is_win_host(env):
 		openssl_path = "\\-=-".join(_openssl_path)
 		openssl_path = openssl_path.replace("-=-", "")
-		print("+++++++++++++++++++++WINDOWS HOST")
 	else:
 		openssl_path = "/".join(_openssl_path)
-		print("+++++++++++++++++++++LINUXBSD HOST")
-	print(openssl_path)
 	return openssl_path
 
 
@@ -181,7 +157,6 @@ def get_target(env):
 			elif arch == "ppc64":
 				return "linux-ppc64"
 
-
 	elif platform == "windows":
 		if env.msvc:
 			if arch == "x86_32":
@@ -194,7 +169,8 @@ def get_target(env):
 			else:
 				return  "mingw64"
 
-# https://wiki.openssl.org/index.php/Compilation_and_Installation#Supported_Platforms
+
+
 # https://wiki.openssl.org/index.php/Compilation_and_Installation#Supported_Platforms
 
 	print("FALHA:" + arch + " -> " + platform)
