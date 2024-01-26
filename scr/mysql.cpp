@@ -290,24 +290,36 @@ Ref<SqlResult> MySQL::execute_prepared(const String p_stmt, const Array binds) {
 		mysql::statement prep_stmt = tcp_conn->prepare_statement(query, ec, diag);
 		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
+		tcp_conn->close_statement(prep_stmt, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 	}
 	else if (type == TCPTLS){
-		mysql::statement prep_stmt = tcp_conn->prepare_statement(query, ec, diag);
+		mysql::statement prep_stmt = tcp_ssl_conn->prepare_statement(query, ec, diag);
 		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
-		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
+		tcp_ssl_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
+		tcp_ssl_conn->close_statement(prep_stmt, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 	}
 	else if (type == UNIX){
-		mysql::statement prep_stmt = tcp_conn->prepare_statement(query, ec, diag);
+		mysql::statement prep_stmt = unix_conn->prepare_statement(query, ec, diag);
 		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
-		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
-		}
+		unix_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
+		unix_conn->close_statement(prep_stmt, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
+	}
 	else if (type == UNIXTLS){
-		mysql::statement prep_stmt = tcp_conn->prepare_statement(query, ec, diag);
+		mysql::statement prep_stmt = unix_ssl_conn->prepare_statement(query, ec, diag);
 		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
-		tcp_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
+		unix_ssl_conn->execute(prep_stmt.bind(args.begin(), args.end()), result, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
+		unix_ssl_conn->close_statement(prep_stmt, ec, diag);
+		SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
 	}
 
-	SQL_EXCEPTION(ec, diag, &last_error, Ref<SqlResult>());
+	
 
 	return build_godot_result(result);
 }
