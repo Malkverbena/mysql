@@ -37,7 +37,7 @@ def compile_openssl(env):
 		cmd_config.append(cross_compilation_param)
 
 	openssl_path = get_openssl_path(env)
-	lib_path = get_boost_install_path(env)
+	lib_path = get_openssl_install_path(env)
 	cmd_config.append("--prefix=" + lib_path)
 	cmd_config.append("--openssldir=" + lib_path)
 	cmd_config.append("-Wl,-rpath=" + lib_path + "/lib64")
@@ -46,6 +46,8 @@ def compile_openssl(env):
 		os.makedirs(lib_path)
 	
 	subprocess.check_call(cmd_config, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
+	subprocess.check_call(cmd_depend, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
+	subprocess.check_call(cmd_compile, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
 	subprocess.check_call(cmd_install, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
 
 	return 0
@@ -87,7 +89,7 @@ def get_cross_compilation_param(env):
 
 
 
-def get_boost_install_path(env):
+def get_openssl_install_path(env):
 	_lib_path = [os.getcwd(), "3party", "bin", env["platform"], env["arch"]]
 	if env["use_llvm"]:
 		_lib_path.append("llvm")
