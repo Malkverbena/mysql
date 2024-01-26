@@ -66,14 +66,14 @@ helpers.apply_config(mysql_env)
 mysql_env.Prepend(CPPPATH=[
 	openssl_include_path,
 	boost_include_path,
- #   openssl_path
+#	openssl_path
 ])
 
 # LIB
 env.Prepend(LIBPATH=[
 	openssl_lib_path,
 	boost_lib_path,
-    openssl_path
+#	openssl_path
 ])
 
 mysql_env.add_source_files(env.modules_sources, "*.cpp")
