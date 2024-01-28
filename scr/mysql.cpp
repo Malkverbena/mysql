@@ -384,7 +384,7 @@ boost::asio::awaitable<void> MySQL::coro_execute_prepared(const char* query, std
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 		std::tie(ec) = co_await tcp_ssl_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec, prep_stmt) = co_await tcp_ssl_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
+		std::tie(ec) = co_await tcp_ssl_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 	}
 	else if (type == UNIX){
@@ -392,7 +392,7 @@ boost::asio::awaitable<void> MySQL::coro_execute_prepared(const char* query, std
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 		std::tie(ec) = co_await unix_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec, prep_stmt) = co_await unix_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
+		std::tie(ec) = co_await unix_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 	}
 	else if (type == UNIXTLS){
@@ -400,7 +400,7 @@ boost::asio::awaitable<void> MySQL::coro_execute_prepared(const char* query, std
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 		std::tie(ec) = co_await unix_ssl_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec, prep_stmt) = co_await unix_ssl_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
+		std::tie(ec) = co_await unix_ssl_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 	}
 
