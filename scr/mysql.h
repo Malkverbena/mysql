@@ -37,12 +37,12 @@ using namespace boost::asio;
 constexpr auto tuple_awaitable = as_tuple(use_awaitable);
 
 
-
 class MySQL : public RefCounted {
 	GDCLASS(MySQL, RefCounted);
 
 
 protected:
+
 	static void _bind_methods();
 
 
@@ -89,7 +89,6 @@ private:
 
 private:
 
-
 	Error set_certificate(const String p_cert_file, const String p_host_name);
 
 	void build_result(mysql::results raw_result, Ref<SqlResult> *gdt_result);
@@ -116,28 +115,27 @@ public:
 	// In non-TLS connections the certificate  and the hostname will be ignored.
 	// If the user wishes to modify the certificate, the connection must be reseted.
 	// Resetting the connection does not reset the credentials.
-	Error define(const ConnType _type = TCPTLS, const String p_cert_file = "", const String p_host_name = "mysql");//////
+	Error define(const ConnType _type = TCPTLS, const String p_cert_file = "", const String p_host_name = "mysql");
 
 	// Retrieves the connection type.
-	ConnType get_connection_type() const { return type;};//////
+	ConnType get_connection_type() const { return type;};
 
 	// Method used to initiate a TCP connection.
 	// It will not work with UNIX-type connections.
-	Error tcp_connect(const String p_hostname = "127.0.0.1", const String p_port = "3306");//////
+	Error tcp_connect(const String p_hostname = "127.0.0.1", const String p_port = "3306");
 
 	// Method used to connect to the database via Socket.
 	// It will not work with TCP-type connections.
-	Error unix_connect(const String p_socket_path = "/var/run/mysqld/mysqld.sock");//////
+	Error unix_connect(const String p_socket_path = "/var/run/mysqld/mysqld.sock");
 
 	// Close the connection.
-	Error close_connection();//////
+	Error close_connection();
 
 	// Returns a dictionary with the last exception that occurred.
-	Dictionary get_last_error() const {return last_error.duplicate(true);};//////
+	Dictionary get_last_error() const {return last_error.duplicate(true);};
 
 	// Checks whether there is an active connection to the server.
-	bool is_server_alive();//////
-
+	bool is_server_alive();
 
 	// Execute queries.
 	Ref<SqlResult> execute(const String p_stmt);
@@ -157,9 +155,9 @@ public:
 	Array execute_multi(const String p_queries);
 
 	// Returns a dictionary with the connection credentials.
-	Dictionary get_credentials() const;//////
+	Dictionary get_credentials() const;
 
-	// Configure connection credentials.//////
+	// Configure connection credentials.
 	Error set_credentials(
 			String p_username,
 			String p_password,
@@ -169,13 +167,11 @@ public:
 			bool multi_queries		= false
 	);
 
-
 	// Execute queries on asynchronous connections.
 	Ref<SqlResult> async_execute(const String p_stmt);
 
 	// Execute prepared queries on asynchronous connections.
 	Ref<SqlResult> async_execute_prepared(const String p_stmt, const Array binds = Array());
-
 
 	MySQL():
 		conn_params((const char *)&username, (const char *)&password, (const char *)&database)
@@ -185,7 +181,6 @@ public:
 	}
 
 };
-
 
 VARIANT_ENUM_CAST(MySQL::MysqlCollations);
 VARIANT_ENUM_CAST(MySQL::ConnType);

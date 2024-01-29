@@ -35,10 +35,10 @@ def get_host():
 
 def apply_config(env):
 
-	if env["recompile"] in ["all", "openssl"]:
+	if env["recompile_sql"] in ["all", "openssl"]:
 		openssl.compile_openssl(env)
 
-	if env["recompile"] in ["all", "boost"]:
+	if env["recompile_sql"] in ["all", "boost"]:
 		boost.compile_boost(env)
 
 

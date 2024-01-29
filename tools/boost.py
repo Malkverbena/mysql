@@ -76,9 +76,9 @@ def compile_boost(env):
 	#print(cmd_b2)
 
 	try:
-		subprocess.check_call(cmd_b2, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+		subprocess.check_call(cmd_b2, shell=True, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
 		cmd_b2.pop()
-		subprocess.check_call(cmd_b2, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+		subprocess.check_call(cmd_b2, shell=True, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
 	except subprocess.CalledProcessError as e:
 		print(f"Erro ao Compilar o Boost: {e}")
 	except Exception as e:

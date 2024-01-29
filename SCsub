@@ -15,7 +15,7 @@ mysql_env = env.Clone()
 # You don't have to compile third-party libraries each time you compile the module.
 # With the "recompile" option you can recompile just Openssl or just Boost, both of them or none of them.
 opts = Variables(["customs.py"], ARGUMENTS)
-opts.Add(EnumVariable("recompile", "Recompile third party library", "all", ("all", "openssl", "boost", "none")))
+opts.Add(EnumVariable("recompile_sql", "Recompile third party library", "all", ("all", "openssl", "boost", "none")))
 opts.Update(mysql_env)
 
 

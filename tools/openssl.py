@@ -10,20 +10,13 @@ from tools import helpers
 def compile_openssl(env):
 
 	target_platform = env["platform"]
-#	arch = env["arch"]
-#	bits = "64" if arch in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
-#	architecture = get_architecture(env)
 	win_host = is_win_host(env)
-
 	jobs = str(env.GetOption("num_jobs"))
-
 
 	cmd_config = ["perl", "Configure"] if win_host else ["./Configure"]
 	cmd_depend = ["nmake", "test"] if win_host else ["make", "depend"]
 	cmd_compile = ['nmake'] if win_host else ["make", "-j" + jobs]
 	cmd_install =  ["nmake install"] if win_host else ["make", "install"]
-
-
 
 
 	target = get_target(env)
@@ -45,14 +38,12 @@ def compile_openssl(env):
 	if not os.path.exists(lib_path):
 		os.makedirs(lib_path)
 	
-	subprocess.check_call(cmd_config, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-	subprocess.check_call(cmd_depend, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-	subprocess.check_call(cmd_compile, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-	subprocess.check_call(cmd_install, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
+	subprocess.check_call(cmd_config, shell=True, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
+	subprocess.check_call(cmd_depend, shell=True, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
+	subprocess.check_call(cmd_compile, shell=True, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
+	subprocess.check_call(cmd_install, shell=True, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
 
 	return 0
-
-
 
 
 

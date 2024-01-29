@@ -356,7 +356,7 @@ Ref<SqlResult> MySQL::async_execute(const String p_stmt){
 
 	boost::asio::co_spawn(
 		ctx->get_executor(),
-		[query, result, this]  { return coro_execute(query, result); },
+		[query, result, this] { return coro_execute(query, result); },
 		boost::asio::detached
 	);
 	ctx->run();
@@ -375,7 +375,7 @@ boost::asio::awaitable<void> MySQL::coro_execute_prepared(const char* query, std
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 		std::tie(ec) = co_await tcp_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec, prep_stmt) = co_await tcp_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
+		std::tie(ec) = co_await tcp_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 
 	}
@@ -404,7 +404,6 @@ boost::asio::awaitable<void> MySQL::coro_execute_prepared(const char* query, std
 		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
 	}
 
-//	this->emit_signal("querty_complete", build_godot_result(result));
 }
 
 
@@ -416,7 +415,7 @@ Ref<SqlResult> MySQL::async_execute_prepared(const String p_stmt, const Array bi
 
 	boost::asio::co_spawn(
 		ctx->get_executor(),
-		[query, args, result, this]  { return coro_execute_prepared(query, args, result); },
+		[query, args, result, this] { return coro_execute_prepared(query, args, result); },
 		boost::asio::detached
 	);
 	ctx->run();
@@ -443,8 +442,6 @@ Array MySQL::execute_sql(const String p_path_to_file){
 Array MySQL::execute_multi(const String p_queries){
 
 	ERR_FAIL_COND_V_EDMSG(not conn_params.multi_queries(), Array(), "This function requires that credentials.multi_queries be enable, once it's uses using multi-queries");
-
-//	const char* queries = p_queries.utf8().get_data();
 	std::string q(p_queries.utf8().get_data());
 	return multiqueries(q);
 }
@@ -458,7 +455,6 @@ Array MySQL::multiqueries(std::string queries){
 	mysql::error_code ec;
 	last_error.clear();
 	Array ret;
-
 
 	if (type == TCP){
 		tcp_conn->start_execution(queries, st, ec, diag);
@@ -536,7 +532,6 @@ void MySQL::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("async_execute", "query"), &MySQL::async_execute);
 	ClassDB::bind_method(D_METHOD("async_execute_prepared", "query", "values"), &MySQL::async_execute_prepared, DEFVAL(Array()));
-
 
 
 	BIND_ENUM_CONSTANT(TCP);

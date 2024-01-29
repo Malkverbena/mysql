@@ -1,7 +1,6 @@
 /* sql_result.cpp */
 
 
-
 #include "sql_result.h"
 
 
