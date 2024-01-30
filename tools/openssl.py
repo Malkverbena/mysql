@@ -26,8 +26,8 @@ def compile_openssl(env):
 	cmd_config.extend(options)
 
 	cross_compilation_param = get_cross_compilation_param(env)
-	if cross_compilation_param != "":
-		cmd_config.append(cross_compilation_param)
+	if cross_compilation_param != []:
+		cmd_config += cross_compilation_param
 
 	openssl_path = get_openssl_path(env)
 	lib_path = get_openssl_install_path(env)
@@ -37,11 +37,11 @@ def compile_openssl(env):
 
 	if not os.path.exists(lib_path):
 		os.makedirs(lib_path)
-	
-	subprocess.check_call(cmd_config, shell=True, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-	subprocess.check_call(cmd_depend, shell=True, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-	subprocess.check_call(cmd_compile, shell=True, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-	subprocess.check_call(cmd_install, shell=True, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
+
+	subprocess.check_call(cmd_config, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
+	subprocess.check_call(cmd_depend, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
+	subprocess.check_call(cmd_compile, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
+	subprocess.check_call(cmd_install, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
 
 	return 0
 
@@ -60,23 +60,29 @@ def get_cross_compilation_param(env):
 	host_bits =  helpers.get_host_bits()
 	is_cross_compile = (host != platform or host_bits != target_bits)
 
-	if not is_cross_compile:
-		return ""
-
 	if platform == "windows":
 		if not (is_win_host(env) or env.get("is_msvc", False)):
 			if target_bits == "64":
-				return "--cross-compile-prefix=x86_64-w64-mingw32-"
+				return ["--cross-compile-prefix=x86_64-w64-mingw32-"]
 			else:
-				return "--cross-compile-prefix=i686-w64-mingw32-"
+				return ["--cross-compile-prefix=i686-w64-mingw32-"]
 
 	elif platform == "linuxbsd":
-		if target_bits == "64":
-			return "--cross-compile-prefix=x86_64-linux-gnu-"
-		else:
-			return"--cross-compile-prefix=i686-linux-gnu-"
+		if is_cross_compile:
+			if target_bits == "64":
+				return ["--cross-compile-prefix=x86_64-linux-gnu-"]
+			else:
+				return ["--cross-compile-prefix=i686-linux-gnu-"]
 
-	return ""
+	elif platform == "macos":
+		args =[]
+		if sys.platform != "darwin" and "OSXCROSS_ROOT" in os.environ:
+			for k in ["CC", "CXX", "AR", "AS", "RANLIB"]:
+				args.append("%s=%s" % (k, env[k]))
+		return args
+
+
+	return []
 
 
 
@@ -154,13 +160,34 @@ def get_target(env):
 		if env.msvc:
 			if arch == "x86_32":
 				return "VC-WIN32"
-			else:
+			if arch == "x86_64":
 				return  "VC-WIN64A"
 		else:
 			if arch == "x86_32":
 				return "mingw"
-			else:
+			if arch == "x86_64":
 				return  "mingw64"
+
+	elif platform == "macos":
+		llvm = env["use_llvm"] == True
+		darwin_target = ""
+
+		if arch == "x86_64":
+			darwin_target = "darwin64-x86_64"
+		elif arch == "x86_32":
+			darwin_target = "darwin-i386"
+		elif arch == "arm64":
+			darwin_target = "darwin64-arm64"
+		elif arch == "ppc32":
+			darwin_target = "darwin-ppc"
+		elif arch == "ppc64":
+			darwin_target = "darwin64-ppc"
+
+		if llvm:
+			darwin_target += "-clang"
+
+		return darwin_target
+
 
 
 
@@ -201,6 +228,7 @@ def ssl_options(platform):
 		"no-shared",
 		"shared",
 		"no-tests",
+		"no-docs",
 	]
 
 	if platform == "windows":

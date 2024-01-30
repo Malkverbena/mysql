@@ -38,6 +38,9 @@ mysql_env.Append(CPPFLAGS=[
 	'-std=c++20',
 ])
 
+target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
+
+
 
 ##### PATHS #####
 
@@ -51,6 +54,18 @@ boost_path = boost.get_boost_install_path(mysql_env)
 boost_include_path = boost_path + "/include"
 boost_lib_path = boost_path + "/stage/lib"
 
+
+print("--------------------\n")
+print("openssl_path: " + openssl_path)
+print("openssl_include_path: " + openssl_include_path)
+print("openssl_lib_path: " + openssl_lib_path)
+
+print("--------------------\n")
+print("boost_path: " + boost_path)
+print("boost_include_path: " + boost_include_path)
+print("boost_lib_path: " + boost_lib_path)
+
+print("--------------------\n")
 
 
 ##### THIRDPARTY COMPILATION #####

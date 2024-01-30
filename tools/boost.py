@@ -54,7 +54,7 @@ def compile_boost(env):
 			arquivo.write(project_comp + "\n")
 
 
-	bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
+	target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
 	cmd_b2 = [b2]
 	cmd_b2 += [
 		jobs,
@@ -67,7 +67,7 @@ def compile_boost(env):
 		f"--exec-prefix={boost_prefix}",
 		f"--stagedir={boost_stage_dir}",
 		f"toolset={get_toolset(env)}",
-		f"address-model={bits}",
+		f"address-model={target_bits}",
 		f"architecture={get_architecture(env)}",
 		f"target-os={get_target_os(env)}",
 		"headers"
@@ -75,15 +75,10 @@ def compile_boost(env):
 
 	#print(cmd_b2)
 
-	try:
-		subprocess.check_call(cmd_b2, shell=True, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
-		cmd_b2.pop()
-		subprocess.check_call(cmd_b2, shell=True, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
-	except subprocess.CalledProcessError as e:
-		print(f"Erro ao Compilar o Boost: {e}")
-	except Exception as e:
-		print(f"Outro erro: {e}")
-		exit(1)
+	subprocess.check_call(cmd_b2, shell=True, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+	cmd_b2.pop()
+	subprocess.check_call(cmd_b2, shell=True, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+
 
 	return 0
 
@@ -129,6 +124,8 @@ def get_target_os(env):
 		return "windows"
 	elif env["platform"] == "linuxbsd":
 		return "linux"
+	elif env["platform"] == "macos":
+		return "darwin"
 	else:
 		return ""
 
