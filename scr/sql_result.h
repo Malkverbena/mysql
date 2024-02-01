@@ -29,30 +29,22 @@ protected:
 
 public:
 
-	// Retrieve the query content as an array.
 	Array get_array() const;
 
-	// Retrieves a specific row.
 	Variant get_row(int row, bool as_array = true) const;
 
-	// Retrieves a specific column by searching for the column name.
 	Array get_column(String column, bool as_array = true) const;
 
-	// Retrieves a specific column by searching for the column number.
 	Array get_column_by_id(int column, bool as_array = true) const;
 
 	Dictionary get_metadata() const {return meta;};
 
-	// Retrieves the query content as an dictionary.
 	Dictionary get_dictionary() const {return result;};
 
-	// Retrieves the number of affected rows by the query.
 	int get_affected_rows() const {return affected_rows;};
 
-	// Retrieves the last insert id by the query.
 	int get_last_insert_id() const {return last_insert_id;};
 
-	// Retrieves the number of warnings.
 	int get_warning_count() const {return warning_count;};
 
 	SqlResult();

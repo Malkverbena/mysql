@@ -1,6 +1,5 @@
 /* sql_result.cpp */
 
-
 #include "sql_result.h"
 
 
@@ -78,6 +77,7 @@ void SqlResult::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_warning_count"), &SqlResult::get_warning_count);
 
 }
+
 
 SqlResult::SqlResult(){
 }
