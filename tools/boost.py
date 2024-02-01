@@ -73,7 +73,7 @@ def compile_boost(env):
 		"headers"
 	]
 
-	#print(cmd_b2)
+	print(cmd_b2)
 
 	subprocess.check_call(cmd_b2, shell=True, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
 	cmd_b2.pop()

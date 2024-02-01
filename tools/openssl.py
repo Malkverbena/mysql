@@ -18,16 +18,15 @@ def compile_openssl(env):
 	cmd_compile = ['nmake'] if win_host else ["make", "-j" + jobs]
 	cmd_install =  ["nmake install"] if win_host else ["make", "install"]
 
+	cross_compilation_param = get_cross_compilation_param(env)
+	if cross_compilation_param != []:
+		cmd_config += cross_compilation_param
 
 	target = get_target(env)
 	cmd_config.append(target)
 
 	options = ssl_options(target_platform)
 	cmd_config.extend(options)
-
-	cross_compilation_param = get_cross_compilation_param(env)
-	if cross_compilation_param != []:
-		cmd_config += cross_compilation_param
 
 	openssl_path = get_openssl_path(env)
 	lib_path = get_openssl_install_path(env)
@@ -37,6 +36,12 @@ def compile_openssl(env):
 
 	if not os.path.exists(lib_path):
 		os.makedirs(lib_path)
+
+
+	print(cmd_config)
+	print(cmd_depend)
+	print(cmd_compile)
+	print(cmd_install)
 
 	subprocess.check_call(cmd_config, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
 	subprocess.check_call(cmd_depend, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
@@ -59,13 +64,24 @@ def get_cross_compilation_param(env):
 	target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
 	host_bits =  helpers.get_host_bits()
 	is_cross_compile = (host != platform or host_bits != target_bits)
+	llvm = env["use_llvm"]
 
 	if platform == "windows":
 		if not (is_win_host(env) or env.get("is_msvc", False)):
-			if target_bits == "64":
-				return ["--cross-compile-prefix=x86_64-w64-mingw32-"]
+			if llvm:
+				if target_bits == "64":
+					return ["--cross-compile-prefix=x86_64-w64-mingw32-"]
+				else:
+					return ["--cross-compile-prefix=i686-w64-mingw32-"]
 			else:
-				return ["--cross-compile-prefix=i686-w64-mingw32-"]
+				if target_bits == "64":
+					return ["--cross-compile-prefix=mingw-w64-x86_64-gcc"]
+				else:
+					return ["--cross-compile-prefix=mingw-w64-i686-gcc"]
+
+
+
+
 
 	elif platform == "linuxbsd":
 		if is_cross_compile:
@@ -162,11 +178,13 @@ def get_target(env):
 				return "VC-WIN32"
 			if arch == "x86_64":
 				return  "VC-WIN64A"
+			if arch == "arm32":
+				return  "VC-WIN64-ARM"
 		else:
 			if arch == "x86_32":
 				return "mingw"
 			if arch == "x86_64":
-				return  "mingw64"
+				return  "mingw"
 
 	elif platform == "macos":
 		llvm = env["use_llvm"] == True
