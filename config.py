@@ -15,9 +15,8 @@ def get_doc_path():
 
 def get_doc_classes():
 	return [ 
-	    "MySQL",
+		"MySQL",
 		"SqlResult",
-		"SqlConnection",
 	]
 
 

@@ -67,9 +67,9 @@ void SqlResult::_bind_methods() {
 	/* ===== QUERY ===== */
 	ClassDB::bind_method(D_METHOD("get_array"), &SqlResult::get_array);
 	ClassDB::bind_method(D_METHOD("get_dictionary"), &SqlResult::get_dictionary);
-	ClassDB::bind_method(D_METHOD("get_row", "row", "as_array"), &SqlResult::get_row, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("get_row", "row", "as_array"), &SqlResult::get_row, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("get_column", "column", "as_array"), &SqlResult::get_column, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("get_column_by_id", "column", "as_array"), &SqlResult::get_column);
+	ClassDB::bind_method(D_METHOD("get_column_by_id", "column", "as_array"), &SqlResult::get_column, DEFVAL(true));
 
 	/* ===== META ===== */
 	ClassDB::bind_method(D_METHOD("get_metadata"), &SqlResult::get_metadata);

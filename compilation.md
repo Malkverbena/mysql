@@ -53,3 +53,10 @@ You can use the command belloww to update the module the submodules at once.
 ```
 git pull --recurse-submodules
 ```
+
+
+### **Note:**
+
+At the moment it is only possible to compile this module for Linux and Windows. Support for MacOS is still being developed.
+It is perfectly possible to compile the module for other platforms such as Android and OSX, however this support has not yet been added.
+Any help adding support for these platforms would be appreciated.

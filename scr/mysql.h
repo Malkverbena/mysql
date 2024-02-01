@@ -145,7 +145,7 @@ public:
 
 	// Execute sql scripts.
 	// This function perform multi-queries, because this the "multi_queries" option must be true in the connection credentials,
-	// otherwise this function won'tbe executed.
+	// otherwise this function won't be executed.
 	// Be extremely careful with this function.
 	Array execute_sql(const String p_path_to_file);
 

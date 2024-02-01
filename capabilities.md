@@ -6,7 +6,6 @@
 * Encrypted connections (TLS). For both, TCP and UNIX socket connections.
 * Authentication methods: mysql_native_password and caching_sha2_password.
 
-
 ### **Methods:**
 
 * Supports asynchronous methods using C++20 coroutines.
@@ -14,7 +13,6 @@
 * Stored procedures. It can be used within Multi-function operations.
 * Text querie:  MySQL refers to this as the "text protocol", as all information is passed using text (as opposed to prepared statements).
 * Prepared statements: MySQL refers to this as the "binary protocol", as the result of executing a prepared statement is sent in binary format rather than in text.
-
 
 ### **EQUIVALENT DATA TYPES:**
 

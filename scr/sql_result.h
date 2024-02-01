@@ -39,9 +39,8 @@ public:
 	Array get_column(String column, bool as_array = true) const;
 
 	// Retrieves a specific column by searching for the column number.
-	Array get_column_by_id(int column, bool as_string = false) const;
+	Array get_column_by_id(int column, bool as_array = true) const;
 
-	// Returns metadata from a specific column.
 	Dictionary get_metadata() const {return meta;};
 
 	// Retrieves the query content as an dictionary.
