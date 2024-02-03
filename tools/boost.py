@@ -24,6 +24,7 @@ def compile_boost(env):
 	is_win_host = (helpers.get_host() == "windows")
 	bootstrap = "bootstrap.bat" if is_win_host else "bootstrap.sh"
 	b2 = "b2.exe" if is_win_host else "b2"
+	cmd_b2 = [b2]
 
 	bootstrap_command = [
 		"bash", bootstrap,
@@ -55,7 +56,8 @@ def compile_boost(env):
 
 
 	target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
-	cmd_b2 = [b2]
+
+	
 	cmd_b2 += [
 		jobs,
 		"-a",
@@ -75,9 +77,9 @@ def compile_boost(env):
 
 	print(cmd_b2)
 
-	subprocess.check_call(cmd_b2, shell=True, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+	subprocess.check_call(cmd_b2, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
 	cmd_b2.pop()
-	subprocess.check_call(cmd_b2, shell=True, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+	subprocess.check_call(cmd_b2, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
 
 
 	return 0

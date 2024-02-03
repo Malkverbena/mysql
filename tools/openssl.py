@@ -13,7 +13,7 @@ def compile_openssl(env):
 	win_host = is_win_host(env)
 	jobs = str(env.GetOption("num_jobs"))
 
-	cmd_config = ["perl", "Configure"] if win_host else ["./Configure"]
+	cmd_config = ["perl", "Configure"] if win_host else ["Configure"]
 	cmd_depend = ["nmake", "test"] if win_host else ["make", "depend"]
 	cmd_compile = ['nmake'] if win_host else ["make", "-j" + jobs]
 	cmd_install =  ["nmake install"] if win_host else ["make", "install"]
