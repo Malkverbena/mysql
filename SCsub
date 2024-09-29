@@ -11,40 +11,52 @@ mysql_env = env_modules.Clone()
 
 
 mysql_env.Append(CPPFLAGS=[
-#	'-fexceptions',
+	'-fexceptions',
 	'-std=c++20',
 ])
 
 
+mysql_env['LIBS'] = []
+
+
 ##### PATHS #####
+openssl_include_path = "/media/cleber/DATA/COMPILATIONS/modules/mysql/thirdparty/openssl/build/linux/x86_64/include"
+boost_include_path = "/media/cleber/DATA/COMPILATIONS/modules/mysql/thirdparty/boost"
+
+openssl_lib_path = "/media/cleber/DATA/COMPILATIONS/modules/mysql/thirdparty/openssl"
+boost_lib_path = "/media/cleber/DATA/COMPILATIONS/modules/mysql/thirdparty/boost/stage/lib"
+
+
 
 
 ##### THIRDPARTY COMPILATION #####
+mysql_env.Append(CPPDEFINES=["BOOST_MYSQL_SEPARATE_COMPILATION"])
+if "boost_headers_only" in env:
+	if env["boost_headers_only"] == "no" or env["boost_headers_only"] == "off" or env["boost_headers_only"] == "false":
+		mysql_env.Remove('CPPDEFINES', 'BOOST_MYSQL_SEPARATE_COMPILATION')
+
 
 
 ##### GODOT MODULE #####
 
 # INCLUDE:
-mysql_env.Prepend(CPPPATH=[
-#	openssl_include_path,
-#	boost_include_path,
-#	openssl_path
+mysql_env.Append(CPPPATH=[
+	openssl_include_path,
+	boost_include_path,
 ])
 
+
 # LIB
-env.Prepend(LIBPATH=[
-#	openssl_lib_path,
-#	boost_lib_path,
-#	openssl_path
+env.Append(LIBPATH=[
+	openssl_lib_path,
+	boost_lib_path,
 ])
+
+
+env.Append(LIBS=["libboost_charconv", "libboost_thread", "ssl", "crypto"])
 
 mysql_env.add_source_files(env.modules_sources, "*.cpp")
 mysql_env.add_source_files(env.modules_sources, "scr/**.cpp")
-
-
-env.Prepend(LIBS=["charconv", "libboost_thread", "libcrypto", "libssl"])
-
-
 
 
 
