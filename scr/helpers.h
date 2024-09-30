@@ -16,16 +16,18 @@
 //#include <stdexcept>
 
 
+#include <core/config/project_settings.h>
+
+#include <boost/mysql/ssl_mode.hpp>
+#include <boost/asio/ssl/context.hpp>
+#include <boost/asio/ssl/host_name_verification.hpp>
+#include <boost/asio/ssl/context_base.hpp>
 
 #include <boost/mysql/mariadb_collations.hpp>
 #include <boost/mysql/mysql_collations.hpp>
 
-
-
-
-#include <boost/mysql/error_with_diagnostics.hpp>
 #include <boost/mysql/error_code.hpp>
-
+#include <boost/mysql/error_with_diagnostics.hpp>
 
 #include <boost/mysql/results.hpp>
 #include <boost/mysql/row_view.hpp>
@@ -65,6 +67,11 @@ void print_sql_exception(const char *p_function, const char *p_file, int p_line,
 void print_std_exception(const char *p_function, const char *p_file, int p_line, std::exception err);
 
 
+
+boost::asio::const_buffer godot_string_to_const_buffer(const String &godot_string);
+
+
+String ensure_global_path(String p_path);
 char* copy_string(char s[]);
 String SqlStr2GdtStr(mysql::string_view s);
 mysql::string_view GdtStr2SqlStr(String s);

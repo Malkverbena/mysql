@@ -11,10 +11,7 @@
 
 #include "helpers.h"
 
-#include <boost/mysql/ssl_mode.hpp>
-#include <boost/asio/ssl/context.hpp>
-#include <boost/asio/ssl/host_name_verification.hpp>
-#include <boost/asio/ssl/context_base.hpp>
+
 
 
 using namespace sqlhelpers;
@@ -29,15 +26,36 @@ class SqlCertificate : public RefCounted {
 
 public:
 
-	using Ssl_Methods = ssl::context_base::method;
+	using SSLMethods = boost::asio::ssl::context_base::method;
+	using FileFormat = boost::asio::ssl::context_base::file_format;
 
+	using PasswordPurpose = boost::asio::ssl::context_base::password_purpose;
 
-
-enum SslMode {
+enum SSLMode {
 	ssl_disable	= int(boost::mysql::ssl_mode::disable),
 	ssl_enable	= int(boost::mysql::ssl_mode::enable),
 	ssl_require	= int(boost::mysql::ssl_mode::require)
 };
+
+enum VerifyMode{
+	verify_none = int(ssl::verify_none),
+	verify_peer = int(ssl::verify_peer),
+	verify_fail_if_no_peer_cert = int(ssl::verify_fail_if_no_peer_cert),
+	verify_client_once = int(ssl::verify_client_once),
+};
+
+	enum SSLOptions {
+		VERIFY_PEER = boost::asio::ssl::context::verify_peer,
+		SINGLE_DH_USE = boost::asio::ssl::context::single_dh_use,
+		DEFAULT_WORKAROUNDS = boost::asio::ssl::context::default_workarounds,
+		NO_SSLV2 = boost::asio::ssl::context::no_sslv2,
+		NO_SSLV3 = boost::asio::ssl::context::no_sslv3,
+		NO_TLSV1 = boost::asio::ssl::context::no_tlsv1,
+		NO_TLSV1_1 = boost::asio::ssl::context::no_tlsv1_1,
+		NO_TLSV1_2 = boost::asio::ssl::context::no_tlsv1_2,
+		NO_TLSV1_3 = boost::asio::ssl::context::no_tlsv1_3,
+	};
+
 
 	SqlCertificate();
 	~SqlCertificate();
@@ -45,35 +63,164 @@ enum SslMode {
 
 private:
 
-	Dictionary ssl_error;
+    Callable password_callback;
+    Callable verify_callback;
+	Dictionary last_ssl_error;
 	std::shared_ptr<asio::ssl::context> ssl_ctx = nullptr;
 
 
-	void start_certificate(Ssl_Methods p_method = Ssl_Methods(asio::ssl::context::tls_client)); // Inicia o contexto SSL
+
+public:
+
+	// Godot specific.   ===========================================================
+
+	void start_certificate(SSLMethods p_method = SSLMethods(asio::ssl::context::tls_client)); // Inicia o contexto SSL
 //	void stop_certificate();                     // deleta  todo o contexto
 
+	// Returns the last Error that occurred in the SSL Context
+	Dictionary get_ssl_error() const {return last_ssl_error.duplicate(true);};
 
-	Error add_certificate_authority(const String CA);	//Add certification authority for performing verification.
-	Error add_verify_path(const String p_path);			// Add a directory containing certificate authority files to be used for performing verification.
-//	Error clear_options();								//Clear options on the context.
-	Error load_verify_file(const String p_path);		// Load a certification authority file for performing verification.
-//	Error native_handle();				// Get the underlying implementation in the native type.
-//	Error set_default_verify_paths();	// Configures the context to use the default directories for finding certification authority certificates.
-//	Error set_options();					// Set options on the context.
-//	Error set_password_callback();		// Set the password callback.
-//	Error set_verify_callback();			// Set the callback used to verify peer certificates.
-//	Error set_verify_depth();			// Set the peer verification depth.
-//	Error set_verify_mode();				// Set the peer verification mode.
-//	Error use_certificate();				// Use a certificate from a memory buffer.
-//	Error use_certificate_chain();		// Use a certificate chain from a memory buffer.
-//	Error use_certificate_chain_file();	// Use a certificate chain from a file.
-//	Error use_certificate_file();		// Use a certificate from a file.
-//	Error use_private_key();				// Use a private key from a memory buffer.
-//	Error use_private_key_file();		// Use a private key from a file.
-//	Error use_rsa_private_key();			// Use an RSA private key from a memory buffer.
-//	Error use_rsa_private_key_file();	// Use an RSA private key from a file.
-//	Error use_tmp_dh();					// Use the specified memory buffer to obtain the temporary Diffie-Hellman parameters.
-//	Error use_tmp_dh_file();				// Use the specified file to obtain the temporary Diffie-Hellman parameters.
+
+
+
+
+	// SSL context methods.  ===========================================================
+
+	// Add certification authority for performing verification.
+	// This function is used to add one trusted certification authority from a memory buffer.
+	// Parameters: "ca": The buffer containing the certification authority certificate. The certificate must use the PEM format.
+	Error add_certificate_authority(const String p_CA);
+
+	// Add a directory containing certificate authority files to be used for performing verification.
+	// This function is used to specify the name of a directory containing certification authority certificates.
+	// Each file in the directory must contain a single certificate. The files must be named using the subject name's hash and an extension of ".0".
+	// Parameters: "path": The name of a directory containing the certificates.
+	Error add_verify_path(const String p_path);
+
+	// Clear options on the context.
+	// This function may be used to configure the SSL options used by the context.
+	// Parameters: "ssl_options": A bitmask of options. The available option values are defined in the ssl::context_base class.
+	// Use the enum SSLOptions to get the values, This enum corresponds to "boost::asio::ssl::context".
+	Error clear_options(const int ssl_options);
+
+	// Set options on the context.
+	// A bitmask of options. The available option values are defined in the ssl::context_base class.
+	// The options are bitwise-ored with any existing value for the options.
+	// Parameters: "ssl_options": A bitmask of options. The available option values are defined in the ssl::context_base class.
+	// Use the enum SSLOptions to get the values, This enum corresponds to "boost::asio::ssl::context".
+	Error set_options(const int ssl_options);
+
+
+	// Load a certification authority file for performing verification.
+	// This function is used to load the certificates for one or more trusted certification authorities from a file.
+	// Parameters: "filename" The name of a file containing certification authority certificates in PEM format.
+	Error load_verify_file(const String p_path);
+
+	//Configures the context to use the default directories for finding certification authority certificates.
+	// This function specifies that the context should use the default, system-dependent directories for locating certification authority certificates.
+	Error set_default_verify_paths();
+
+	// Set the password callback.
+	// This function is used to specify a callback function to obtain password information about an encrypted key in PEM format.
+	// Parameters:
+	//			"max_length": The maximum size for a password.
+	//			"purpose": Whether password is for reading or writing.
+	// The return value of the callback is a string containing the password.
+	Error set_password_callback(const Callable &p_callback);
+	//String set_password_callback(const int p_max_length, const PasswordPurpose p_purpose);
+
+
+	// Set the callback used to verify peer certificates.
+	// This function is used to specify a callback function that will be called by the implementation when it needs to verify a peer certificate.
+	// The function object to be used for verifying a certificate.
+	// Parameters: "preverified": True if the certificate passed pre-verification.
+	// The return value of the callback is an Error if the method failed, is true if the certificate has passed verification and false otherwise.
+	Error set_verify_callback(const Callable &p_callback);
+
+
+	// Set the peer verification depth.
+	// This function may be used to configure the maximum verification depth allowed by the context.
+	// Parameters: "depth": Maximum depth for the certificate chain verification that shall be allowed.
+	Error set_verify_depth(const int depth);
+
+	// Set the peer verification mode.
+	// This function may be used to configure the peer verification mode used by the context.
+	// Parameters: "mode" A bitmask of peer verification modes. See ssl::verify_mode for available values.
+	// Use the enum VerifyMode in the flags.
+	Error set_verify_mode(const int p_mode);
+
+	// Use a certificate from a memory buffer.
+	// This function is used to load a certificate into the context from a buffer.
+	// Parameters:
+	//		"certificate": The buffer containing the certificate.
+	//		"format": The certificate format (ASN.1 or PEM).
+	Error use_certificate(const String p_certificate, const FileFormat file_format);
+
+	// Use a certificate chain from a memory buffer.
+	// This function is used to load a certificate chain into the context from a buffer.
+	// Parameters: "chain": The buffer containing the certificate chain. The certificate chain must use the PEM format.
+	Error use_certificate_chain(const String p_chain);
+
+	// Use a certificate chain from a file.
+	// This function is used to load a certificate chain into the context from a file.
+	// Parameters: "filename": The path to file containing the certificate. The file must use the PEM format.
+	Error use_certificate_chain_file(const String p_filename);
+
+	//Use a certificate from a file.
+	// This function is used to load a certificate into the context from a file.
+	// Parameters:
+	//		"filename": The name of the file containing the certificate.
+	//		"format": The file format (ASN.1 or PEM).
+	Error use_certificate_file(const String p_filename, const FileFormat p_format);
+
+
+	// Use a private key from a memory buffer.
+	// This function is used to load a private key into the context from a buffer.
+	// Parameters:
+	//		"private_key": The buffer containing the private key.
+	//		"format": The private key format (ASN.1 or PEM).
+	Error use_private_key(const String p_private_key, const FileFormat p_format);
+
+
+	// Use a private key from a file.
+	// This function is used to load a private key into the context from a file.
+	// Parameters
+	//		"filename": The name of the file containing the private key.
+	//		"format": The file format (ASN.1 or PEM).
+	Error use_private_key_file(const String p_filename, const FileFormat p_format);
+
+
+
+
+	// Use an RSA private key from a memory buffer.
+	// This function is used to load an RSA private key into the context from a buffer.
+	// Parameters:
+	//		"private_key": The buffer containing the RSA private key.
+	//		"format": The private key format (ASN.1 or PEM).
+	Error use_rsa_private_key(const String p_private_key, const FileFormat p_format);
+
+
+	// Use an RSA private key from a file.
+	// This function is used to load an RSA private key into the context from a file.
+	// Parameters
+	//		"filename": The name of the file containing the RSA private key.
+	//		"format": The file format (ASN.1 or PEM).
+	Error use_rsa_private_key_file(const String p_filename, const FileFormat p_format);
+
+
+
+	// Use the specified memory buffer to obtain the temporary Diffie-Hellman parameters.
+	// This function is used to load Diffie-Hellman parameters into the context from a buffer.
+	// Parameters: "dh_buffer": The memory buffer containing the Diffie-Hellman parameters. The buffer must use the PEM format.
+	Error use_tmp_dh(const String p_dh_buffer);
+
+
+
+
+	// Use the specified file to obtain the temporary Diffie-Hellman parameters.
+	// This function is used to load Diffie-Hellman parameters into the context from a file.
+	// Parameters: "filename": The name of the file containing the Diffie-Hellman parameters. The file must use the PEM format.
+	Error use_tmp_dh_file(const String p_filename);
 
 
 
@@ -84,89 +231,21 @@ protected:
 	static void _bind_methods();
 
 
+
 };
 
 
-VARIANT_ENUM_CAST(SqlCertificate::SslMode);
-VARIANT_ENUM_CAST(SqlCertificate::Ssl_Methods);
+
+VARIANT_ENUM_CAST(SqlCertificate::SSLMode);
+VARIANT_ENUM_CAST(SqlCertificate::FileFormat);
+VARIANT_ENUM_CAST(SqlCertificate::SSLMethods);
+VARIANT_ENUM_CAST(SqlCertificate::SSLOptions);
+VARIANT_ENUM_CAST(SqlCertificate::VerifyMode);
+VARIANT_ENUM_CAST(SqlCertificate::PasswordPurpose);
+
+
 
 
 
 #endif // SQLCERTIFICATE_H
 
-
-/*
-SslMethods: 
-
- /// Generic SSL version 2.
-	sslv2,
-
-	/// SSL version 2 client.
-	sslv2_client,
-
-	/// SSL version 2 server.
-	sslv2_server,
-
-	/// Generic SSL version 3.
-	sslv3,
-
-	/// SSL version 3 client.
-	sslv3_client,
-
-	/// SSL version 3 server.
-	sslv3_server,
-
-	/// Generic TLS version 1.
-	tlsv1,
-
-	/// TLS version 1 client.
-	tlsv1_client,
-
-	/// TLS version 1 server.
-	tlsv1_server,
-
-	/// Generic SSL/TLS.
-	sslv23,
-
-	/// SSL/TLS client.
-	sslv23_client,
-
-	/// SSL/TLS server.
-	sslv23_server,
-
-	/// Generic TLS version 1.1.
-	tlsv11,
-
-	/// TLS version 1.1 client.
-	tlsv11_client,
-
-	/// TLS version 1.1 server.
-	tlsv11_server,
-
-	/// Generic TLS version 1.2.
-	tlsv12,
-
-	/// TLS version 1.2 client.
-	tlsv12_client,
-
-	/// TLS version 1.2 server.
-	tlsv12_server,
-
-	/// Generic TLS version 1.3.
-	tlsv13,
-
-	/// TLS version 1.3 client.
-	tlsv13_client,
-
-	/// TLS version 1.3 server.
-	tlsv13_server,
-
-	/// Generic TLS.
-	tls,
-
-	/// TLS client.
-	tls_client,
-
-	/// TLS server.
-	tls_server
-*/

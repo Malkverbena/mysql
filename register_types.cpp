@@ -4,8 +4,11 @@
 #include "register_types.h"
 
 
+
 #include "scr/mysql.h"
-#include "scr/helpers.h"
+//#include "scr/sqlconnection.h"
+//#include "scr/sqlcertificate.h"
+//#include "scr/helpers.h"
 
 
 
@@ -14,9 +17,9 @@ void initialize_mysql_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 
-//	GDREGISTER_CLASS(SqlResult);
-//	GDREGISTER_CLASS(SqlConnection);
-//	GDREGISTER_CLASS(SqlCertificate);
+	GDREGISTER_CLASS(SqlResult);
+	GDREGISTER_CLASS(SqlConnection);
+	GDREGISTER_CLASS(SqlCertificate);
 	GDREGISTER_CLASS(MySQL);
 
 }

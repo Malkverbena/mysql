@@ -80,13 +80,13 @@ public:
 	String get_password() { return SqlStr2GdtStr(credential_params.password); }
 	String get_database() { return SqlStr2GdtStr(credential_params.database); }
 	bool get_multi_queries() { return credential_params.multi_queries; }
-	SqlCertificate::SslMode get_ssl_mode() { return SqlCertificate::SslMode(credential_params.ssl); }
+	SqlCertificate::SSLMode get_ssl_mode() { return SqlCertificate::SSLMode(credential_params.ssl); }
 	SqlConnection::MysqlCollations get_connection_collation() { return static_cast<SqlConnection::MysqlCollations>(credential_params.connection_collation); }
 
 	void set_username(String p_username) { credential_params.username = GdtStr2SqlStr(p_username); }
 	void set_password(String p_password) { credential_params.password = GdtStr2SqlStr(p_password); }
 	void set_database(String p_database) { credential_params.database = GdtStr2SqlStr(p_database); }
-	void set_ssl_mode(SqlCertificate::SslMode p_mode){ credential_params.ssl = static_cast<boost::mysql::ssl_mode>(p_mode); }
+	void set_ssl_mode(SqlCertificate::SSLMode p_mode){ credential_params.ssl = static_cast<boost::mysql::ssl_mode>(p_mode); }
 	void set_multi_queries(bool p_multi_queries) { credential_params.multi_queries = p_multi_queries; }
 	void set_connection_collation(SqlConnection::MysqlCollations p_collation) { credential_params.connection_collation = p_collation; }
 

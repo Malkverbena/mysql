@@ -11,8 +11,25 @@
 #endif
 
 
-//using namespace sqlhelpers;
 
+boost::asio::const_buffer sqlhelpers::godot_string_to_const_buffer(const String &godot_string) {
+    std::string utf8_string = godot_string.utf8().get_data();
+    return boost::asio::const_buffer(utf8_string.data(), utf8_string.size());
+}
+
+
+String sqlhelpers::ensure_global_path(String  p_path){
+	if (p_path.is_absolute_path()){
+		return p_path;
+	}
+	else if (p_path.is_absolute_path()){
+		ProjectSettings &ps = *ProjectSettings::get_singleton();
+		return ps.globalize_path(p_path);
+	}
+	else {
+		return String();
+	}
+}
 
 
 char* sqlhelpers::copy_string(char s[]) {

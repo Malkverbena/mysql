@@ -29,6 +29,7 @@ boost_lib_path = "/media/cleber/DATA/COMPILATIONS/modules/mysql/thirdparty/boost
 
 
 
+
 ##### THIRDPARTY COMPILATION #####
 mysql_env.Append(CPPDEFINES=["BOOST_MYSQL_SEPARATE_COMPILATION"])
 if "boost_headers_only" in env:
@@ -59,5 +60,10 @@ mysql_env.add_source_files(env.modules_sources, "*.cpp")
 mysql_env.add_source_files(env.modules_sources, "scr/**.cpp")
 
 
+#mysql_env.add_source_files(env.modules_sources, "scr/helpers.cpp")
+#mysql_env.add_source_files(env.modules_sources, "scr/mysql.cpp")
+#mysql_env.add_source_files(env.modules_sources, "scr/sqlconnection.cpp")
+#mysql_env.add_source_files(env.modules_sources, "scr/sqlcertificate.cpp")
+#mysql_env.add_source_files(env.modules_sources, "scr/sqlresult.cpp")
 
 

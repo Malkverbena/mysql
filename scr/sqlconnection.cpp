@@ -4,15 +4,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
 /*
 
 void SqlConnection::start_connection(){
@@ -57,8 +48,8 @@ void SqlConnection::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_ssl_mode"), &SqlConnection::get_ssl_mode);
 	ClassDB::bind_method(D_METHOD("set_ssl_mode", "value"), &SqlConnection::set_ssl_mode);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "SslMode", PROPERTY_HINT_ENUM, "ssl_disable, ssl_enable, ssl_require"), "set_ssl_mode", "get_ssl_mode");
-	ADD_PROPERTY_DEFAULT("SslMode", SqlCertificate::SslMode::ssl_enable);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "SSLMode", PROPERTY_HINT_ENUM, "ssl_disable, ssl_enable, ssl_require"), "set_ssl_mode", "get_ssl_mode");
+	ADD_PROPERTY_DEFAULT("SSLMode", SqlCertificate::SSLMode::ssl_enable);
 
 	ClassDB::bind_method(D_METHOD("get_connection_collation"), &SqlConnection::get_connection_collation);
 	ClassDB::bind_method(D_METHOD("set_connection_collation", "value"), &SqlConnection::set_ssl_mode);
