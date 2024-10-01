@@ -4,7 +4,8 @@
 #define SQLRESULT_H
 
 
-#include "helpers.h"
+#include "core/object/ref_counted.h"
+#include "core/core_bind.h"
 
 
 class SqlResult : public RefCounted {

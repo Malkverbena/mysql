@@ -28,7 +28,6 @@ public:
 
 	using SSLMethods = boost::asio::ssl::context_base::method;
 	using FileFormat = boost::asio::ssl::context_base::file_format;
-
 	using PasswordPurpose = boost::asio::ssl::context_base::password_purpose;
 
 enum SSLMode {
@@ -63,25 +62,27 @@ enum VerifyMode{
 
 private:
 
-    Callable password_callback;
-    Callable verify_callback;
+	std::string read_password;
+	std::string write_password;
 	Dictionary last_ssl_error;
 	std::shared_ptr<asio::ssl::context> ssl_ctx = nullptr;
 
+//	std::shared_ptr<asio::ssl::context> get_context() { return ssl_ctx; }
+	bool is_valid() { return (ssl_ctx != nullptr); }
 
 
 public:
 
 	// Godot specific.   ===========================================================
 
+	// Star5ts the ssl context.
 	void start_certificate(SSLMethods p_method = SSLMethods(asio::ssl::context::tls_client)); // Inicia o contexto SSL
-//	void stop_certificate();                     // deleta  todo o contexto
 
 	// Returns the last Error that occurred in the SSL Context
 	Dictionary get_ssl_error() const {return last_ssl_error.duplicate(true);};
 
 
-
+	
 
 
 	// SSL context methods.  ===========================================================
@@ -126,17 +127,11 @@ public:
 	//			"max_length": The maximum size for a password.
 	//			"purpose": Whether password is for reading or writing.
 	// The return value of the callback is a string containing the password.
-	Error set_password_callback(const Callable &p_callback);
-	//String set_password_callback(const int p_max_length, const PasswordPurpose p_purpose);
+	// The function "configure_callback_password" must be called first to configure the passwords.
+	Error set_password_callback();
 
-
-	// Set the callback used to verify peer certificates.
-	// This function is used to specify a callback function that will be called by the implementation when it needs to verify a peer certificate.
-	// The function object to be used for verifying a certificate.
-	// Parameters: "preverified": True if the certificate passed pre-verification.
-	// The return value of the callback is an Error if the method failed, is true if the certificate has passed verification and false otherwise.
-	Error set_verify_callback(const Callable &p_callback);
-
+	// Configure the passwords callbacks.
+	void configure_callback_password(const String p_write_password, const String p_read_password);
 
 	// Set the peer verification depth.
 	// This function may be used to configure the maximum verification depth allowed by the context.
@@ -181,16 +176,12 @@ public:
 	//		"format": The private key format (ASN.1 or PEM).
 	Error use_private_key(const String p_private_key, const FileFormat p_format);
 
-
 	// Use a private key from a file.
 	// This function is used to load a private key into the context from a file.
 	// Parameters
 	//		"filename": The name of the file containing the private key.
 	//		"format": The file format (ASN.1 or PEM).
 	Error use_private_key_file(const String p_filename, const FileFormat p_format);
-
-
-
 
 	// Use an RSA private key from a memory buffer.
 	// This function is used to load an RSA private key into the context from a buffer.
@@ -199,7 +190,6 @@ public:
 	//		"format": The private key format (ASN.1 or PEM).
 	Error use_rsa_private_key(const String p_private_key, const FileFormat p_format);
 
-
 	// Use an RSA private key from a file.
 	// This function is used to load an RSA private key into the context from a file.
 	// Parameters
@@ -207,15 +197,10 @@ public:
 	//		"format": The file format (ASN.1 or PEM).
 	Error use_rsa_private_key_file(const String p_filename, const FileFormat p_format);
 
-
-
 	// Use the specified memory buffer to obtain the temporary Diffie-Hellman parameters.
 	// This function is used to load Diffie-Hellman parameters into the context from a buffer.
 	// Parameters: "dh_buffer": The memory buffer containing the Diffie-Hellman parameters. The buffer must use the PEM format.
 	Error use_tmp_dh(const String p_dh_buffer);
-
-
-
 
 	// Use the specified file to obtain the temporary Diffie-Hellman parameters.
 	// This function is used to load Diffie-Hellman parameters into the context from a file.

@@ -12,7 +12,7 @@
 
 
 
-boost::asio::const_buffer sqlhelpers::godot_string_to_const_buffer(const String &godot_string) {
+boost::asio::const_buffer sqlhelpers::GDstring_to_SQLbuffer(const String &godot_string) {
     std::string utf8_string = godot_string.utf8().get_data();
     return boost::asio::const_buffer(utf8_string.data(), utf8_string.size());
 }
@@ -40,13 +40,13 @@ char* sqlhelpers::copy_string(char s[]) {
 }
 
 
-String sqlhelpers::SqlStr2GdtStr(mysql::string_view s) {
+String sqlhelpers::SQLstring_to_GDstring(mysql::string_view s) {
 	String str(s.data(), s.size());
 	return str;
 }
 
 
-mysql::string_view sqlhelpers::GdtStr2SqlStr(String s) {
+mysql::string_view sqlhelpers::GDstring_to_SQLstring(String s) {
 	boost::mysql::string_view str(s.utf8().get_data());
 	return str;
 }
@@ -79,18 +79,18 @@ void sqlhelpers::sql_dictionary(Dictionary *dic, const char *p_function, const c
 	(*dic)["LINE"] = p_line;
 	(*dic)["FUNCTION"] = String(p_function);
 	(*dic)["ERROR"] = ec.value();
-	(*dic)["DESCRIPTION"] = sqlhelpers::SqlStr2GdtStr(ec.what());
+	(*dic)["DESCRIPTION"] = sqlhelpers::SQLstring_to_GDstring(ec.what());
 	(*dic)["SERVER_MESSAGE"] = diag.server_message().data();
 	(*dic)["CLIENT_MESSAGE"] = diag.client_message().data();
 }
 
 
-void print_sql_exception(const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec) {
+void sqlhelpers::print_sql_exception(const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec) {
 	String exc = \
 	String("\n# SQL EXCEPTION Caught!\n") +\
 	vformat("# ERR: SQLException in: %s", p_file) + vformat(" in function: %s", p_function) + vformat("() on line %s\n", p_line) +\
 	vformat("# ERR: Code: %s\n", ec.value()) +\
-	vformat("# ERR: Description: %s\n", sqlhelpers::SqlStr2GdtStr(ec.what())) +\
+	vformat("# ERR: Description: %s\n", sqlhelpers::SQLstring_to_GDstring(ec.what())) +\
 	vformat("# Server error: %s\n", diag.server_message().data()) +\
 	vformat("# Client Error: %s\n", diag.client_message().data());
 	WARN_PRINT(exc);

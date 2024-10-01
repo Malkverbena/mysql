@@ -17,10 +17,10 @@ void initialize_mysql_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 
-	GDREGISTER_CLASS(SqlResult);
+//	GDREGISTER_CLASS(MySQL);
+//	GDREGISTER_CLASS(SqlResult);
 	GDREGISTER_CLASS(SqlConnection);
 	GDREGISTER_CLASS(SqlCertificate);
-	GDREGISTER_CLASS(MySQL);
 
 }
 

@@ -10,10 +10,13 @@
 #include <iostream>
 #include <string_view>
 #include <memory>
+#include <mutex>
+#include <thread>
 
 
-//#include <fstream>
-//#include <stdexcept>
+#include <boost/asio/awaitable.hpp>
+#include <boost/asio/co_spawn.hpp>
+
 
 
 #include <core/config/project_settings.h>
@@ -68,13 +71,13 @@ void print_std_exception(const char *p_function, const char *p_file, int p_line,
 
 
 
-boost::asio::const_buffer godot_string_to_const_buffer(const String &godot_string);
+boost::asio::const_buffer GDstring_to_SQLbuffer(const String &godot_string);
 
 
 String ensure_global_path(String p_path);
 char* copy_string(char s[]);
-String SqlStr2GdtStr(mysql::string_view s);
-mysql::string_view GdtStr2SqlStr(String s);
+String SQLstring_to_GDstring(mysql::string_view s);
+mysql::string_view GDstring_to_SQLstring(String s);
 
 
 bool is_date(Dictionary d);
@@ -108,8 +111,29 @@ Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_vi
 	if (unlikely(m_errcode)) {														\
 		sql_dictionary(m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);\
 		print_sql_exception(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);	\
-	} else																			\
+		co_return m_ret;
+	} else	{																		\
 		((void)0)
+	}
+
+
+
+/*
+#define CORO_SQL_EXCEPTION(m_errcode, m_diag, m_dic, m_ret)									\
+	do {																					\
+		if (unlikely(m_errcode)) {															\
+			sql_dictionary(m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);	\
+			print_sql_exception(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);		\
+			co_return m_ret;																\
+		} else {																			\
+			((void)0);																		\
+		}																					\
+	} while(0)
+*/
+
+
+
+
 
 
 #define CORO_SQL_EXCEPTION_VOID(m_errcode, m_diag, m_dic)							\
@@ -119,7 +143,6 @@ Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_vi
 		co_return;																	\
 	} else																			\
 		((void)0)
-
 
 }
 

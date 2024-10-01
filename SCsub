@@ -61,9 +61,9 @@ mysql_env.add_source_files(env.modules_sources, "scr/**.cpp")
 
 
 #mysql_env.add_source_files(env.modules_sources, "scr/helpers.cpp")
-#mysql_env.add_source_files(env.modules_sources, "scr/mysql.cpp")
-#mysql_env.add_source_files(env.modules_sources, "scr/sqlconnection.cpp")
 #mysql_env.add_source_files(env.modules_sources, "scr/sqlcertificate.cpp")
+#mysql_env.add_source_files(env.modules_sources, "scr/sqlconnection.cpp")
+#mysql_env.add_source_files(env.modules_sources, "scr/mysql.cpp")
 #mysql_env.add_source_files(env.modules_sources, "scr/sqlresult.cpp")
 
 
