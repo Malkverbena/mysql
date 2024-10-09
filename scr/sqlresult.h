@@ -16,6 +16,7 @@ friend class MySQL;
 
 private:
 
+	Dictionary sql_exception;
 	Dictionary result;
 	Dictionary meta;
 	int affected_rows;
@@ -30,18 +31,18 @@ protected:
 
 public:
 
-	SqlResult();
-	~SqlResult();
-
 	Array get_array() const;
 	Variant get_row(int row, bool as_array = true) const;
 	Array get_column(String column, bool as_array = true) const;
 	Array get_column_by_id(int column, bool as_array = true) const;
-	Dictionary get_metadata() const {return meta;};
-	Dictionary get_dictionary() const {return result;};
-	int get_affected_rows() const {return affected_rows;};
-	int get_last_insert_id() const {return last_insert_id;};
-	int get_warning_count() const {return warning_count;};
+	Dictionary get_metadata() const ;
+	Dictionary get_dictionary() const ;
+	int get_affected_rows() const ;
+	int get_last_insert_id() const ;
+	int get_warning_count() const ;
+
+	SqlResult();
+	~SqlResult();
 
 };
 

@@ -5,15 +5,61 @@
 using namespace sqlhelpers;
 
 
+
+
+
+
+// ============================ ASYNC ============================
+
+
+Dictionary SqlConnection::async_db_connect(const String p_hostname, const int p_port){
+	std::lock_guard<std::mutex> lock(connection_mutex);
+
+	if (conn_type == TCP or conn_type == TCP_TLS){
+		credentials_params.server_address.emplace_host_and_port(GDstring_to_SQLstring(p_hostname),  static_cast<std::uint16_t>(p_port));
+	}
+	else if (conn_type == UNIX){
+		credentials_params.server_address.emplace_unix_path(GDstring_to_SQLstring(p_hostname));
+	}
+	else{
+		Dictionary err = Dictionary();
+		err["ERROR"] = ERR_INVALID_PARAMETER;
+		err["DESCRIPTION"] = String("Only TCP, TCP_TLS or UNIX are valid options");
+		err["FUNCTION"] = String(FUNCTION_NAME);
+		return err;
+	}
+
+	mysql::error_code ec;
+	mysql::diagnostics diag;
+
+	auto result_future = asio::co_spawn(
+		ctx->get_executor(),
+		coro_async_db_connect(ec, diag),
+		asio::use_future
+	);
+	ctx->run();
+
+	Dictionary err = result_future.get();
+	return err;
+
+}
+
+
+awaitable<Dictionary> SqlConnection::coro_async_db_connect(boost::mysql::error_code& ec, boost::mysql::diagnostics& diag){
+	auto executor = co_await asio::this_coro::executor;
+	co_await conn->async_connect(credentials_params, diag, asio::redirect_error(use_awaitable, ec));
+	CORO_SQL_EXCEPTION(ec, diag);
+}
+
+
 Error SqlConnection::configure_connection(ConnType connectiontype, bool p_use_certificate) {
 
 	//#if defined(DEBUG_ENABLED) && defined(TOOLS_ENABLED)
 	bool unconf = (p_use_certificate and not certificate.is_valid());
 	ERR_FAIL_COND_V_EDMSG(unconf, ERR_UNCONFIGURED, "Certificate unconfigured!");
-	
+
 	use_certificate = p_use_certificate;
 	conn_type = connectiontype;
-	last_sql_error.clear();
 	ctx.reset();
 	conn.reset();
 	ctx = std::make_shared<asio::io_context>();
@@ -30,41 +76,42 @@ Error SqlConnection::configure_connection(ConnType connectiontype, bool p_use_ce
 }
 
 
-Error SqlConnection::db_connect(const String p_hostname, const int port) {
+Dictionary SqlConnection::db_connect(const String p_hostname, const int port) {
 
 	if (conn_type == TCP or conn_type == TCP_TLS){
 		credentials_params.server_address.emplace_host_and_port(GDstring_to_SQLstring(p_hostname),  static_cast<std::uint16_t>(port));
-	}	
+	}
 	else if (conn_type == UNIX){
 		credentials_params.server_address.emplace_unix_path(GDstring_to_SQLstring(p_hostname));
 	}
 	else{
-		return ERR_INVALID_PARAMETER;
+		Dictionary err = Dictionary();
+		err["ERROR"] = ERR_INVALID_PARAMETER;
+		err["DESCRIPTION"] = String("Only TCP, TCP_TLS or UNIX are valid options");
+		err["FUNCTION"] = String(FUNCTION_NAME);
+		return err;
 	}
 
 	mysql::error_code ec;
 	mysql::diagnostics diag;
 	conn->connect(credentials_params, ec, diag);
-	SQL_EXCEPTION(ec, diag, &last_sql_error, FAILED);
-	return OK;
+	SQL_EXCEPTION(ec, diag);
 }
 
 
-Error SqlConnection::close_connection() {
+Dictionary SqlConnection::close_connection() {
 	mysql::error_code ec;
 	mysql::diagnostics diag;
-	conn->close();
-	SQL_EXCEPTION(ec, diag, &last_sql_error, FAILED);
-	return OK;
+	conn->close(ec, diag);
+	SQL_EXCEPTION(ec, diag);
 }
 
 
-Error SqlConnection::reset_connection(){
+Dictionary SqlConnection::reset_connection(){
 	mysql::error_code ec;
 	mysql::diagnostics diag;
 	conn->reset_connection();
-	SQL_EXCEPTION(ec, diag, &last_sql_error, FAILED);
-	return OK;
+	SQL_EXCEPTION(ec, diag);
 }
 
 
@@ -87,8 +134,8 @@ SqlConnection::~SqlConnection() {
 
 void SqlConnection::_bind_methods() {
 
-
 	// SQL
+	ClassDB::bind_method(D_METHOD("async_db_connect", "hostname", "port"), &SqlConnection::async_db_connect, DEFVAL("/var/run/mysqld/mysqld.sock"), DEFVAL(3307));
 	ClassDB::bind_method(D_METHOD("db_connect", "hostname", "port"), &SqlConnection::db_connect, DEFVAL("/var/run/mysqld/mysqld.sock"), DEFVAL(3307));
 	ClassDB::bind_method(D_METHOD("get_connection_type"), &SqlConnection::get_connection_type);
 	ClassDB::bind_method(D_METHOD("backslash_escapes"), &SqlConnection::backslash_escapes);
@@ -96,17 +143,10 @@ void SqlConnection::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("reset_connection"), &SqlConnection::reset_connection);
 	ClassDB::bind_method(D_METHOD("is_server_alive"), &SqlConnection::is_server_alive);
 
-	
-
 
 	// Connection
 	ClassDB::bind_method(D_METHOD("configure_connection", "connection type", "use_certificate"), &SqlConnection::configure_connection, DEFVAL(TCP), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("is_using_certificate"), &SqlConnection::is_using_certificate);
-	ClassDB::bind_method(D_METHOD("get_sql_error"), &SqlConnection::get_sql_error);
-	ClassDB::bind_method(D_METHOD("get_async"), &SqlConnection::get_async);
-	ClassDB::bind_method(D_METHOD("set_async", "value"), &SqlConnection::set_async);
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "enable_async"), "set_async", "get_async");
-	ADD_PROPERTY_DEFAULT("enable_async", "false");
 
 
 	// Credentials
@@ -157,8 +197,8 @@ void SqlConnection::_bind_methods() {
 	BIND_ENUM_CONSTANT(TCP);
 	BIND_ENUM_CONSTANT(TCP_TLS);
 	BIND_ENUM_CONSTANT(UNIX);
-	
-	
+
+
 	// MysqlCollations
 	BIND_ENUM_CONSTANT(default_collation);
 	BIND_ENUM_CONSTANT(big5_chinese_ci);

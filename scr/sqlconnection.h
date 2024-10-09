@@ -10,8 +10,6 @@
 #include <boost/mysql/any_connection.hpp>
 #include <boost/mysql/any_address.hpp>
 
-#include <boost/asio/awaitable.hpp>
-#include <boost/asio/co_spawn.hpp>
 
 
 
@@ -38,13 +36,11 @@ public:
 private:
 
 	Ref<SqlCertificate> certificate;
-	Dictionary last_sql_error;
 
 	ConnType conn_type;
 	ConnectionStatus status;
 
 	bool use_certificate;
-	bool enable_async = false;
 
 	boost::mysql::connect_params credentials_params;
 	boost::mysql::any_connection_params ctor_params;
@@ -64,7 +60,7 @@ public:
 	}
 
 	~SqlConnection();
-	
+
 
 
 protected:
@@ -73,22 +69,37 @@ protected:
 
 
 
+	awaitable<Dictionary> coro_async_db_connect(boost::mysql::error_code& ec, boost::mysql::diagnostics& diag);
+
+
 
 public:
 
 
-	Dictionary get_sql_error() const {return last_sql_error.duplicate(true);};
+
+
+	Dictionary async_db_connect(const String p_hostname = "/var/run/mysqld/mysqld.sock", const int p_port = 3307);
+
+//	Error async_close_connection();
+
+//	Error async_reset_connection();
+
+
+
+
+
+
 
 	// Establishes a connection to a MySQL server.
 	// "HostName" can be a  UNIX socket path or an IP/HostName. In case of UNIX connections the port will be ignorated.
-	Error db_connect(const String p_hostname = "/var/run/mysqld/mysqld.sock", const int p_port = 3307);
+	Dictionary db_connect(const String p_hostname = "/var/run/mysqld/mysqld.sock", const int p_port = 3307);
 
 	// Cleanly closes the connection to the server.
 	// Sends a quit request. This is required by the MySQL protocol, to inform the server that we're closing the connection gracefully.
-	Error close_connection();
+	Dictionary close_connection();
 
 	//Resets server-side session state, like variables and prepared statements.
-	Error reset_connection();
+	Dictionary reset_connection();
 
 	// Checks whether the server is alive.
 	bool is_server_alive();
@@ -98,8 +109,6 @@ public:
 	Error configure_connection(ConnType connectiontype = TCP, bool p_use_certificate = false);
 
 
-	void set_async(bool p_enable_async) { enable_async = p_enable_async; }
-	bool get_async() const { return enable_async; }
 	ConnType get_connection_type() const { return conn_type; }
 
 	// Returns if the connection is configurated to use certificates.

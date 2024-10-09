@@ -1,10 +1,36 @@
 /* sqlresult.cpp */
 
+
 #include "sqlresult.h"
 
+std::mutex connection_mutex;
+
+
+
+Dictionary  SqlResult::get_metadata() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	return meta;
+}
+Dictionary  SqlResult::get_dictionary() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	return result;
+}
+int  SqlResult::get_affected_rows() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	return affected_rows;
+}
+int  SqlResult::get_last_insert_id() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	return last_insert_id;
+}
+int  SqlResult::get_warning_count() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	return warning_count;
+}
 
 
 Array SqlResult::get_array() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
 	Array ret;
 	for (int col = 0; col < result.size(); col++) {
 		Dictionary dic_row = result[col];
@@ -16,6 +42,7 @@ Array SqlResult::get_array() const {
 
 
 Variant SqlResult::get_row(int row, bool as_array) const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
 	if(as_array) {
 		Array ret = Array();
 		Dictionary line = result[row];
@@ -29,6 +56,7 @@ Variant SqlResult::get_row(int row, bool as_array) const {
 
 
 Array SqlResult::get_column(String column, bool as_array) const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
 	Array ret;
 	for (int col = 0; col < result.size(); col++) {
 		Dictionary dic_row = result[col];
@@ -46,6 +74,7 @@ Array SqlResult::get_column(String column, bool as_array) const {
 
 
 Array SqlResult::get_column_by_id(int column, bool as_array) const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
 	Array ret;
 	for (int col = 0; col < result.size(); col++) {
 		Dictionary dic_row = result[col];
@@ -63,13 +92,13 @@ Array SqlResult::get_column_by_id(int column, bool as_array) const {
 
 
 void SqlResult::_bind_methods() {
-	// ===== QUERY ===== 
+	// ===== QUERY =====
 	ClassDB::bind_method(D_METHOD("get_array"), &SqlResult::get_array);
 	ClassDB::bind_method(D_METHOD("get_dictionary"), &SqlResult::get_dictionary);
 	ClassDB::bind_method(D_METHOD("get_row", "row", "as_array"), &SqlResult::get_row, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("get_column", "column", "as_array"), &SqlResult::get_column, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("get_column_by_id", "column", "as_array"), &SqlResult::get_column, DEFVAL(true));
-	// ===== META ===== 
+	// ===== META =====
 	ClassDB::bind_method(D_METHOD("get_metadata"), &SqlResult::get_metadata);
 	ClassDB::bind_method(D_METHOD("get_affected_rows"), &SqlResult::get_affected_rows);
 	ClassDB::bind_method(D_METHOD("get_last_insert_id"), &SqlResult::get_last_insert_id);
@@ -83,6 +112,6 @@ SqlResult::SqlResult(){
 
 
 SqlResult::~SqlResult(){
-	
+
 }
 

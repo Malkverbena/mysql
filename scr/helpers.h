@@ -16,7 +16,7 @@
 
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/co_spawn.hpp>
-
+#include <boost/asio.hpp>
 
 
 #include <core/config/project_settings.h>
@@ -53,8 +53,6 @@
 using namespace boost;
 using namespace boost::mysql;
 
-using namespace std;
-using namespace std::chrono;
 
 //using boost::mysql::with_diagnostics;
 
@@ -63,8 +61,26 @@ using namespace std::chrono;
 namespace sqlhelpers {
 
 
-void boost_dictionary(Dictionary *dic, const char *p_function, const char *p_file, int p_line, const mysql::error_code ec);
-void sql_dictionary(Dictionary *dic, const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec);
+/*
+Dictionary error_template = []() {
+	Dictionary temp_dic;
+	temp_dic["ERROR"] = OK;
+	return temp_dic;
+}();
+*/
+
+
+
+
+inline Dictionary ok_dictionary(){
+	Dictionary ret;
+	ret["ERROR"] = OK;
+	return ret;
+}
+
+
+Dictionary boost_dictionary(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec);
+Dictionary sql_dictionary(const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec);
 void print_boost_exception(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec);
 void print_sql_exception(const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec);
 void print_std_exception(const char *p_function, const char *p_file, int p_line, std::exception err);
@@ -89,6 +105,118 @@ Dictionary make_metadata_result(mysql::metadata_collection_view meta_collection)
 Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_view meta_coll);
 
 
+
+#define BOOST_EXCEPTION(m_errcode)															\
+	if (unlikely(m_errcode)) {																\
+		print_boost_exception(FUNCTION_NAME, __FILE__, __LINE__, m_errcode);				\
+		return boost_dictionary(FUNCTION_NAME, __FILE__, __LINE__, m_errcode);				\
+	} else	{																				\
+		return ok_dictionary();																\
+	}
+
+#define CORO_SQL_EXCEPTION(m_errcode, m_diag)															\
+	do {																								\
+		if (unlikely(m_errcode)) {																		\
+			print_sql_exception(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);					\
+			Dictionary m_dic = sql_dictionary(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);	\
+			co_return m_dic;																			\
+		} else {																						\
+			co_return ok_dictionary();																	\
+		}																								\
+	} while(0)
+
+
+#define SQL_EXCEPTION(m_errcode, m_diag)															\
+	if (unlikely(m_errcode)) {																		\
+		print_sql_exception(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);					\
+		return sql_dictionary(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);				\
+	} else																							\
+		return ok_dictionary();
+
+
+
+/*
+#define RETURN_NO_ERROR return error_template.duplicate(true);
+
+
+#define BOOST_EXCEPTION(m_errcode)												\
+	Dictionary m_dic;															\
+	m_dic["ERROR"] = OK;														\
+	if (unlikely(m_errcode)) {													\
+		boost_dictionary(&m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_errcode);	\
+		print_boost_exception(FUNCTION_NAME, __FILE__, __LINE__, m_errcode);	\
+		return m_dic;															\
+	} else	{																	\
+		return m_dic;															\
+	}
+
+
+#define CORO_SQL_EXCEPTION(m_errcode, m_diag)												\
+	do {																					\
+		Dictionary m_dic;																	\
+		m_dic["ERROR"] = OK;																\
+		if (unlikely(m_errcode)) {															\
+			sql_dictionary(&m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);	\
+			print_sql_exception(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);		\
+			co_return m_dic;																\
+		} else {																			\
+			co_return error_template.duplicate(true);										\
+		}																					\
+	} while(0)
+
+
+
+
+#define CORO_SQL_EXCEPTION_WITH_RESULT(m_errcode, m_diag, m_result)							\
+	do {																					\
+		Dictionary m_dic;																	\
+		m_dic["ERROR"] = OK;																\
+		if (unlikely(m_errcode)) {															\
+			sql_dictionary(&m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);	\
+			print_sql_exception(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);		\
+			co_return m_dic;																\
+		} else {																			\
+			co_return m_dic;																\
+		}																					\
+	} while(0)
+
+
+#define SQL_EXCEPTION(m_errcode, m_diag)												\
+	Dictionary m_dic;																	\
+	m_dic["ERROR"] = OK;																\
+	if (unlikely(m_errcode)) {															\
+		sql_dictionary(&m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);	\
+		print_sql_exception(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);		\
+		return m_dic;																	\
+	} else																				\
+		return m_dic;
+
+
+#define SQL_EXCEPTION_ON_RESULT(m_errcode, m_diag, m_result)							\
+	Dictionary m_dic;																	\
+	m_dic["ERROR"] = OK;																\
+	if (unlikely(m_errcode)) {															\
+		sql_dictionary(&m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);	\
+		print_sql_exception(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);		\
+		m_result->sql_exception = m_dic;												\
+		return m_result;																\
+	} else																				\
+		((void)0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #define BOOST_EXCEPTION(m_errcode, m_dic, m_ret)								\
 	if (unlikely(m_errcode)) {													\
 		boost_dictionary(m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_errcode);	\
@@ -98,6 +226,31 @@ Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_vi
 		((void)0)
 
 
+
+#define BOOST_EXCEPTION_RETURN(m_errcode)										\
+	Dictionary m_dic = error_template.duplicate(true);							\
+	if (unlikely(m_errcode)) {													\
+		boost_dictionary(m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_errcode);	\
+		print_boost_exception(FUNCTION_NAME, __FILE__, __LINE__, m_errcode);	\
+		return m_dic;															\
+	} else	{																	\
+		return m_dic;															\
+	}
+
+
+
+
+#define CORO_BOOST_EXCEPTION_RETURN(m_errcode, m_ret)								\
+	Dictionary m_dic = error_template.duplicate(true);							\
+	if (unlikely(m_errcode)) {													\
+		boost_dictionary(m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_errcode);	\
+		print_boost_exception(FUNCTION_NAME, __FILE__, __LINE__, m_errcode);	\
+		co_return m_dic;															\
+	} else	{																	\
+		co_return m_dic;															\
+	}
+
+
 #define SQL_EXCEPTION(m_errcode, m_diag, m_dic, m_ret)								\
 	if (unlikely(m_errcode)) {														\
 		sql_dictionary(m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);\
@@ -105,6 +258,7 @@ Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_vi
 		return m_ret;																\
 	} else																			\
 		((void)0)
+
 
 
 #define CORO_SQL_EXCEPTION(m_errcode, m_diag, m_dic, m_ret)							\
@@ -118,7 +272,8 @@ Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_vi
 
 
 
-/*
+
+
 #define CORO_SQL_EXCEPTION(m_errcode, m_diag, m_dic, m_ret)									\
 	do {																					\
 		if (unlikely(m_errcode)) {															\
@@ -129,7 +284,7 @@ Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_vi
 			((void)0);																		\
 		}																					\
 	} while(0)
-*/
+
 
 
 
@@ -143,6 +298,9 @@ Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_vi
 		co_return;																	\
 	} else																			\
 		((void)0)
+
+
+*/
 
 }
 

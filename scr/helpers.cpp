@@ -11,10 +11,17 @@
 #endif
 
 
+using namespace std;
+using namespace std::chrono;
+
+
+
+
+
 
 boost::asio::const_buffer sqlhelpers::GDstring_to_SQLbuffer(const String &godot_string) {
-    std::string utf8_string = godot_string.utf8().get_data();
-    return boost::asio::const_buffer(utf8_string.data(), utf8_string.size());
+	std::string utf8_string = godot_string.utf8().get_data();
+	return boost::asio::const_buffer(utf8_string.data(), utf8_string.size());
 }
 
 
@@ -22,7 +29,7 @@ String sqlhelpers::ensure_global_path(String  p_path){
 	if (p_path.is_absolute_path()){
 		return p_path;
 	}
-	else if (p_path.is_absolute_path()){
+	else if (p_path.is_relative_path()){
 		ProjectSettings &ps = *ProjectSettings::get_singleton();
 		return ps.globalize_path(p_path);
 	}
@@ -52,13 +59,14 @@ mysql::string_view sqlhelpers::GDstring_to_SQLstring(String s) {
 }
 
 
-void sqlhelpers::boost_dictionary(Dictionary *dic, const char *p_function, const char *p_file, int p_line, const mysql::error_code ec) {
-	dic->clear();
-	(*dic)["FILE"] = String(p_file);
-	(*dic)["LINE"] = p_line;
-	(*dic)["FUNCTION"] = String(p_function);
-	(*dic)["ERROR"] = ec.value();
-	(*dic)["DESCRIPTION"] = ec.what().data();
+Dictionary sqlhelpers::boost_dictionary(const char *p_function, const char *p_file, int p_line, const mysql::error_code ec) {
+	Dictionary dic;
+	dic["FILE"] = String(p_file);
+	dic["LINE"] = p_line;
+	dic["FUNCTION"] = String(p_function);
+	dic["ERROR"] = ec.value();
+	dic["DESCRIPTION"] = ec.what().data();
+	return dic;
 }
 
 
@@ -73,15 +81,16 @@ void sqlhelpers::print_boost_exception(const char *p_function, const char *p_fil
 }
 
 
-void sqlhelpers::sql_dictionary(Dictionary *dic, const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec) {
-	dic->clear();
-	(*dic)["FILE"] = String(p_file);
-	(*dic)["LINE"] = p_line;
-	(*dic)["FUNCTION"] = String(p_function);
-	(*dic)["ERROR"] = ec.value();
-	(*dic)["DESCRIPTION"] = sqlhelpers::SQLstring_to_GDstring(ec.what());
-	(*dic)["SERVER_MESSAGE"] = diag.server_message().data();
-	(*dic)["CLIENT_MESSAGE"] = diag.client_message().data();
+Dictionary sqlhelpers::sql_dictionary(const char *p_function, const char *p_file, int p_line, const mysql::diagnostics diag, const mysql::error_code ec) {
+	Dictionary dic;
+	dic["FILE"] = String(p_file);
+	dic["LINE"] = p_line;
+	dic["FUNCTION"] = String(p_function);
+	dic["ERROR"] = ec.value();
+	dic["DESCRIPTION"] = sqlhelpers::SQLstring_to_GDstring(ec.what());
+	dic["SERVER_MESSAGE"] = diag.server_message().data();
+	dic["CLIENT_MESSAGE"] = diag.client_message().data();
+	return dic;
 }
 
 

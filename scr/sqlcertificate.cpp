@@ -7,58 +7,52 @@
 
 
 
-Error SqlCertificate::add_certificate_authority(String p_CA){
+
+Dictionary SqlCertificate::add_certificate_authority(String p_CA){
 	boost::system::error_code ec;
 	const const_buffer & certificate = GDstring_to_SQLbuffer(p_CA);
 	ssl_ctx->add_certificate_authority(certificate, ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
 
-Error SqlCertificate::add_verify_path(String p_path){
+Dictionary SqlCertificate::add_verify_path(String p_path){
 	String path = ensure_global_path(p_path);
 	boost::system::error_code ec;
 	ssl_ctx->add_verify_path(GDstring_to_SQLstring(path), ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
 
-Error SqlCertificate::load_verify_file(const String p_path){
+Dictionary SqlCertificate::load_verify_file(const String p_path){
 	boost::system::error_code ec;
 	String path = ensure_global_path(p_path);
 	ssl_ctx->load_verify_file(GDstring_to_SQLstring(path), ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
+
 }
 
 
-Error SqlCertificate::set_default_verify_paths(){
+Dictionary SqlCertificate::set_default_verify_paths(){
 	boost::system::error_code ec;
 	ssl_ctx->set_default_verify_paths(ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
+
 }
 
 
-Error SqlCertificate::clear_options(const int p_ssl_options){
+Dictionary SqlCertificate::clear_options(const int p_ssl_options){
 	boost::system::error_code ec;
-	ssl_ctx->clear_options(
-
-		static_cast<ssl::context_base::options>(p_ssl_options),
-
-		ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	ssl_ctx->clear_options(static_cast<ssl::context_base::options>(p_ssl_options), ec);
+	BOOST_EXCEPTION(ec);
 }
 
 
-Error SqlCertificate::set_options(const int p_ssl_options){
+Dictionary SqlCertificate::set_options(const int p_ssl_options){
 	boost::system::error_code ec;
 	ssl_ctx->set_options(static_cast<ssl::context_base::options>(p_ssl_options), ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
+
 }
 
 
@@ -68,10 +62,12 @@ void SqlCertificate::configure_callback_password(const String p_write_password, 
 }
 
 
-Error SqlCertificate::set_password_callback() {
+Dictionary SqlCertificate::set_password_callback() {
 	boost::system::error_code ec;
 	if (read_password.empty() || write_password.empty()) {
-		return ERR_INVALID_PARAMETER;
+		Dictionary err = Dictionary();
+		err["ERROR"] = ERR_INVALID_PARAMETER;
+		return err;
 	}
 	ssl_ctx->set_password_callback(
 		[this](std::size_t max_length, ssl::context_base::password_purpose purpose) -> std::string {
@@ -93,28 +89,25 @@ Error SqlCertificate::set_password_callback() {
 		},
 		ec
 	);
-	BOOST_EXCEPTION(ec, &last_ssl_error, ERR_INVALID_PARAMETER);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
 
-Error SqlCertificate::set_verify_depth(const int depth){
+Dictionary SqlCertificate::set_verify_depth(const int depth){
 	boost::system::error_code ec;
 	ssl_ctx->set_verify_depth(depth, ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
 
-Error SqlCertificate::set_verify_mode(const int p_mode){
+Dictionary SqlCertificate::set_verify_mode(const int p_mode){
 	boost::system::error_code ec;
 	ssl_ctx->set_verify_mode(static_cast<ssl::verify_mode>(p_mode), ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
 
-Error SqlCertificate::use_certificate(const String p_certificate, const FileFormat file_format){
+Dictionary SqlCertificate::use_certificate(const String p_certificate, const FileFormat file_format){
 	boost::system::error_code ec;
 	const const_buffer & certificate = GDstring_to_SQLbuffer(p_certificate);
 	ssl_ctx->use_certificate(
@@ -122,27 +115,27 @@ Error SqlCertificate::use_certificate(const String p_certificate, const FileForm
 		static_cast<ssl::context::file_format>(file_format),
 		ec
 	);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
-Error SqlCertificate::use_certificate_chain(const String p_chain){
+
+Dictionary SqlCertificate::use_certificate_chain(const String p_chain){
 	boost::system::error_code ec;
 	const const_buffer & chain = GDstring_to_SQLbuffer(p_chain);
 	ssl_ctx->use_certificate_chain(chain, ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
-Error SqlCertificate::use_certificate_chain_file(const String p_filename){
+
+Dictionary SqlCertificate::use_certificate_chain_file(const String p_filename){
 	boost::system::error_code ec;
 	String filename = ensure_global_path(p_filename);
 	ssl_ctx->use_certificate_chain_file(GDstring_to_SQLstring(filename), ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
-Error SqlCertificate::use_certificate_file(const String p_filename, const FileFormat p_format){
+
+Dictionary SqlCertificate::use_certificate_file(const String p_filename, const FileFormat p_format){
 	boost::system::error_code ec;
 	String filename = ensure_global_path(p_filename);
 	ssl_ctx->use_certificate_file(
@@ -150,11 +143,11 @@ Error SqlCertificate::use_certificate_file(const String p_filename, const FileFo
 		static_cast<ssl::context::file_format>(p_format),
 		ec
 	);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
+
 }
 
-Error SqlCertificate::use_private_key(const String p_private_key, const FileFormat p_format){
+Dictionary SqlCertificate::use_private_key(const String p_private_key, const FileFormat p_format){
 	boost::system::error_code ec;
 	const const_buffer & private_key = GDstring_to_SQLbuffer(p_private_key);
 
@@ -164,12 +157,12 @@ Error SqlCertificate::use_private_key(const String p_private_key, const FileForm
 		ec
 	);
 
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
+
 }
 
 
-Error SqlCertificate::use_private_key_file(const String p_filename, const FileFormat p_format){
+Dictionary SqlCertificate::use_private_key_file(const String p_filename, const FileFormat p_format){
 	boost::system::error_code ec;
 	String filename = ensure_global_path(p_filename);
 	ssl_ctx->use_private_key_file(
@@ -177,21 +170,19 @@ Error SqlCertificate::use_private_key_file(const String p_filename, const FileFo
 		static_cast<ssl::context::file_format>(p_format),
 		ec
 	);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
 
-Error SqlCertificate::use_rsa_private_key(const String p_private_key, const FileFormat p_format){
+Dictionary SqlCertificate::use_rsa_private_key(const String p_private_key, const FileFormat p_format){
 	boost::system::error_code ec;
 	const const_buffer & private_key = GDstring_to_SQLbuffer(p_private_key);
 	ssl_ctx->use_rsa_private_key(private_key, static_cast<ssl::context::file_format>(p_format),	ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
 
-Error SqlCertificate::use_rsa_private_key_file(const String p_filename, const FileFormat p_format){
+Dictionary SqlCertificate::use_rsa_private_key_file(const String p_filename, const FileFormat p_format){
 	boost::system::error_code ec;
 	String filename = ensure_global_path(p_filename);
 	ssl_ctx->use_rsa_private_key_file(
@@ -199,26 +190,23 @@ Error SqlCertificate::use_rsa_private_key_file(const String p_filename, const Fi
 		static_cast<ssl::context::file_format>(p_format),
 		ec
 	);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
 
-Error SqlCertificate::use_tmp_dh(const String p_dh_buffer){
+Dictionary SqlCertificate::use_tmp_dh(const String p_dh_buffer){
 	boost::system::error_code ec;
 	const const_buffer & dh_buffer = GDstring_to_SQLbuffer(p_dh_buffer);
 	ssl_ctx->use_tmp_dh(dh_buffer, ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
 
-Error SqlCertificate::use_tmp_dh_file(const String p_filename){
+Dictionary SqlCertificate::use_tmp_dh_file(const String p_filename){
 	boost::system::error_code ec;
 	String filename = ensure_global_path(p_filename);
 	ssl_ctx->use_tmp_dh_file(GDstring_to_SQLstring(filename), ec);
-	BOOST_EXCEPTION(ec, &last_ssl_error, FAILED);
-	return OK;
+	BOOST_EXCEPTION(ec);
 }
 
 
