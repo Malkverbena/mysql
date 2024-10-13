@@ -281,6 +281,14 @@ Ref<SqlResult> MySQL::build_godot_result(mysql::results result, Dictionary _sql_
 
 
 
+Ref<SqlConnection> MySQL::get_connection() {
+	return connection;
+}
+
+Ref<SqlCertificate> MySQL::get_certificate() {
+	return certificate;
+}
+
 
 // Default constructor
 MySQL::MySQL() {
@@ -307,8 +315,22 @@ void MySQL::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("async_execute_sql", "sql file path"), &MySQL::async_execute_sql);
 	ClassDB::bind_method(D_METHOD("async_execute_multi", "queries"), &MySQL::async_execute_multi);
 
+	ClassDB::bind_method(D_METHOD("get_connection"), &MySQL::get_connection);
+	ClassDB::bind_method(D_METHOD("get_certificate"), &MySQL::get_certificate);
+
+/*
+	
+	ADD_PROPERTY(
+		PropertyInfo(
+			Variant::OBJECT, "connection", PROPERTY_HINT_RESOURCE_TYPE, "SqlConnection", PROPERTY_USAGE_NONE), "", "get_connection"
+	);
+
+	ADD_PROPERTY(
+		PropertyInfo(
+			Variant::OBJECT, "certificate", PROPERTY_HINT_RESOURCE_TYPE, "SqlCertificate", PROPERTY_USAGE_NONE), "", "get_certificate"
+	);
 
 
-
-
+*/
+	
 }

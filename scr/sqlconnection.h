@@ -22,6 +22,12 @@ class SqlConnection : public RefCounted {
 	friend class MySQL;
 
 
+protected:
+
+	static void _bind_methods();
+
+
+
 public:
 
 	using MysqlCollations = MYSQLCOLLATIONS;
@@ -34,6 +40,7 @@ public:
 
 
 private:
+	mutable std::mutex connection_mutex;
 
 	Ref<SqlCertificate> certificate;
 
@@ -48,6 +55,7 @@ private:
 	std::shared_ptr<asio::io_context> ctx = nullptr;
 	std::shared_ptr<mysql::any_connection> conn = nullptr;
 
+	awaitable<Dictionary> coro_async_db_connect(boost::mysql::error_code& ec, boost::mysql::diagnostics& diag);
 
 
 
@@ -60,21 +68,6 @@ public:
 	}
 
 	~SqlConnection();
-
-
-
-protected:
-
-	static void _bind_methods();
-
-
-
-	awaitable<Dictionary> coro_async_db_connect(boost::mysql::error_code& ec, boost::mysql::diagnostics& diag);
-
-
-
-public:
-
 
 
 
@@ -94,12 +87,15 @@ public:
 	// "HostName" can be a  UNIX socket path or an IP/HostName. In case of UNIX connections the port will be ignorated.
 	Dictionary db_connect(const String p_hostname = "/var/run/mysqld/mysqld.sock", const int p_port = 3307);
 
+
 	// Cleanly closes the connection to the server.
 	// Sends a quit request. This is required by the MySQL protocol, to inform the server that we're closing the connection gracefully.
 	Dictionary close_connection();
 
+
 	//Resets server-side session state, like variables and prepared statements.
 	Dictionary reset_connection();
+
 
 	// Checks whether the server is alive.
 	bool is_server_alive();
@@ -111,13 +107,16 @@ public:
 
 	ConnType get_connection_type() const { return conn_type; }
 
+
 	// Returns if the connection is configurated to use certificates.
 	bool is_using_certificate() const {return use_certificate; }
+
 
 	// Returns whether the connection negotiated the use of SSL or not.
 	// This function can be used to determine whether you are using a SSL connection or not when using SSL negotiation.
 	// This function always returns false for connections that haven't been established yet. If the connection establishment fails, the return value is undefined.
 	bool get_uses_ssl() const { return conn->uses_ssl(); }
+
 
 	// Returns whether backslashes are being treated as escape sequences.
 	// By default, the server treats backslashes in string values as escape characters.
@@ -131,23 +130,24 @@ public:
 	// This function does not involve server communication.
 	bool backslash_escapes() const { return conn->backslash_escapes(); }
 
+
+
 	// Get credentials methods
-	String get_username() const { return SQLstring_to_GDstring(credentials_params.username); }
-	String get_password() const { return SQLstring_to_GDstring(credentials_params.password); }
-	String get_database() const { return SQLstring_to_GDstring(credentials_params.database); }
-	bool get_multi_queries() const { return credentials_params.multi_queries; }
-	SqlCertificate::SSLMode get_ssl_mode() const { return SqlCertificate::SSLMode(credentials_params.ssl); }
-	SqlConnection::MysqlCollations get_connection_collation() const { return static_cast<SqlConnection::MysqlCollations>(credentials_params.connection_collation); }
+	String get_username() const;
+	String get_password() const;
+	String get_database() const;
+	bool get_multi_queries() const ;
+	SqlCertificate::SSLMode get_ssl_mode() const ;
+	int get_connection_collation() const ;
+
 
 	// Set credentials methods
-	void set_username(String p_username) { credentials_params.username = GDstring_to_SQLstring(p_username); }
-	void set_password(String p_password) { credentials_params.password = GDstring_to_SQLstring(p_password); }
-	void set_database(String p_database) { credentials_params.database = GDstring_to_SQLstring(p_database); }
-	void set_ssl_mode(SqlCertificate::SSLMode p_mode){ credentials_params.ssl = static_cast<boost::mysql::ssl_mode>(p_mode); }
-	void set_multi_queries(bool p_multi_queries) { credentials_params.multi_queries = p_multi_queries; }
-	void set_connection_collation(SqlConnection::MysqlCollations p_collation) { credentials_params.connection_collation = p_collation; }
-
-
+	void set_username(String p_username);
+	void set_password(String p_password);
+	void set_database(String p_database);
+	void set_ssl_mode(SqlCertificate::SSLMode p_mode);
+	void set_multi_queries(bool p_multi_queries);
+	void set_connection_collation(const int p_collation);
 
 
 
@@ -158,6 +158,7 @@ VARIANT_ENUM_CAST(SqlConnection::ConnectionStatus);
 VARIANT_ENUM_CAST(SqlConnection::MysqlCollations);
 VARIANT_ENUM_CAST(SqlConnection::ConnType);
 VARIANT_ENUM_CAST(SqlConnection::AddressType);
+
 
 
 

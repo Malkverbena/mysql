@@ -78,6 +78,9 @@ private:
 
 public:
 
+	Ref<SqlConnection> get_connection();
+	Ref<SqlCertificate> get_certificate();
+
 
 
 	// Execute queries.

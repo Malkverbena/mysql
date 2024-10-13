@@ -6,6 +6,84 @@ using namespace sqlhelpers;
 
 
 
+// ============================ CREDENTIALS ============================
+
+
+String SqlConnection::get_username() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	return credentials_params.username.c_str();
+}
+
+
+String SqlConnection::get_password() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	return SQLstring_to_GDstring(credentials_params.password);
+}
+
+
+String SqlConnection::get_database() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	return SQLstring_to_GDstring(credentials_params.database);
+}
+
+
+bool SqlConnection::get_multi_queries() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	return credentials_params.multi_queries;
+}
+
+
+SqlCertificate::SSLMode SqlConnection::get_ssl_mode() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	return SqlCertificate::SSLMode(credentials_params.ssl);
+}
+
+
+int SqlConnection::get_connection_collation() const {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	return static_cast<int>(credentials_params.connection_collation);
+}
+
+
+void SqlConnection::set_username(String p_username) {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	credentials_params.username = p_username.utf8().get_data();
+}
+
+
+void SqlConnection::set_password(String p_password) {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	credentials_params.password = GDstring_to_SQLstring(p_password);
+}
+
+
+void SqlConnection::set_database(String p_database) {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	credentials_params.database = GDstring_to_SQLstring(p_database);
+}
+
+
+void SqlConnection::set_ssl_mode(SqlCertificate::SSLMode p_mode){
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	credentials_params.ssl = static_cast<boost::mysql::ssl_mode>(p_mode);
+}
+
+
+
+void SqlConnection::set_multi_queries(bool p_multi_queries) {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	credentials_params.multi_queries = p_multi_queries;
+}
+
+
+void SqlConnection::set_connection_collation(int p_collation) {
+	std::lock_guard<std::mutex> lock(connection_mutex);
+	if (p_collation >= default_collation && p_collation <= utf8mb4_0900_bin) {
+		credentials_params.connection_collation = static_cast<std::uint16_t>(p_collation);
+	} else {
+		credentials_params.connection_collation = static_cast<std::uint16_t>(default_collation); // Valor padrão
+	}
+}
 
 
 
@@ -145,40 +223,28 @@ void SqlConnection::_bind_methods() {
 
 
 	// Connection
-	ClassDB::bind_method(D_METHOD("configure_connection", "connection type", "use_certificate"), &SqlConnection::configure_connection, DEFVAL(TCP), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("configure_connection", "connection type", "use_certificate"), &SqlConnection::configure_connection, DEFVAL(SqlConnection::ConnType::TCP), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("is_using_certificate"), &SqlConnection::is_using_certificate);
 
 
 	// Credentials
 	ClassDB::bind_method(D_METHOD("get_username"), &SqlConnection::get_username);
-	ClassDB::bind_method(D_METHOD("set_username", "value"), &SqlConnection::set_username);
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "username"), "set_username", "get_username");
-	ADD_PROPERTY_DEFAULT("username", "");
+	ClassDB::bind_method(D_METHOD("set_username", "username"), &SqlConnection::set_username);
 
 	ClassDB::bind_method(D_METHOD("get_password"), &SqlConnection::get_password);
-	ClassDB::bind_method(D_METHOD("set_password", "value"), &SqlConnection::set_password);
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "password"), "set_password", "get_password");
-	ADD_PROPERTY_DEFAULT("password", "");
+	ClassDB::bind_method(D_METHOD("set_password", "password"), &SqlConnection::set_password);
 
 	ClassDB::bind_method(D_METHOD("get_database"), &SqlConnection::get_database);
-	ClassDB::bind_method(D_METHOD("set_database", "value"), &SqlConnection::set_database);
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "database"), "set_database", "get_database");
-	ADD_PROPERTY_DEFAULT("database", "");
+	ClassDB::bind_method(D_METHOD("set_database", "database"), &SqlConnection::set_database);
 
 	ClassDB::bind_method(D_METHOD("get_multi_queries"), &SqlConnection::get_multi_queries);
-	ClassDB::bind_method(D_METHOD("set_multi_queries", "value"), &SqlConnection::set_multi_queries);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "multi_queries"), "set_multi_queries", "get_multi_queries");
-	ADD_PROPERTY_DEFAULT("multi_queries", false);
+	ClassDB::bind_method(D_METHOD("set_multi_queries", "multi_queries"), &SqlConnection::set_multi_queries);
 
 	ClassDB::bind_method(D_METHOD("get_ssl_mode"), &SqlConnection::get_ssl_mode);
-	ClassDB::bind_method(D_METHOD("set_ssl_mode", "value"), &SqlConnection::set_ssl_mode);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "SSLMode", PROPERTY_HINT_ENUM, "ssl_disable, ssl_enable, ssl_require"), "set_ssl_mode", "get_ssl_mode");
-	ADD_PROPERTY_DEFAULT("SSLMode", SqlCertificate::SSLMode::ssl_enable);
+	ClassDB::bind_method(D_METHOD("set_ssl_mode", "SSLMode"), &SqlConnection::set_ssl_mode);
 
+	ClassDB::bind_method(D_METHOD("set_connection_collation", "collation"), &SqlConnection::set_connection_collation);
 	ClassDB::bind_method(D_METHOD("get_connection_collation"), &SqlConnection::get_connection_collation);
-	ClassDB::bind_method(D_METHOD("set_connection_collation", "value"), &SqlConnection::set_ssl_mode);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "connection_collation", PROPERTY_HINT_ENUM), "set_connection_collation", "set_connection_collation");
-	ADD_PROPERTY_DEFAULT("connection_collation", SqlConnection::MysqlCollations::default_collation);
 
 
 

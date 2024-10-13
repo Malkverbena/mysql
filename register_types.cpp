@@ -4,7 +4,7 @@
 #include "register_types.h"
 
 
-#include "scr/sqlresult.h"
+//#include "scr/sqlresult.h"
 
 #include "scr/mysql.h"
 //#include "scr/sqlconnection.h"
@@ -23,6 +23,8 @@ void initialize_mysql_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(SqlConnection);
 	GDREGISTER_CLASS(SqlCertificate);
 
+//	ClassDB::register_class<SqlConnection>();
+//	GDREGISTER_ABSTRACT_CLASS(SqlConnection);
 }
 
 
