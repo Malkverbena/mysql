@@ -1,91 +1,89 @@
-#!/usr/bin/env python
-#SCsub
-
-
-import os
-from tools import helpers, openssl, boost
-
-
-
-##### ENVIROMENT #####
+# SCsub — módulo MySQL para Godot (ajuste mínimo p/ corrotinas e Asio sem exceptions)
 
 Import('env')
-mysql_env = env.Clone()
+import os
+from os.path import join as PJ
+from SCons.Action import Action
 
-# You don't have to compile third-party libraries each time you compile the module.
-# With the "recompile" option you can recompile just Openssl or just Boost, both of them or none of them.
-opts = Variables(["customs.py"], ARGUMENTS)
-opts.Add(EnumVariable("recompile_sql", "Recompile third party library", "all", ("all", "openssl", "boost", "none")))
-opts.Update(mysql_env)
+mod = env.Clone()
 
+platform = str(mod['platform'])
+arch     = str(mod.get('arch', ''))
+bits     = int(mod.get('bits', 64 if arch.endswith('64') else 32))
 
+MOD_ROOT        = '.'
+TOOLS_PATH      = [PJ(MOD_ROOT, 'tools')]
+THIRDPARTY_BASE = PJ(MOD_ROOT, 'thirdparty')
+ARCH_STR        = arch if arch else ('x86_64' if bits == 64 else 'x86')
+OUTBIN_BASE     = PJ('thirdparty', 'bin', platform, ARCH_STR)
 
-##### FLAGS #####
+# Tools (Boost/OpenSSL)
+mod.Tool('boost',   toolpath=TOOLS_PATH)
+mod.Tool('openssl', toolpath=TOOLS_PATH)
 
-# Enable Boost separate compilation mode
-#mysql_env.Append(CPPDEFINES=["BOOST_MYSQL_SEPARATE_COMPILATION"])
+boost_info = mod.BoostInstall(
+    thirdparty_base='thirdparty',
+    outbin_base=OUTBIN_BASE,
+    platform=platform,
+    bits=bits,
+)
 
-# Build with exceptions!
-#if env["disable_exceptions"]:
-#	if env.msvc and ("_HAS_EXCEPTIONS", 0) in mysql_env["CPPDEFINES"]:
-#		mysql_env["CPPDEFINES"].remove(("_HAS_EXCEPTIONS", 0))
-#		mysql_env.AppendUnique(CPPFLAGS=["/EHsc"])
-#	elif not env.msvc and "-fno-exceptions" in mysql_env["CPPFLAGS"]:
-#		mysql_env["CPPFLAGS"].remove("-fno-exceptions")
+openssl_info = mod.OpenSSLStatic(
+    thirdparty_base='thirdparty',
+    outbin_base=OUTBIN_BASE,
+    platform=platform,
+    arch=arch,
+    bits=bits,
+    prefer_mingw=bool(mod.get('use_mingw', False)),
+)
 
-mysql_env.Append(CPPFLAGS=[
-	'-fexceptions',
-	'-std=c++20',
-])
+# Include/Libs
+mod.Prepend(CPPPATH = boost_info['include_dirs'] + openssl_info['include_dirs'])
+mod.Prepend(LIBPATH = openssl_info['lib_dirs'])
+mod.Prepend(LIBS    = openssl_info['libs'])
 
-target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
+if platform == 'linuxbsd':
+    mod.Prepend(LIBS=['dl', 'pthread'])
+elif platform == 'windows':
+    mod.Prepend(LIBS=['ws2_32', 'bcrypt', 'advapi32', 'crypt32'])
 
+# ---- Correções cruciais ----
+# 1) Asio sem exceptions (mantém -fno-exceptions do Godot sem tocar em BOOST_NO_EXCEPTIONS)
+env.Append(CPPDEFINES=['BOOST_ASIO_NO_EXCEPTIONS', 'ASIO_NO_EXCEPTIONS'])
 
+# 2) Corrotinas C++20 (precisa estar PRESENTE na linha de comando final; por isso usamos 'env')
+#    A última opção de -std vence; isso habilita awaitable/co_spawn.
+env.Append(CCFLAGS=['-std=gnu++20'])
 
-##### PATHS #####
+# Gerar o "separate compilation" do Boost.MySQL
+GENERATED_DIR = PJ(MOD_ROOT, 'generated')
+GENERATED_SRC = PJ(GENERATED_DIR, 'boost_mysql_separate.cpp')
 
-# Use absolut paths to avoid problem between platforms.
-# dep_path = os.path.join(os.getcwd(), "3party")
+def _write_boost_mysql_separate(target, source, env):
+    os.makedirs(GENERATED_DIR, exist_ok=True)
+    content = (
+        "// Gerado automaticamente.\n"
+        "#define BOOST_ASIO_NO_EXCEPTIONS 1\n"
+        "#define ASIO_NO_EXCEPTIONS 1\n"
+        "#define BOOST_MYSQL_SEPARATE_COMPILATION\n"
+        "#include <boost/mysql/src.hpp>\n"
+    )
+    with open(str(target[0]), 'w', encoding='utf-8') as f:
+        f.write(content)
+    return 0
 
-openssl_path = openssl.get_openssl_install_path(mysql_env)
-openssl_include_path = openssl_path + "/include"
-openssl_lib_path = openssl_path + "/lib64"
-boost_path = boost.get_boost_install_path(mysql_env)
-boost_include_path = boost_path + "/include"
-boost_lib_path = boost_path + "/stage/lib"
+gen_node = mod.Command(
+    target=GENERATED_SRC,
+    source=[],
+    action=Action(_write_boost_mysql_separate, cmdstr='[gen] $TARGET')
+)
+mod.Clean(gen_node, GENERATED_SRC)
+mod.Clean(gen_node, GENERATED_DIR)
 
+# Sources
+sources = []
+sources += Glob(PJ(MOD_ROOT, 'src', '*.cpp'))
+sources.append(gen_node[0])
 
-##### THIRDPARTY COMPILATION #####
-
-# Update and compile thirdparty.
-helpers.apply_config(mysql_env)
-
-
-
-##### GODOT MODULE #####
-
-# INCLUDE:
-mysql_env.Prepend(CPPPATH=[
-	openssl_include_path,
-	boost_include_path,
-#	openssl_path
-])
-
-# LIB
-env.Prepend(LIBPATH=[
-	openssl_lib_path,
-	boost_lib_path,
-#	openssl_path
-])
-
-mysql_env.add_source_files(env.modules_sources, "*.cpp")
-mysql_env.add_source_files(env.modules_sources, "scr/**.cpp")
-
-
-env.Prepend(LIBS=["libboost_thread", "libcrypto", "libssl"])
-
-
-
-
-
-
+mod.Prepend(CPPPATH=[PJ(MOD_ROOT, 'src')])
+mod.add_source_files(env.modules_sources, sources)

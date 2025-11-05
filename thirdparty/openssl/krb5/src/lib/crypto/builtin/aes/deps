@@ -1,0 +1,9 @@
+#
+# Generated makefile dependencies follow.
+#
+aescrypt.so aescrypt.po $(OUTPRE)aescrypt.$(OBJEXT): \
+  aes.h aescrypt.c aesopt.h aestab.h brg_endian.h brg_types.h
+aestab.so aestab.po $(OUTPRE)aestab.$(OBJEXT): aes.h \
+  aesopt.h aestab.c aestab.h brg_endian.h brg_types.h
+aeskey.so aeskey.po $(OUTPRE)aeskey.$(OBJEXT): aes.h \
+  aeskey.c aesopt.h aestab.h brg_endian.h brg_types.h

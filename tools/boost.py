@@ -1,181 +1,132 @@
-#!/usr/bin/env python3
-# boost.py
+# tools/boost.py
+# - Usa o sistema nativo do Boost (bootstrap + b2) para preparar/instalar headers
+# - Instala em: thirdparty/bin/<platform>/<arch>/boost/install/include
+# - Não requer paths do usuário; assume submódulo em thirdparty/boost (ou boost_1_xx_x)
 
+import os
+import glob
+import subprocess
+import shutil
+from os.path import join as PJ
 
-# https://www.boost.org/build/tutorial.html
+REQUIRED_REL_HEADER = PJ('boost', 'mysql', 'mariadb_collations.hpp')
 
+def _run(cmd, cwd=None, env=None):
+    print(f'[boost] {cmd}')
+    subprocess.check_call(cmd, shell=True, cwd=cwd, env=env)
 
-import os, subprocess
-from tools import helpers
+def _jobs():
+    try:
+        n = os.cpu_count() or 1
+    except Exception:
+        n = 1
+    return max(1, int(n))
 
+def _dir(p): return os.path.isdir(p)
+def _file(p): return os.path.isfile(p)
 
-def compile_boost(env):
+def _find_boost_root(thirdparty_base):
+    """
+    Localiza a raiz do submódulo Boost (onde ficam bootstrap.sh/b2).
+    Suporta:
+      - thirdparty/boost
+      - thirdparty/boost_1_XX_X
+    """
+    candidates = [PJ(thirdparty_base, 'boost')]
+    candidates += sorted(glob.glob(PJ(thirdparty_base, 'boost_*')))
 
-	jobs = "-j" + str(env.GetOption("num_jobs"))
-	boost_path = f"{os.getcwd()}/3party/boost"
-	
-	boost_prefix = get_boost_install_path(env)		# --exec-prefix=
-	boost_stage_dir = f"{boost_prefix}/stage"		# --exec-prefix=
-	boost_lib_dir = f"{boost_stage_dir}/lib"		# --libdir=
-	boost_include_dir = f"{boost_prefix}/include"	# --includedir=
-	build_dir = f"{boost_prefix}/build"				# --build-dir=
+    for root in candidates:
+        if _file(PJ(root, 'bootstrap.sh')) or _file(PJ(root, 'bootstrap.bat')):
+            return root
 
+    raise RuntimeError(
+        "[mysql module] Não encontrei o submódulo do Boost em thirdparty/.\n"
+        "Esperado algo como: thirdparty/boost (com bootstrap.sh)."
+    )
 
-	is_win_host = (helpers.get_host() == "windows")
-	bootstrap = "bootstrap.bat" if is_win_host else "bootstrap.sh"
-	b2 = "b2.exe" if is_win_host else "b2"
-	cmd_b2 = [b2]
+def _ensure_dir(p):
+    os.makedirs(p, exist_ok=True)
 
-	bootstrap_command = [
-		"bash", bootstrap,
-		f"--prefix={boost_prefix}",
-		f"--libdir={boost_lib_dir}",
-		f"--includedir={boost_include_dir}"
-	]
-	compiller = helpers.get_compiller(env)
-	if compiller == "clang":
-		bootstrap_command.append("--with-toolset=clang")
+def _installed_headers_ok(install_inc):
+    return _file(PJ(install_inc, REQUIRED_REL_HEADER))
 
-	if not os.path.exists(boost_prefix):
-		os.makedirs(boost_prefix)
+def BoostInstall(env, thirdparty_base, outbin_base, platform, bits):
+    boost_root   = _find_boost_root(thirdparty_base)
+    install_root = PJ(outbin_base, 'boost', 'install')
+    install_inc  = PJ(install_root, 'include')
+    dst_boost    = PJ(install_inc, 'boost')
 
+    # Já instalado?
+    if _dir(dst_boost) and _installed_headers_ok(install_inc):
+        print(f'[boost] usando instalação existente: {install_inc}')
+        return {'include_dirs': [install_inc]}
 
-	try:
-		subprocess.check_call(bootstrap_command, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
-	except subprocess.CalledProcessError as e:
-		print(f"Error trying configure Boost: {e}")
-		exit(1)
+    # 1) Bootstrap (se necessário)
+    if os.name == 'nt':
+        b2_path = PJ(boost_root, 'b2.exe')
+        b2_cmd  = 'b2.exe'  # com cwd=boost_root
+        if not _file(b2_path):
+            _run('cmd /c bootstrap.bat', cwd=boost_root)
+    else:
+        b2_path = PJ(boost_root, 'b2')
+        b2_cmd  = './b2'    # com cwd=boost_root (CORREÇÃO AQUI)
+        if not _file(b2_path):
+            _run('bash ./bootstrap.sh', cwd=boost_root)
+        # garante executável (eventuais permissões após checkout)
+        if _file(b2_path):
+            try:
+                os.chmod(b2_path, 0o755)
+            except Exception:
+                pass
 
+    if not _file(b2_path):
+        raise RuntimeError('[boost] Falha ao gerar o b2 (bootstrap).')
 
+    # 2) Rodar b2 "headers" (não compila libs; prepara árvore de headers)
+    common_args = [
+        b2_cmd,                          # usar comando relativo ao cwd
+        f'-j{_jobs()}',
+        f'address-model={bits}',
+        'threading=multi',
+        'variant=release',
+        'link=static',
+        'runtime-link=static',
+        '--ignore-site-config',
+    ]
+    if platform == 'windows':
+        common_args.append('target-os=windows')
+    elif platform == 'linuxbsd':
+        common_args.append('target-os=linux')
 
-	is_cross_compilation = is_cross_compile(env)
-	if is_cross_compilation:
-		project_comp = get_project_set(env)
-		with open('project-config.jam', 'a') as arquivo:
-			arquivo.write(project_comp + "\n")
+    _run(' '.join(common_args + ['headers']), cwd=boost_root)
 
+    # 3) Instalar headers no prefixo do módulo
+    _ensure_dir(install_inc)
+    print(f'[boost] instalando headers em: {install_inc}')
+    # Copia somente a pasta "boost/" (headers) para o prefixo
+    src_headers = PJ(boost_root, 'boost')
+    if not _dir(src_headers):
+        alt = PJ(boost_root, 'include', 'boost')
+        if _dir(alt):
+            src_headers = alt
 
-	target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
+    if not _dir(src_headers):
+        raise RuntimeError('[boost] Não encontrei diretório de headers "boost/".')
 
-	
-	cmd_b2 += [
-		jobs,
-		"-a",
-		"link=static",
-		"threading=multi",
-		"runtime-link=static",
-		"variant=release",
-		f"--build-dir={build_dir}",
-		f"--exec-prefix={boost_prefix}",
-		f"--stagedir={boost_stage_dir}",
-		f"toolset={get_toolset(env)}",
-		f"address-model={target_bits}",
-		f"architecture={get_architecture(env)}",
-		f"target-os={get_target_os(env)}",
-		"headers"
-	]
+    shutil.copytree(src_headers, dst_boost, dirs_exist_ok=True)
 
-	print(cmd_b2)
+    # 4) Verificação final
+    if not _installed_headers_ok(install_inc):
+        raise RuntimeError(
+            "[boost] Instalação de headers concluída, mas não encontrei "
+            "'boost/mysql/mariadb_collations.hpp' no destino."
+        )
 
-	subprocess.check_call(cmd_b2, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
-	cmd_b2.pop()
-	subprocess.check_call(cmd_b2, cwd=boost_path, env={"PATH": f"{boost_path}:{os.environ['PATH']}"})
+    print(f'[boost] headers instalados em: {install_inc}')
+    return {'include_dirs': [install_inc]}
 
+def generate(env):
+    env.AddMethod(BoostInstall, 'BoostInstall')
 
-	return 0
-
-
-
-def get_project_set(env):
-	target_platform = env["platform"]
-	host_platform = helpers.get_host()
-	target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
-	compiller = helpers.get_compiller(env)
-
-	if host_platform == "linuxbsd":
-		if target_platform ==  "windows":
-			if compiller == "gcc":
-				if target_bits == "64":
-					"using gcc : mingw : x86_64-w64-mingw32-g++ ;"
-				else:
-					"using gcc : mingw : i686-w64-mingw32-g++ ;"
-			elif compiller == "clang":
-				if target_bits == "64":
-					"using clang : : x86_64-w64-mingw32-clang++ ;"
-				else:
-					"using clang : : i686-w64-mingw32-clang++ ;"
-
-	if host_platform == "windows":
-		#TODO:
-		pass
-
-
-
-
-def is_cross_compile(env):
-	host_bits = helpers.get_host_bits()
-	host_platform = helpers.get_host()
-	target_platform = env["platform"]
-	target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
-	return (host_platform != target_platform or host_bits != target_bits)
-
-
-
-def get_target_os(env):
-	if env["platform"] == "windows":
-		return "windows"
-	elif env["platform"] == "linuxbsd":
-		return "linux"
-	elif env["platform"] == "macos":
-		return "darwin"
-	else:
-		return ""
-
-
-
-
-def get_toolset(env):
-	compiller = helpers.get_compiller(env)
-	if compiller == "":
-		return ""
-
-	if env["platform"] == "windows":
-		if compiller == "gcc":
-			return "gcc-mingw"
-		elif compiller == "clang":
-			return "clang-mingw"
-		else:
-			return ""
-
-	if env["platform"] == "linuxbsd":
-		return compiller
-
-	return ""
-
-
-
-# Supports ["x86", "arm", "power", riscv"] for now
-def get_architecture(env):
-	godot_target = env["arch"]
-	if "x86" in godot_target:
-		return "x86"
-	elif "arm" in godot_target:
-		return "arm"
-	elif "ppc" in godot_target:
-		return "power"
-	elif "rv" in godot_target:
-		return "riscv"
-	elif "wasm" in godot_target:
-		return "????"
-
-
-
-def get_boost_install_path(env):
-	bin_path = f"{os.getcwd()}/3party/bin"
-	_lib_path = [bin_path, env["platform"], env["arch"]]
-	if env["use_llvm"]:
-		_lib_path.append("llvm")
-	_lib_path.append("boost")
-	lib_path = "/".join(_lib_path)
-	return lib_path
-
+def exists(env):
+    return True

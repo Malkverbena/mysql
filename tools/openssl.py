@@ -1,263 +1,149 @@
-#!/usr/bin/env python3
-# openssl.py
-
-
-import os, subprocess, sys
-from tools import helpers
-
-
-
-def compile_openssl(env):
-
-	target_platform = env["platform"]
-	win_host = is_win_host(env)
-	jobs = str(env.GetOption("num_jobs"))
-
-	cmd_config = ["perl", "Configure"] if win_host else ["Configure"]
-	cmd_depend = ["nmake", "test"] if win_host else ["make", "depend"]
-	cmd_compile = ['nmake'] if win_host else ["make", "-j" + jobs]
-	cmd_install =  ["nmake install"] if win_host else ["make", "install"]
-
-	cross_compilation_param = get_cross_compilation_param(env)
-	if cross_compilation_param != []:
-		cmd_config += cross_compilation_param
-
-	target = get_target(env)
-	cmd_config.append(target)
-
-	options = ssl_options(target_platform)
-	cmd_config.extend(options)
-
-	openssl_path = get_openssl_path(env)
-	lib_path = get_openssl_install_path(env)
-	cmd_config.append("--prefix=" + lib_path)
-	cmd_config.append("--openssldir=" + lib_path)
-	cmd_config.append("-Wl,-rpath=" + lib_path + "/lib64")
-
-	if not os.path.exists(lib_path):
-		os.makedirs(lib_path)
-
-
-	print(cmd_config)
-	print(cmd_depend)
-	print(cmd_compile)
-	print(cmd_install)
-
-	subprocess.check_call(cmd_config, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-	subprocess.check_call(cmd_depend, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-	subprocess.check_call(cmd_compile, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-	subprocess.check_call(cmd_install, cwd=openssl_path, env={"PATH": f"{openssl_path}:{os.environ['PATH']}"})
-
-	return 0
-
-
-
-
-def is_win_host(env):
-	return sys.platform in ["win32", "msys", "cygwin"]
-
-
-def get_cross_compilation_param(env):
-
-	platform = env["platform"]
-	host = helpers.get_host()
-	target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
-	host_bits =  helpers.get_host_bits()
-	is_cross_compile = (host != platform or host_bits != target_bits)
-	llvm = env["use_llvm"]
-
-	if platform == "windows":
-		if not (is_win_host(env) or env.get("is_msvc", False)):
-			if llvm:
-				if target_bits == "64":
-					return ["--cross-compile-prefix=x86_64-w64-mingw32-"]
-				else:
-					return ["--cross-compile-prefix=i686-w64-mingw32-"]
-			else:
-				if target_bits == "64":
-					return ["--cross-compile-prefix=mingw-w64-x86_64-gcc"]
-				else:
-					return ["--cross-compile-prefix=mingw-w64-i686-gcc"]
-
-
-
-
-
-	elif platform == "linuxbsd":
-		if is_cross_compile:
-			if target_bits == "64":
-				return ["--cross-compile-prefix=x86_64-linux-gnu-"]
-			else:
-				return ["--cross-compile-prefix=i686-linux-gnu-"]
-
-	elif platform == "macos":
-		args =[]
-		if sys.platform != "darwin" and "OSXCROSS_ROOT" in os.environ:
-			for k in ["CC", "CXX", "AR", "AS", "RANLIB"]:
-				args.append("%s=%s" % (k, env[k]))
-		return args
-
-
-	return []
-
-
-
-def get_openssl_install_path(env):
-	_lib_path = [os.getcwd(), "3party", "bin", env["platform"], env["arch"]]
-	if env["use_llvm"]:
-		_lib_path.append("llvm")
-	_lib_path.append("openssl")
-	lib_path = ""
-	if is_win_host(env):
-		lib_path = "\\-=-".join(_lib_path)
-		lib_path = lib_path.replace("-=-", "")
-	else:
-		lib_path = "/".join(_lib_path)
-	return lib_path
-
-
-def get_openssl_path(env):
-	_openssl_path = [os.getcwd(), "3party", "openssl"]
-	openssl_path = ""
-	if is_win_host(env):
-		openssl_path = "\\-=-".join(_openssl_path)
-		openssl_path = openssl_path.replace("-=-", "")
-	else:
-		openssl_path = "/".join(_openssl_path)
-	return openssl_path
-
-
-
-
-def get_target(env):
-
-	platform = env["platform"]
-	arch = env["arch"]
-	compiller = helpers.get_compiller(env)
-
-	if platform == "linuxbsd":
-		if compiller == "gcc":
-			if arch == "x86_32":
-				return "linux-x86"
-			elif arch == "x86_64":
-				return "linux-x86_64"
-			elif arch == "arm32":
-				return "linux-armv4"
-			elif arch == "arm64":
-				return "linux-aarch64"
-			elif arch == "rv64":
-				return "linux64-riscv64"
-			elif arch == "ppc32":
-				return "linux-ppc"
-			elif arch == "ppc64":
-				return "linux-ppc64"
-			elif arch == "ppc64":
-				return "linux-ppc64"
-
-		elif compiller == "clang":
-			if arch == "x86_32":
-				return "linux-x86-clang"
-			elif arch == "x86_64":
-				return "linux-x86_64-clang"
-			elif arch == "arm32":
-				return "linux-armv4"
-			elif arch == "arm64":
-				return "linux-aarch64"
-			elif arch == "rv64":
-				return "linux64-riscv64"
-			elif arch == "ppc32":
-				return "linux-ppc"
-			elif arch == "ppc64":
-				return "linux-ppc64"
-			elif arch == "ppc64":
-				return "linux-ppc64"
-
-	elif platform == "windows":
-		if env.msvc:
-			if arch == "x86_32":
-				return "VC-WIN32"
-			if arch == "x86_64":
-				return  "VC-WIN64A"
-			if arch == "arm32":
-				return  "VC-WIN64-ARM"
-		else:
-			if arch == "x86_32":
-				return "mingw"
-			if arch == "x86_64":
-				return  "mingw"
-
-	elif platform == "macos":
-		llvm = env["use_llvm"] == True
-		darwin_target = ""
-
-		if arch == "x86_64":
-			darwin_target = "darwin64-x86_64"
-		elif arch == "x86_32":
-			darwin_target = "darwin-i386"
-		elif arch == "arm64":
-			darwin_target = "darwin64-arm64"
-		elif arch == "ppc32":
-			darwin_target = "darwin-ppc"
-		elif arch == "ppc64":
-			darwin_target = "darwin64-ppc"
-
-		if llvm:
-			darwin_target += "-clang"
-
-		return darwin_target
-
-
-
-
-# https://wiki.openssl.org/index.php/Compilation_and_Installation#Supported_Platforms
-
-	print("FALHA:" + arch + " -> " + platform)
-	raise ValueError("Architecture '%s' not supported for platform: '%s'" % (arch, platform))
-	return ""
-
-
-
-def get_architecture(env):
-	architecture = ""
-	if env["arch"] in ["x86_32", "x86_64"]:
-		return "x86"
-	elif env["arch"] in ["arm32", "arm64"]:
-		return "arm"
-	elif env["arch"] in ["rv64"]:
-		return "riscv"
-	elif env["arch"] in ["ppc32", "ppc64"]:
-		return "power"
-	elif env["arch"] in ["wasm32"]:
-		return "wasm"
-
-	raise ValueError("Architecture '%s' not supported for platform: '%s'" % (env["arch"], env["platform"]))
-	return architecture
-
-
-
-
-# https://wiki.openssl.org/index.php/Compilation_and_Installation
-# Olhar antes de adicionar novas plataformas
-def ssl_options(platform):
-	ssl_config_options = [
-		"no-ssl3",
-		"no-weak-ssl-ciphers",
-		"no-legacy",
-		"no-shared",
-		"shared",
-		"no-tests",
-		"no-docs",
-	]
-
-	if platform == "windows":
-		ssl_config_options.append("enable-capieng")
-
-	return ssl_config_options
-
-
-
-
-def update_openssl():
-	git_cmd = ["git pull", "--recurse-submodules"]
-	subprocess.run(git_cmd, shell=True, cwd="3party/openssl")
-
+# tools/openssl.py
+# - Usa o build nativo do OpenSSL (./Configure + make install_sw)
+# - Compila ESTÁTICO e instala em: thirdparty/bin/<platform>/<arch>/openssl/install/{include,lib|lib64}
+# - Detecta plataforma/bits (Linux e cross Linux->Windows via MinGW)
+# - Não requer paths do usuário; assume submódulo em thirdparty/openssl
+
+import os
+import subprocess
+from os.path import join as PJ
+
+def _run(cmd, cwd=None, env=None):
+    print(f'[openssl] {cmd}')
+    subprocess.check_call(cmd, shell=True, cwd=cwd, env=env)
+
+def _jobs():
+    try:
+        n = os.cpu_count() or 1
+    except Exception:
+        n = 1
+    return max(1, int(n))
+
+def _target_for_configure(platform, bits):
+    if platform == 'linuxbsd':
+        return 'linux-x86_64' if bits == 64 else 'linux-x86'
+    if platform == 'windows':
+        return 'mingw64' if bits == 64 else 'mingw'
+    raise RuntimeError(f'[openssl] Plataforma não suportada: {platform}/{bits} bits')
+
+def _env_for_cross(platform, bits, prefer_mingw):
+    env = os.environ.copy()
+    if platform == 'windows' and prefer_mingw:
+        trip = 'x86_64-w64-mingw32' if bits == 64 else 'i686-w64-mingw32'
+        env.update({
+            'CC':      f'{trip}-gcc',
+            'CXX':     f'{trip}-g++',
+            'AR':      f'{trip}-ar',
+            'RANLIB':  f'{trip}-ranlib',
+            'WINDRES': f'{trip}-windres',
+            'CROSS_COMPILE': f'{trip}-',
+        })
+    return env
+
+def _ensure_dir(p):
+    os.makedirs(p, exist_ok=True)
+
+def _has_static_libs(libdir):
+    if not os.path.isdir(libdir):
+        return False
+    ssl_a      = os.path.join(libdir, 'libssl.a')
+    crypto_a   = os.path.join(libdir, 'libcrypto.a')
+    ssl_lib    = os.path.join(libdir, 'libssl.lib')
+    crypto_lib = os.path.join(libdir, 'libcrypto.lib')
+    return (os.path.isfile(ssl_a) and os.path.isfile(crypto_a)) or (os.path.isfile(ssl_lib) and os.path.isfile(crypto_lib))
+
+def _has_headers(incdir):
+    return os.path.isfile(os.path.join(incdir, 'openssl', 'ssl.h'))
+
+def _find_libdir_abs(install_root_abs):
+    """Retorna o diretório de libs que realmente contém as libs estáticas (lib/ ou lib64/)."""
+    for cand in ('lib', 'lib64'):
+        d = os.path.join(install_root_abs, cand)
+        if _has_static_libs(d):
+            return d
+    return None
+
+def OpenSSLStatic(env, thirdparty_base, outbin_base, platform, arch, bits, prefer_mingw=False):
+    # Caminhos relativos (para retorno ao SCons)
+    install_root_rel = PJ(outbin_base, 'openssl', 'install')
+    install_inc_rel  = PJ(install_root_rel, 'include')
+    # lib dir relativo será decidido depois (lib ou lib64)
+    build_dir_rel    = PJ(outbin_base, 'openssl', 'build')
+    src_dir_rel      = PJ(thirdparty_base, 'openssl')
+
+    # Caminhos absolutos para as chamadas externas
+    build_dir_abs    = os.path.abspath(build_dir_rel)
+    install_root_abs = os.path.abspath(install_root_rel)
+    install_inc_abs  = os.path.abspath(install_inc_rel)
+    src_dir_abs      = os.path.abspath(src_dir_rel)
+    src_config_abs   = os.path.join(src_dir_abs, 'Configure')
+
+    # Já instalado? (reutiliza)
+    libdir_abs = _find_libdir_abs(install_root_abs)
+    if _has_headers(install_inc_abs) and libdir_abs:
+        # Determina relativo libdir (lib ou lib64) a partir do sufixo
+        libdir_name = os.path.basename(libdir_abs)
+        install_lib_rel = PJ(install_root_rel, libdir_name)
+        print(f'[openssl] usando instalação pré-existente: {install_root_rel} ({libdir_name})')
+        return {'include_dirs': [install_inc_rel], 'lib_dirs': [install_lib_rel], 'libs': ['ssl', 'crypto']}
+
+    # Submódulo de fontes do OpenSSL
+    if not os.path.isfile(src_config_abs):
+        raise RuntimeError(
+            '[mysql module] OpenSSL não encontrado em thirdparty/openssl (submódulo ausente).\n'
+            'Execute: git submodule update --init --recursive'
+        )
+
+    # Pastas de build/instalação
+    _ensure_dir(build_dir_abs)
+    _ensure_dir(install_inc_abs)
+    # Não criamos lib/ aqui; deixe o instalador escolher (lib ou lib64)
+
+    target   = _target_for_configure(platform, bits)
+    xenv     = _env_for_cross(platform, bits, prefer_mingw)
+
+    conf_flags = [
+        target,
+        'no-shared',
+        'no-dso',
+        'no-tests',
+        'no-module',
+        'no-filenames',
+        f'--prefix={install_root_abs}'   # prefixo absoluto exigido pelo OpenSSL
+    ]
+
+    # -fPIC em Linux para linkar estático dentro de .so do Godot
+    cflags = xenv.get('CFLAGS', '')
+    if platform == 'linuxbsd' and '-fPIC' not in cflags:
+        xenv['CFLAGS']   = (cflags + ' -fPIC').strip()
+        xenv['CXXFLAGS'] = (xenv.get('CXXFLAGS', '') + ' -fPIC').strip()
+
+    # Em Windows/MinGW, se não houver nasm, desabilita asm para simplificar
+    if platform == 'windows':
+        try:
+            subprocess.check_call(['nasm', '-v'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            conf_flags.append('no-asm')
+
+    print(f'[openssl] compilando a partir de fontes: {src_dir_rel}')
+    _run(f'perl "{src_config_abs}" {" ".join(conf_flags)}', cwd=src_dir_abs, env=xenv)
+    _run(f'make -j{_jobs()}', cwd=src_dir_abs, env=xenv)
+    _run('make install_sw',   cwd=src_dir_abs, env=xenv)
+
+    # Após instalar, descubra se foi lib/ ou lib64/
+    libdir_abs = _find_libdir_abs(install_root_abs)
+    if not (_has_headers(install_inc_abs) and libdir_abs):
+        raise RuntimeError('[openssl] Build finalizado, mas não encontrei headers/libs estáticos esperados.')
+
+    libdir_name     = os.path.basename(libdir_abs)  # 'lib' ou 'lib64'
+    install_lib_rel = PJ(install_root_rel, libdir_name)
+
+    print(f'[openssl] instalado em: {install_root_rel} ({libdir_name})')
+    # Retorna caminhos RELATIVOS para o SCons
+    return {'include_dirs': [install_inc_rel], 'lib_dirs': [install_lib_rel], 'libs': ['ssl', 'crypto']}
+
+def generate(env):
+    env.AddMethod(OpenSSLStatic, 'OpenSSLStatic')
+
+def exists(env):
+    return True
