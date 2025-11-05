@@ -12,7 +12,7 @@ from tools import helpers
 def compile_boost(env):
 
 	jobs = "-j" + str(env.GetOption("num_jobs"))
-	boost_path = f"{os.getcwd()}/3party/boost"
+	boost_path = f"{os.getcwd()}/thirdparty/boost"
 	
 	boost_prefix = get_boost_install_path(env)		# --exec-prefix=
 	boost_stage_dir = f"{boost_prefix}/stage"		# --exec-prefix=
@@ -171,7 +171,7 @@ def get_architecture(env):
 
 
 def get_boost_install_path(env):
-	bin_path = f"{os.getcwd()}/3party/bin"
+	bin_path = f"{os.getcwd()}/thirdparty/bin"
 	_lib_path = [bin_path, env["platform"], env["arch"]]
 	if env["use_llvm"]:
 		_lib_path.append("llvm")

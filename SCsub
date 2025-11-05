@@ -45,7 +45,7 @@ target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "
 ##### PATHS #####
 
 # Use absolut paths to avoid problem between platforms.
-# dep_path = os.path.join(os.getcwd(), "3party")
+# dep_path = os.path.join(os.getcwd(), "thirdparty")
 
 openssl_path = openssl.get_openssl_install_path(mysql_env)
 openssl_include_path = openssl_path + "/include"

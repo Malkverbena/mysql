@@ -53,5 +53,5 @@ __pycache__/
 .godot/
 dep/
 deb/
-3party/bin/
+thirdparty/bin/
 
