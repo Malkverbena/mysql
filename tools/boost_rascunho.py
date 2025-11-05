@@ -38,7 +38,7 @@ def get_host():
 
 def update_boost():
 	git_cmd = ["git pull", "--recurse-submodules"]
-	subprocess.run(git_cmd, shell=True, cwd="3party/boost")
+	subprocess.run(git_cmd, shell=True, cwd="thirdparty/boost")
 
 
 def get_variant(env):
@@ -80,7 +80,7 @@ def execute(env, commands, tool):
 
 #	comp = f"--with-toolset={tool}"
 
-	caminho_executavel = f"{os.getcwd()}/3party/boost"
+	caminho_executavel = f"{os.getcwd()}/thirdparty/boost"
 	os.chdir(caminho_executavel)
 
 	is_win_host = sys.platform in ["win32", "msys", "cygwin"]

@@ -103,7 +103,7 @@ def get_cross_compilation_param(env):
 
 
 def get_openssl_install_path(env):
-	_lib_path = [os.getcwd(), "3party", "bin", env["platform"], env["arch"]]
+	_lib_path = [os.getcwd(), "thirdparty", "bin", env["platform"], env["arch"]]
 	if env["use_llvm"]:
 		_lib_path.append("llvm")
 	_lib_path.append("openssl")
@@ -117,7 +117,7 @@ def get_openssl_install_path(env):
 
 
 def get_openssl_path(env):
-	_openssl_path = [os.getcwd(), "3party", "openssl"]
+	_openssl_path = [os.getcwd(), "thirdparty", "openssl"]
 	openssl_path = ""
 	if is_win_host(env):
 		openssl_path = "\\-=-".join(_openssl_path)
@@ -259,5 +259,5 @@ def ssl_options(platform):
 
 def update_openssl():
 	git_cmd = ["git pull", "--recurse-submodules"]
-	subprocess.run(git_cmd, shell=True, cwd="3party/openssl")
+	subprocess.run(git_cmd, shell=True, cwd="thirdparty/openssl")
 
