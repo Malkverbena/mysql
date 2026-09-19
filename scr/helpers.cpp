@@ -17,7 +17,7 @@ char* copy_string(char s[]) {
 
 
 String SqlStr2GdtStr(mysql::string_view s) {
-	String str(s.data(), s.size());
+	String str = String::utf8(s.data(), s.size());
 	return str;
 }
 
@@ -112,7 +112,7 @@ Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_vi
 	for(size_t row = 0; row < batch.size(); row++) {
 		Dictionary line = Dictionary();
 		size_t f = 0;
-		for (auto fv : batch.at(row).as_vector()) {
+		for (auto fv : batch[row].as_vector()) {
 			String column_name = String(meta_coll[f].column_name().data());
 			mysql::column_type column_type = meta_coll[f].type();
 			line[column_name] = field2Var(fv, column_type);
@@ -253,7 +253,7 @@ Variant field2Var(const mysql::field_view fv, mysql::column_type column_type) {
 	}
 
 	else if (fv.is_int64()) {
-		int64_t i = fv.as_int64();
+		int64_t i = fv.get_int64();
 		return i;
 	}
 

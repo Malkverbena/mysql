@@ -57,18 +57,12 @@ Dictionary make_raw_result(mysql::rows_view batch, mysql::metadata_collection_vi
 	} else																			\
 		((void)0)
 
-#define CORO_SQL_EXCEPTION(m_errcode, m_diag, m_dic, m_ret)							\
+// For callbacks of async operations (return type void).
+#define ASYNC_SQL_EXCEPTION(m_errcode, m_diag, m_dic)								\
 	if (unlikely(m_errcode)) {														\
 		sql_dictionary(m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);\
 		print_sql_exception(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);	\
-	} else																			\
-		((void)0)
-
-#define CORO_SQL_EXCEPTION_VOID(m_errcode, m_diag, m_dic)							\
-	if (unlikely(m_errcode)) {														\
-		sql_dictionary(m_dic, FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);\
-		print_sql_exception(FUNCTION_NAME, __FILE__, __LINE__, m_diag, m_errcode);	\
-		co_return;																	\
+		return;																		\
 	} else																			\
 		((void)0)
 
