@@ -5,7 +5,7 @@
 
 Boost.MySQL is a client for MySQL and MariaDB database servers, based on Boost.Asio.
 Boost.MySQL is part of Boost.
-This module takes advantage of C++20.
+This module is written in C++17 and, like Godot's default, is built without C++ exceptions (`no_exception`).
 Check out the Boost repository: [Boost.MySQL](https://github.com/boostorg/mysql?tab=readme-ov-file).
 
 
@@ -33,9 +33,13 @@ Version 1.0 uses C++ MySQL Connector Library from [Oracle](https://dev.mysql.com
 * Android - In the future.
 * Web - need help.
 
-### [See the full list of features here.](https://github.com/Malkverbena/mysql/blob/3.0/capabilities.md)
+### [See the full list of features here.](capabilities.md)
 
-### [Compilation intruction here!](https://github.com/Malkverbena/mysql/blob/3.0/compilation.md)
+### [Compilation instructions here!](compilation.md)
+
+This module does not bundle nor build its dependencies. You need to
+compile Boost and OpenSSL yourself before compiling the module — see
+[compilation.md](compilation.md) for the exact steps and flags.
 
 
 ## Usage:

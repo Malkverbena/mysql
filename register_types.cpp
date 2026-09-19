@@ -4,10 +4,6 @@
 
 #include "register_types.h"
 
-#ifdef BOOST_MYSQL_SEPARATE_COMPILATION
-#include <boost/mysql/src.hpp>
-#endif
-
 #include "scr/constants.h"
 #include "scr/helpers.h"
 #include "scr/sql_result.h"

@@ -9,11 +9,6 @@
 #include <iostream>
 
 
-#ifdef BOOST_MYSQL_SEPARATE_COMPILATION
-#include <boost/mysql/src.hpp>
-#endif
-
-
 #include <boost/mysql/mariadb_collations.hpp>
 #include <boost/mysql/mysql_collations.hpp>
 #include <boost/mysql/ssl_mode.hpp>

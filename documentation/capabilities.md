@@ -8,7 +8,7 @@
 
 ### **Methods:**
 
-* Supports asynchronous methods using C++20 coroutines.
+* Supports asynchronous methods (`async_execute`, `async_execute_prepared`) using Boost.Asio callbacks (C++17, no exceptions). The call blocks until the operation completes.
 * Supports Multi-function operations.
 * Stored procedures. It can be used within Multi-function operations.
 * Text querie:  MySQL refers to this as the "text protocol", as all information is passed using text (as opposed to prepared statements).

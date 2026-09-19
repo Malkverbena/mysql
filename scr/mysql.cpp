@@ -325,103 +325,116 @@ Ref<SqlResult> MySQL::execute_prepared(const String p_stmt, const Array binds) {
 }
 
 
-boost::asio::awaitable<void> MySQL::coro_execute(const char* query, std::shared_ptr<mysql::results> result){
+namespace {
 
+// Runs a text query, or prepare -> execute -> close for a prepared statement, as a chain
+// of callbacks (C++17, no exceptions: every handler receives an error_code).
+// Each pending handler holds a shared_ptr to the operation, so it stays alive until the
+// last handler returns. Only one operation per connection may be outstanding at a time.
+template <class Conn>
+class AsyncQuery : public std::enable_shared_from_this<AsyncQuery<Conn>> {
+
+	Conn &conn;
+	Dictionary &last_error;
+	mysql::results &result;
+	const std::string query;
+	const std::vector<mysql::field> args;
+	const bool prepared;
 	mysql::diagnostics diag;
-	mysql::error_code ec;
+	mysql::statement stmt;
+
+	void on_prepare(mysql::error_code ec, mysql::statement p_stmt) {
+		ASYNC_SQL_EXCEPTION(ec, diag, &last_error);
+		stmt = p_stmt;
+		auto self = this->shared_from_this();
+		conn.async_execute(stmt.bind(args.begin(), args.end()), result, diag, [self](mysql::error_code p_ec) {
+			self->on_execute_prepared(p_ec);
+		});
+	}
+
+	void on_execute_prepared(mysql::error_code ec) {
+		ASYNC_SQL_EXCEPTION(ec, diag, &last_error);
+		auto self = this->shared_from_this();
+		conn.async_close_statement(stmt, diag, [self](mysql::error_code p_ec) {
+			self->on_close(p_ec);
+		});
+	}
+
+	void on_execute(mysql::error_code ec) {
+		ASYNC_SQL_EXCEPTION(ec, diag, &last_error);
+	}
+
+	void on_close(mysql::error_code ec) {
+		ASYNC_SQL_EXCEPTION(ec, diag, &last_error);
+	}
+
+public:
+
+	AsyncQuery(Conn &p_conn, Dictionary &p_last_error, mysql::results &p_result, std::string p_query, std::vector<mysql::field> p_args, bool p_prepared) :
+			conn(p_conn), last_error(p_last_error), result(p_result), query(std::move(p_query)), args(std::move(p_args)), prepared(p_prepared) {}
+
+	void start() {
+		auto self = this->shared_from_this();
+		if (prepared) {
+			conn.async_prepare_statement(query, diag, [self](mysql::error_code ec, mysql::statement p_stmt) {
+				self->on_prepare(ec, p_stmt);
+			});
+		} else {
+			conn.async_execute(query, result, diag, [self](mysql::error_code ec) {
+				self->on_execute(ec);
+			});
+		}
+	}
+};
+
+template <class Conn>
+void start_async_query(Conn &conn, Dictionary &last_error, mysql::results &result, std::string query, std::vector<mysql::field> args, bool prepared) {
+	std::make_shared<AsyncQuery<Conn>>(conn, last_error, result, std::move(query), std::move(args), prepared)->start();
+}
+
+} // namespace
+
+
+Ref<SqlResult> MySQL::run_async(std::string query, std::vector<mysql::field> args, bool prepared) {
+
+	last_error.clear();
+	ERR_FAIL_NULL_V_MSG(ctx, Ref<SqlResult>(), "The connection is not defined. Call define() and connect first.");
+
+	mysql::results result;
 
 	if (type == TCP){
-		std::tie(ec) = co_await tcp_conn->async_execute(query, *result, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+		start_async_query(*tcp_conn, last_error, result, std::move(query), std::move(args), prepared);
 	}
 	else if (type == TCPTLS){
-		std::tie(ec) = co_await tcp_ssl_conn->async_execute(query, *result, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+		start_async_query(*tcp_ssl_conn, last_error, result, std::move(query), std::move(args), prepared);
 	}
 	else if (type == UNIX){
-		std::tie(ec) = co_await unix_conn->async_execute(query, *result, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+		start_async_query(*unix_conn, last_error, result, std::move(query), std::move(args), prepared);
 	}
 	else if (type == UNIXTLS){
-		std::tie(ec) = co_await unix_ssl_conn->async_execute(query, *result, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
+		start_async_query(*unix_ssl_conn, last_error, result, std::move(query), std::move(args), prepared);
 	}
+
+	// run() returns when the queue is empty and leaves the context stopped; restart() is
+	// required before it can run again, otherwise the 2nd call would return immediately.
+	ctx->restart();
+	ctx->run();
+
+	if (not last_error.is_empty()){
+		return Ref<SqlResult>();
+	}
+	return build_godot_result(result);
 }
 
 
 Ref<SqlResult> MySQL::async_execute(const String p_stmt){
-
-	const char* query = p_stmt.utf8().get_data();
-	std::shared_ptr<mysql::results> result = std::make_shared<mysql::results>();
-
-	boost::asio::co_spawn(
-		ctx->get_executor(),
-		[query, result, this] { return coro_execute(query, result); },
-		boost::asio::detached
-	);
-	ctx->run();
-	return build_godot_result(*result);
-}
-
-
-boost::asio::awaitable<void> MySQL::coro_execute_prepared(const char* query, std::vector<mysql::field> args, std::shared_ptr<mysql::results> result){
-
-	mysql::diagnostics diag;
-	mysql::error_code ec;
-	mysql::statement prep_stmt;
-
-	if (type == TCP){
-		std::tie(ec, prep_stmt) = co_await tcp_conn->async_prepare_statement(query, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec) = co_await tcp_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec) = co_await tcp_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-
-	}
-	else if (type == TCPTLS){
-		std::tie(ec, prep_stmt) = co_await tcp_ssl_conn->async_prepare_statement(query, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec) = co_await tcp_ssl_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec) = co_await tcp_ssl_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-	}
-	else if (type == UNIX){
-		std::tie(ec, prep_stmt) = co_await unix_conn->async_prepare_statement(query, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec) = co_await unix_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec) = co_await unix_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-	}
-	else if (type == UNIXTLS){
-		std::tie(ec, prep_stmt) = co_await unix_ssl_conn->async_prepare_statement(query, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec) = co_await unix_ssl_conn->async_execute(prep_stmt.bind(args.begin(), args.end()), *result, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-		std::tie(ec) = co_await unix_ssl_conn->async_close_statement(prep_stmt, diag, tuple_awaitable);
-		CORO_SQL_EXCEPTION_VOID(ec, diag, &last_error);
-	}
-
+	return run_async(p_stmt.utf8().get_data(), std::vector<mysql::field>(), false);
 }
 
 
 Ref<SqlResult> MySQL::async_execute_prepared(const String p_stmt, const Array binds){
-
-	const char* query = p_stmt.utf8().get_data();
-	std::vector<mysql::field> args = binds_to_field(binds);
-	std::shared_ptr<mysql::results> result = std::make_shared<mysql::results>();
-
-	boost::asio::co_spawn(
-		ctx->get_executor(),
-		[query, args, result, this] { return coro_execute_prepared(query, args, result); },
-		boost::asio::detached
-	);
-	ctx->run();
-	return build_godot_result(*result);
+	return run_async(p_stmt.utf8().get_data(), binds_to_field(binds), true);
 }
-
 
 
 Array MySQL::execute_sql(const String p_path_to_file){

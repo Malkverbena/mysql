@@ -17,6 +17,8 @@
 #include "sql_result.h"
 
 #include <memory>
+#include <string>
+#include <vector>
 #include <fstream>
 #include <stdexcept>
 
@@ -34,16 +36,8 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl/context.hpp>
 
-#include <boost/asio/as_tuple.hpp>
-#include <boost/asio/awaitable.hpp>
-#include <boost/asio/co_spawn.hpp>
-#include <boost/asio/use_awaitable.hpp>
-#include <boost/asio/detached.hpp>
-
 
 using namespace boost::asio;
-
-constexpr auto tuple_awaitable = as_tuple(use_awaitable);
 
 
 class MySQL : public RefCounted {
@@ -92,8 +86,9 @@ private:
 	std::shared_ptr<mysql::unix_connection> unix_conn = nullptr;
 	std::shared_ptr<mysql::unix_ssl_connection> unix_ssl_conn = nullptr;
 
-	asio::awaitable<void> coro_execute(const char* query, std::shared_ptr<mysql::results> result);
-	asio::awaitable<void> coro_execute_prepared(const char* query, std::vector<mysql::field> args, std::shared_ptr<mysql::results> result);
+	// Runs a text query or a prepared statement through Boost.MySQL's async_* functions
+	// (callback chain) and blocks until it finishes.
+	Ref<SqlResult> run_async(std::string query, std::vector<mysql::field> args, bool prepared);
 
 
 private:
