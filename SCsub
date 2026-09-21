@@ -11,8 +11,15 @@ mysql_env = env.Clone()
 
 ##### CONFIG (config.cfg) #####
 
-# Caminhos do Boost/OpenSSL e modo de compilação vêm de config.cfg, na
-# pasta do módulo. Ver documentation/compilation.md.
+# Caminhos do Boost/OpenSSL e modo de compilação vêm de config.cfg, na pasta do módulo.
+# Ver documentation/compilation.md.
+#
+# Compilar pra mais de uma plataforma a partir da mesma pasta do módulo (Fase 7 —
+# portabilidade) exige caminhos diferentes por plataforma (cada uma tem seu próprio
+# Boost/OpenSSL compilados). Em vez de um config.cfg só, com um platform= por vez, um
+# config.<platform>.cfg (ex.: config.windows.cfg) é lido no lugar de config.cfg quando
+# existe, pro platform= daquele build — sem isso, o config.cfg "principal" (geralmente
+# Linux) continua valendo pra qualquer platform= que não tenha um arquivo próprio.
 
 import os
 import re
@@ -20,12 +27,14 @@ import configparser
 
 # SConscripts não têm __file__: usa a pasta deste SCsub.
 _module_dir = Dir(".").srcnode().abspath
-_config_file = os.path.join(_module_dir, "config.cfg")
+_platform_config_file = os.path.join(_module_dir, "config.%s.cfg" % env["platform"])
+_config_file = _platform_config_file if os.path.isfile(_platform_config_file) else os.path.join(_module_dir, "config.cfg")
 
 _cfg = configparser.ConfigParser()
 if not _cfg.read(_config_file):
 	print("mysql: arquivo de configuração não encontrado: " + _config_file)
 	Exit(255)
+print("mysql: usando " + _config_file)
 
 
 def _cfg_path(key):
