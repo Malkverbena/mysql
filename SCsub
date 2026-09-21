@@ -15,6 +15,7 @@ mysql_env = env.Clone()
 # pasta do módulo. Ver documentation/compilation.md.
 
 import os
+import re
 import configparser
 
 # SConscripts não têm __file__: usa a pasta deste SCsub.
@@ -35,8 +36,56 @@ def _cfg_path(key):
 	return path
 
 
+def _check_boost(path):
+	# Confere headers e versão mínima (1.85: quando o Boost.MySQL passou a exigir
+	# Boost.Charconv compilado) antes de deixar um erro de link mais tarde e mais
+	# difícil de entender explicar o problema.
+	mysql_header = os.path.join(path, "boost", "mysql.hpp")
+	version_header = os.path.join(path, "boost", "version.hpp")
+	if not os.path.isfile(version_header) or not os.path.isfile(mysql_header):
+		print("mysql: boost_path (%s) não parece uma árvore do Boost compilada (falta boost/version.hpp ou boost/mysql.hpp; use um clone completo de boostorg/boost, que traz o Boost.MySQL desde a 1.82)" % path)
+		Exit(255)
+	with open(version_header) as f:
+		match = re.search(r"#\s*define\s+BOOST_VERSION\s+(\d+)", f.read())
+	if not match:
+		print("mysql: não consegui ler BOOST_VERSION em %s" % version_header)
+		Exit(255)
+	version = int(match.group(1))
+	if version < 108500:
+		print("mysql: Boost %d.%d.%d é anterior ao mínimo exigido (1.85.0)" % (version // 100000, (version // 100) % 1000, version % 100))
+		Exit(255)
+
+
+def _check_openssl_include(path):
+	include = os.path.join(path, "include")
+	ssl_header = os.path.join(include, "openssl", "ssl.h")
+	version_header = os.path.join(include, "openssl", "opensslv.h")
+	if not os.path.isfile(ssl_header) or not os.path.isfile(version_header):
+		print("mysql: openssl_path (%s) não parece uma árvore do OpenSSL compilada (falta include/openssl/ssl.h ou opensslv.h)" % path)
+		Exit(255)
+	with open(version_header) as f:
+		match = re.search(r"#\s*define\s+OPENSSL_VERSION_MAJOR\s+(\d+)", f.read())
+	if not match or int(match.group(1)) < 3:
+		print("mysql: openssl_path (%s) é anterior ao mínimo exigido (OpenSSL 3.0) ou a versão não pôde ser lida em opensslv.h" % path)
+		Exit(255)
+	return include
+
+
+def _openssl_lib_path(path):
+	# lib64/ ou lib/, dependendo de como o OpenSSL foi configurado — não fixo, ver B9
+	# da auditoria (documentation/roadmap.md, Fase 0).
+	for subdir in ("lib64", "lib"):
+		candidate = os.path.join(path, subdir)
+		if os.path.isfile(os.path.join(candidate, "libssl.a")) and os.path.isfile(os.path.join(candidate, "libcrypto.a")):
+			return candidate
+	print("mysql: não encontrei libssl.a/libcrypto.a em %s/lib64 nem em %s/lib — confira openssl_path no config.cfg" % (path, path))
+	Exit(255)
+
+
 boost_path = _cfg_path("boost_path")
 openssl_path = _cfg_path("openssl_path")
+
+_check_boost(boost_path)
 
 # Sem valor padrão embutido aqui: a opção precisa estar definida no config.cfg.
 if not _cfg.has_option("build", "boost_mysql_mode"):
@@ -49,8 +98,12 @@ if boost_mysql_mode not in ("header-only", "separate"):
 
 boost_include_path = boost_path
 boost_lib_path = os.path.join(boost_path, "stage", "lib")
-openssl_include_path = os.path.join(openssl_path, "include")
-openssl_lib_path = os.path.join(openssl_path, "lib64")
+if not os.path.isfile(os.path.join(boost_lib_path, "libboost_charconv.a")):
+	print("mysql: não encontrei libboost_charconv.a em %s — rode o b2 conforme documentation/compilation.md" % boost_lib_path)
+	Exit(255)
+
+openssl_include_path = _check_openssl_include(openssl_path)
+openssl_lib_path = _openssl_lib_path(openssl_path)
 
 
 ##### FLAGS #####

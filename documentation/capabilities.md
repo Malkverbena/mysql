@@ -1,9 +1,9 @@
 # Capacidades
 
 > **Design alvo da reescrita em andamento.** Este documento descreve o que o módulo faz
-> quando a reescrita estiver pronta, fase a fase (ver `roadmap.md`). Neste commit o
-> código é um esqueleto vazio — nada aqui está implementado ainda. As decisões que
-> embasam esta lista, com o raciocínio por trás de cada uma, estão em `design-notes.md`.
+> quando a reescrita estiver pronta. Neste ponto do desenvolvimento, nem todo o código
+> descrito aqui está implementado ainda — consulte o histórico de commits do módulo para
+> o estado exato da implementação.
 
 ## Bancos suportados
 
@@ -35,9 +35,23 @@ universais.
   carregar tudo em memória de uma vez.
 * Assíncrono real: não bloqueia a thread chamadora (diferente de versões anteriores do
   módulo); cada chamada `async_*` devolve um `MySQLAsyncOperation` usável com `await`.
-* Transações (`MySQLTransaction`) e pool de conexões (`MySQLPool`), com suporte a
-  multithread — cada thread usa sua própria `MySQLSession`, nunca uma `Connection`
-  compartilhada entre threads ao mesmo tempo.
+* Transações (`MySQLTransaction`, obtida via `MySQLSession.begin_transaction()`) e pool
+  de conexões (`MySQLPool`), com suporte a multithread — cada thread usa sua própria
+  `MySQLSession`, nunca uma `Connection` compartilhada entre threads ao mesmo tempo.
+
+### Rollback automático
+
+Toda `MySQLTransaction` precisa ser fechada explicitamente com `commit()` ou
+`rollback()`. **Se ela for destruída (todas as referências ao objeto soltas) sem
+nenhum dos dois ter sido chamado, o módulo faz `ROLLBACK` automaticamente** e registra
+um aviso (warning) no Godot avisando que isso aconteceu.
+
+Isso é uma rede de segurança contra transação esquecida aberta na conexão — por
+exemplo, se o script sair de escopo cedo demais, lançar um erro antes de chegar ao
+`commit()`, ou simplesmente esquecer. **Não é um fluxo recomendado**: sempre feche a
+transação você mesmo, no caminho de sucesso e no de erro (`commit()` num, `rollback()`
+no outro). Depender do rollback automático significa que a transação fica aberta por
+mais tempo do que precisa, até o coletor de referências do Godot destruir o objeto.
 
 ## Modelo de erro
 
@@ -79,8 +93,8 @@ fallível expõe `is_ok()` e `get_error() -> Dictionary`, com as chaves `categor
 ## Plataformas
 
 Alvo final: Linux, Windows, macOS, Android, iOS. Durante esta reescrita, desenvolvimento
-e testes acontecem só em **Linux x86_64**; as demais entram na Fase 7 do `roadmap.md`,
-depois do módulo funcionar por completo em Linux.
+e testes acontecem só em **Linux x86_64**; as demais plataformas entram depois, quando o
+módulo funcionar por completo em Linux.
 
 ## Distribuição
 

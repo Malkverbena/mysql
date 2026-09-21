@@ -2,3 +2,114 @@
 /* mysql_connection.cpp */
 
 #include "mysql_connection.h"
+
+#include "godot_convert.h"
+
+#include <boost/asio/ssl/host_name_verification.hpp>
+#include <boost/mysql/any_address.hpp>
+#include <boost/mysql/connect_params.hpp>
+#include <boost/mysql/ssl_mode.hpp>
+
+namespace {
+
+bool wants_tls(MySQLConfig::TransportMode p_mode) {
+	return p_mode == MySQLConfig::TCP_TLS_PREFERRED || p_mode == MySQLConfig::TCP_TLS_REQUIRED;
+}
+
+} //namespace
+
+boost::asio::ssl::context MySQLConnection::_make_ssl_context(const Ref<MySQLConfig> &p_config) {
+	boost::asio::ssl::context ctx(boost::asio::ssl::context::tls_client);
+	if (wants_tls(p_config->get_transport_mode())) {
+		// Validação de certificado ligada por padrão, com hostname derivado do
+		// endpoint real da conexão (nunca um valor fixo) — resolve S5 da auditoria.
+		ctx.set_verify_mode(boost::asio::ssl::verify_peer);
+		ctx.set_default_verify_paths();
+		std::string host = mysql_module::to_std_string(p_config->get_host());
+		ctx.set_verify_callback(boost::asio::ssl::host_name_verification(host));
+	}
+	return ctx;
+}
+
+boost::mysql::any_connection_params MySQLConnection::_make_any_connection_params(const Ref<MySQLConfig> &p_config, boost::asio::ssl::context &p_ssl_context) {
+	boost::mysql::any_connection_params params;
+	if (wants_tls(p_config->get_transport_mode())) {
+		params.ssl_context = &p_ssl_context;
+	}
+	params.max_buffer_size = (std::size_t)p_config->get_max_buffer_size();
+	return params;
+}
+
+MySQLConnection::MySQLConnection(Ref<MySQLConfig> p_config) :
+		config(p_config),
+		ssl_context(_make_ssl_context(p_config)),
+		connection(io_context.get_executor(), _make_any_connection_params(p_config, ssl_context)) {
+	state = CONFIGURED;
+}
+
+boost::mysql::connect_params MySQLConnection::_make_connect_params() const {
+	boost::mysql::connect_params params;
+
+	if (config->get_transport_mode() == MySQLConfig::UNIX_SOCKET) {
+		params.server_address = boost::mysql::unix_path{ mysql_module::to_std_string(config->get_unix_socket_path()) };
+		// Sem UNIX+TLS — socket UNIX é local e nunca usa TLS (ver design-notes.md).
+		params.ssl = boost::mysql::ssl_mode::disable;
+	} else {
+		boost::mysql::host_and_port address;
+		address.host = mysql_module::to_std_string(config->get_host());
+		address.port = (unsigned short)config->get_port();
+		params.server_address = address;
+
+		switch (config->get_transport_mode()) {
+			case MySQLConfig::TCP_TLS_DISABLED:
+				params.ssl = boost::mysql::ssl_mode::disable;
+				break;
+			case MySQLConfig::TCP_TLS_PREFERRED:
+				params.ssl = boost::mysql::ssl_mode::enable;
+				break;
+			case MySQLConfig::TCP_TLS_REQUIRED:
+			default:
+				params.ssl = boost::mysql::ssl_mode::require;
+				break;
+		}
+	}
+
+	params.username = mysql_module::to_std_string(config->get_user());
+	params.password = config->get_password_std();
+	params.database = mysql_module::to_std_string(config->get_database());
+	params.multi_queries = config->get_allow_multi_queries();
+
+	return params;
+}
+
+bool MySQLConnection::connect() {
+	state = CONNECTING;
+	last_error.clear();
+	last_diagnostics.clear();
+
+	boost::mysql::connect_params params = _make_connect_params();
+	connection.connect(params, last_error, last_diagnostics);
+
+	if (last_error) {
+		state = FAILED;
+		return false;
+	}
+
+	state = CONNECTED;
+	return true;
+}
+
+void MySQLConnection::close() {
+	if (state != CONNECTED) {
+		return;
+	}
+	state = CLOSING;
+	last_error.clear();
+	last_diagnostics.clear();
+
+	connection.close(last_error, last_diagnostics);
+
+	// Erro ao fechar não é fatal pro chamador: a conexão deixa de ser utilizável de
+	// qualquer forma. Registrado em last_error() pra quem quiser inspecionar.
+	state = last_error ? FAILED : NONE;
+}
