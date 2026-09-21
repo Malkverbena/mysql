@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /* boost_mysql_src.cpp */
 
 

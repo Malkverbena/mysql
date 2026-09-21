@@ -1,11 +1,17 @@
 # Compilação
 
+> **Estado atual:** o módulo está em reescrita completa (ver `roadmap.md`). Durante a
+> reescrita, só o build em Linux x86_64 é validado a cada fase; as instruções abaixo
+> para Windows/macOS continuam aqui como referência, mas ainda não foram testadas nesta
+> reescrita.
+
 Este módulo **não baixa nem compila** o Boost e o OpenSSL. Você precisa
 compilá-los manualmente antes de compilar o Godot com o módulo. Este guia
 traz o passo a passo e as flags usadas.
 
 ## Requisitos
 
+- Godot **4.6** ou mais recente.
 - Um compilador com suporte a C++17: GCC, Clang (Linux/macOS) ou Visual
   C++ (Windows).
 - [**NASM**](https://www.nasm.us/pub/nasm/releasebuilds/) — só no Windows,

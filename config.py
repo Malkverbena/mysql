@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # config.py
 
 
@@ -14,10 +15,9 @@ def get_doc_path():
 
 
 def get_doc_classes():
-	return [ 
-		"MySQL",
-		"SqlResult",
-	]
+	# Reescrita em andamento (ver documentation/roadmap.md): preenchido à medida que
+	# as classes forem implementadas e a documentação gerada com --doctool.
+	return []
 
 
 def get_icons_path():
