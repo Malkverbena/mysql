@@ -3,10 +3,10 @@
 
 #include "mysql_type_convert.h"
 
+#include "godot_convert.h"
+
 #include "core/io/json.h"
 #include "core/variant/dictionary.h"
-
-#include "godot_convert.h"
 
 #include <boost/mysql/blob_view.hpp>
 #include <boost/mysql/column_type.hpp>

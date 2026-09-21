@@ -3,8 +3,6 @@
 
 #include "register_types.h"
 
-#include "core/object/class_db.h"
-
 #include "scr/mysql_async_operation.h"
 #include "scr/mysql_config.h"
 #include "scr/mysql_connection.h"
@@ -14,6 +12,8 @@
 #include "scr/mysql_streaming_cursor.h"
 #include "scr/mysql_transaction.h"
 #include "scr/prepared_statement_cache.h"
+
+#include "core/object/class_db.h"
 
 // Reescrita em andamento (ver documentation/roadmap.md). As classes são registradas
 // aqui à medida que forem implementadas, seguindo a ordem das fases do roadmap:

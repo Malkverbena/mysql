@@ -3,11 +3,11 @@
 
 #include "mysql_result.h"
 
-#include "core/io/json.h"
-#include "core/object/class_db.h"
-
 #include "godot_convert.h"
 #include "mysql_type_convert.h"
+
+#include "core/io/json.h"
+#include "core/object/class_db.h"
 
 #include <boost/mysql/metadata_collection_view.hpp>
 #include <boost/mysql/resultset_view.hpp>
@@ -114,7 +114,12 @@ Variant MySQLResult::get_parsed_json(int p_resultset, int p_row, int p_column) {
 		return Variant();
 	}
 	ERR_FAIL_INDEX_V(p_column, data->column_types.size(), Variant());
-	ERR_FAIL_COND_V_MSG(data->column_types[p_column] != boost::mysql::column_type::json, Variant(), "MySQLResult: get_parsed_json() chamado numa coluna que não é JSON.");
+	// Sem checar column_types[p_column] == json de propósito: o MariaDB não tem um
+	// tipo JSON à parte no protocolo (JSON é alias de LONGTEXT lá, ver
+	// design-notes.md) — a coluna chega como "text" mesmo sendo JSON de verdade. Quem
+	// chama get_parsed_json() já está dizendo "isto é JSON" ao nomear a célula; se não
+	// for texto JSON válido, JSON::parse_string() volta null, sem gravar exceção nem
+	// travar nada.
 
 	uint64_t key = _json_cache_key(p_resultset, p_row, p_column);
 	if (Variant *cached = json_cache.getptr(key)) {

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 /* throw_exception.cpp */
 
-
 // Com -fno-exceptions o Boost define BOOST_NO_EXCEPTIONS e deixa boost::throw_exception()
 // sem definição: o programa precisa fornecê-la. Sem exceções não há como recuperar, então
 // qualquer chegada aqui é fatal: registra a mensagem no Godot e aborta.
@@ -20,11 +19,11 @@
 
 namespace boost {
 
-void throw_exception(std::exception const &p_e) {
+void throw_exception(const std::exception &p_e) {
 	CRASH_NOW_MSG(vformat("Boost.MySQL: %s", p_e.what()));
 }
 
-void throw_exception(std::exception const &p_e, boost::source_location const &p_loc) {
+void throw_exception(const std::exception &p_e, const boost::source_location &p_loc) {
 	CRASH_NOW_MSG(vformat("Boost.MySQL: %s (%s:%d)", p_e.what(), p_loc.file_name(), (int)p_loc.line()));
 }
 

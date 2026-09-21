@@ -3,9 +3,9 @@
 
 #include "mysql_pool.h"
 
-#include "core/object/class_db.h"
-
 #include "mysql_connection.h"
+
+#include "core/object/class_db.h"
 
 void MySQLPool::set_config(const Ref<MySQLConfig> &p_config) {
 	ERR_FAIL_COND_MSG(total_count > 0, "MySQLPool: a config não pode ser trocada depois que alguma conexão já foi criada.");

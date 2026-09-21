@@ -2,10 +2,10 @@
 /* mysql_pool.h */
 #pragma once
 
-#include "core/object/ref_counted.h"
-
 #include "mysql_config.h"
 #include "mysql_session.h"
+
+#include "core/object/ref_counted.h"
 
 #include <condition_variable>
 #include <memory>

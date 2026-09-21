@@ -2,12 +2,12 @@
 /* mysql_result.h */
 #pragma once
 
+#include "mysql_config.h"
+
 #include "core/object/ref_counted.h"
 #include "core/templates/hash_map.h"
 #include "core/variant/array.h"
 #include "core/variant/dictionary.h"
-
-#include "mysql_config.h"
 
 #include <boost/mysql/column_type.hpp>
 #include <boost/mysql/results.hpp>

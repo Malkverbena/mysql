@@ -2,9 +2,9 @@
 /* mysql_async_operation.h */
 #pragma once
 
-#include "core/object/ref_counted.h"
-
 #include "mysql_result.h"
+
+#include "core/object/ref_counted.h"
 
 // MySQLAsyncOperation — RefCounted com sinal `completed`, devolvido por toda chamada
 // async_*; carrega o MySQLResult (ou o erro, dentro dele) quando termina. _complete() só

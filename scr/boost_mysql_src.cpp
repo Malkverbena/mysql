@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 /* boost_mysql_src.cpp */
 
-
 // Única unidade de compilação que instancia o Boost.MySQL no modo "separate"
 // (config.cfg: boost_mysql_mode = separate).
 //

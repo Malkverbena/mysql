@@ -8,6 +8,7 @@
 #include <boost/asio/ssl/host_name_verification.hpp>
 #include <boost/mysql/any_address.hpp>
 #include <boost/mysql/connect_params.hpp>
+#include <boost/mysql/metadata_mode.hpp>
 #include <boost/mysql/ssl_mode.hpp>
 
 namespace {
@@ -94,6 +95,13 @@ bool MySQLConnection::connect() {
 		state = FAILED;
 		return false;
 	}
+
+	// Padrão do Boost.MySQL é metadata_mode::minimal, que deixa column_name() vazio —
+	// MySQLResult::get_column_names() é uma capacidade documentada do módulo, não algo
+	// opcional, então full é obrigatório aqui (achado ao testar contra um servidor de
+	// verdade: toda checagem por nome de coluna falhava em silêncio, caindo no índice
+	// -1 do GDScript e lendo a última coluna por coincidência).
+	connection.set_meta_mode(boost::mysql::metadata_mode::full);
 
 	state = CONNECTED;
 	return true;

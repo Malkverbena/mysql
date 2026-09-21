@@ -3,8 +3,6 @@
 
 #include "mysql_session.h"
 
-#include "core/object/class_db.h"
-
 #include "godot_convert.h"
 #include "mysql_async_operation.h"
 #include "mysql_connection.h"
@@ -13,6 +11,8 @@
 #include "mysql_streaming_cursor.h"
 #include "mysql_transaction.h"
 #include "prepared_statement_cache.h"
+
+#include "core/object/class_db.h"
 
 #include <boost/asio/cancel_after.hpp>
 #include <boost/mysql/client_errc.hpp>
@@ -353,8 +353,7 @@ Ref<MySQLAsyncOperation> MySQLSession::async_execute_prepared(const String &p_sq
 		return op;
 	}
 	if ((size_t)stmt.num_params() != fields->views.size()) {
-		op->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_client_error_dict(
-											vformat("async_execute_prepared: a prepared statement espera %d parâmetro(s), recebeu %d.", (int)stmt.num_params(), (int)fields->views.size()))));
+		op->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_client_error_dict(vformat("async_execute_prepared: a prepared statement espera %d parâmetro(s), recebeu %d.", (int)stmt.num_params(), (int)fields->views.size()))));
 		return op;
 	}
 

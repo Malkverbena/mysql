@@ -2,9 +2,9 @@
 /* mysql_type_convert.h */
 #pragma once
 
-#include "core/variant/variant.h"
-
 #include "mysql_config.h"
+
+#include "core/variant/variant.h"
 
 #include <boost/mysql/field_view.hpp>
 #include <boost/mysql/metadata.hpp>

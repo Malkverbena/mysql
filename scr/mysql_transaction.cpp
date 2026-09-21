@@ -3,10 +3,10 @@
 
 #include "mysql_transaction.h"
 
-#include "core/object/class_db.h"
-
 #include "mysql_error.h"
 #include "mysql_session.h"
+
+#include "core/object/class_db.h"
 
 Ref<MySQLTransaction> MySQLTransaction::create(Ref<MySQLSession> p_session) {
 	Ref<MySQLTransaction> tx;
