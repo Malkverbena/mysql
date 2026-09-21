@@ -3,13 +3,13 @@
 
 #include "mysql_streaming_cursor.h"
 
-#include "core/object/class_db.h"
-
 #include "godot_convert.h"
 #include "mysql_connection.h"
 #include "mysql_error.h"
 #include "mysql_session.h"
 #include "mysql_type_convert.h"
+
+#include "core/object/class_db.h"
 
 #include <boost/mysql/metadata_collection_view.hpp>
 #include <boost/mysql/row_view.hpp>

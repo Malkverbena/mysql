@@ -34,7 +34,13 @@ universais.
 * **Streaming:** leitura incremental de resultados grandes (`MySQLStreamingCursor`), sem
   carregar tudo em memória de uma vez.
 * Assíncrono real: não bloqueia a thread chamadora (diferente de versões anteriores do
-  módulo); cada chamada `async_*` devolve um `MySQLAsyncOperation` usável com `await`.
+  módulo); cada chamada `async_*` devolve um `MySQLAsyncOperation` usável com `await`
+  (`var result = await op.completed`). **Use `await`, não espera ativa em loop**
+  (`while not op.is_finished(): ...`): um loop assim nunca devolve o controle pro
+  `SceneTree` rodar frames, e é isso que entrega o resultado — a operação termina de
+  verdade, só nunca é observada. **Mantenha a `MySQLSession` (ou o `MySQLPool` de onde
+  ela veio) referenciada até a operação terminar**: se a única referência sair de
+  escopo antes disso, a Session é destruída e a thread de I/O pára no meio.
 * Transações (`MySQLTransaction`, obtida via `MySQLSession.begin_transaction()`) e pool
   de conexões (`MySQLPool`), com suporte a multithread — cada thread usa sua própria
   `MySQLSession`, nunca uma `Connection` compartilhada entre threads ao mesmo tempo.
@@ -90,11 +96,23 @@ fallível expõe `is_ok()` e `get_error() -> Dictionary`, com as chaves `categor
 * `LAZY_PARSED_VARIANT` (**padrão**): guarda a string e só converte quando pedido; o
   resultado convertido pode ficar em cache.
 
+> ⚠️ **No MariaDB, `PARSED_VARIANT` se comporta como `RAW_STRING`.** A detecção
+> automática de qual coluna é JSON depende do servidor reportar um tipo `JSON` distinto
+> na metadata — o MySQL faz isso, mas o **MariaDB não**: lá `JSON` é só um alias de
+> `LONGTEXT` com uma restrição `CHECK` por trás, e a coluna chega como texto comum. Pra
+> converter JSON explicitamente independente do banco, use `get_parsed_json(resultset,
+> row, column)` — ela não depende do tipo da coluna, converte o texto que você indicar.
+
 ## Plataformas
 
-Alvo final: Linux, Windows, macOS, Android, iOS. Durante esta reescrita, desenvolvimento
-e testes acontecem só em **Linux x86_64**; as demais plataformas entram depois, quando o
-módulo funcionar por completo em Linux.
+Alvo confirmado nesta reescrita: Linux, Windows, macOS, Android. Desenvolvimento e
+testes acontecem só em **Linux x86_64**; as demais entram depois, quando o módulo
+funcionar por completo em Linux.
+
+**iOS não está na lista por enquanto** — compilar e testar pra iOS exige um Mac com
+Xcode, que não existe no ambiente de desenvolvimento atual. Não é uma decisão técnica
+nem um descarte: entra quando houver esse hardware disponível (por exemplo, via
+contribuição externa).
 
 ## Distribuição
 

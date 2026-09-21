@@ -29,8 +29,14 @@ Version 1.0 uses C++ MySQL Connector Library from [Oracle](https://dev.mysql.com
 
 ## Supported platforms
 
-Final target: Linux, Windows, macOS, Android, iOS. During this rewrite, development and
-testing happen only on **Linux x86_64** — the other platforms are ported afterwards.
+Confirmed target for this rewrite: Linux, Windows, macOS, Android. During this rewrite,
+development and testing happen only on **Linux x86_64** — the other platforms are
+ported afterwards.
+
+iOS is not on the list for now — building and testing for iOS needs a Mac with Xcode,
+which isn't part of the current development environment. Not a technical decision or a
+drop, just deferred until that hardware is available (e.g. through an external
+contribution).
 
 ## Distribution
 

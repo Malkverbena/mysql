@@ -2,12 +2,12 @@
 /* mysql_session.h */
 #pragma once
 
+#include "mysql_config.h"
+#include "mysql_result.h"
+
 #include "core/object/ref_counted.h"
 #include "core/variant/array.h"
 #include "core/variant/dictionary.h"
-
-#include "mysql_config.h"
-#include "mysql_result.h"
 
 #include <boost/asio/executor_work_guard.hpp>
 #include <boost/asio/io_context.hpp>

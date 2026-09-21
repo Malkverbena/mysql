@@ -3,9 +3,9 @@
 
 #include "mysql_config.h"
 
-#include "core/object/class_db.h"
-
 #include "godot_convert.h"
+
+#include "core/object/class_db.h"
 
 #include <openssl/crypto.h>
 

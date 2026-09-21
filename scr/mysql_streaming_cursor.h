@@ -2,11 +2,11 @@
 /* mysql_streaming_cursor.h */
 #pragma once
 
+#include "mysql_config.h"
+
 #include "core/object/ref_counted.h"
 #include "core/variant/array.h"
 #include "core/variant/dictionary.h"
-
-#include "mysql_config.h"
 
 #include <boost/mysql/execution_state.hpp>
 
