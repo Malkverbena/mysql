@@ -230,9 +230,112 @@ scons platform=linuxbsd arch=x86_64 target=editor \
 Se Boost/OpenSSL não estiverem no layout de pastas irmãs padrão, ajuste
 `boost_path` e `openssl_path` em `mysql/config.cfg` (ver "Configuração").
 
+## 4. Cross-compilando pra Windows a partir do Linux (MinGW-w64)
+
+Verificado nesta reescrita: Boost e OpenSSL cross-compilados com MinGW-w64, módulo e
+Godot compilados com `platform=windows`, binário resultante rodado e testado (suite
+completa de `tests/`, 51 checagens) via [Wine](https://www.winehq.org/) contra um
+MariaDB de verdade.
+
+### Pré-requisito
+
+`x86_64-w64-mingw32-gcc`/`g++`/`ar`/`ranlib`/`windres` no PATH (pacote `mingw-w64` na
+maioria das distros Linux).
+
+### Boost
+
+Mesmo clone do Boost usado pra Linux, mas numa pasta separada — cada plataforma
+precisa do seu próprio `stage/lib` com objetos no formato certo (ELF para Linux,
+COFF/PE para Windows). Um `git worktree` evita reclonar o monorepo inteiro:
+
+```bash
+cd thirdparty/boost
+git worktree add ../boost-windows boost-1.92.0   # a tag que você compilou pra Linux
+cd ../boost-windows
+git submodule update --init --recursive
+
+cat > /tmp/mingw-user-config.jam <<'EOF'
+using gcc : mingw : x86_64-w64-mingw32-g++ ;
+EOF
+
+./bootstrap.sh --prefix="$(pwd)" --libdir="$(pwd)/stage/lib" --includedir="$(pwd)/include"
+./b2 headers
+./b2 -j"$(nproc)" \
+    --user-config=/tmp/mingw-user-config.jam \
+    link=static \
+    threading=multi \
+    runtime-link=static \
+    variant=release \
+    --stagedir="$(pwd)/stage" \
+    toolset=gcc-mingw \
+    target-os=windows \
+    address-model=64 \
+    architecture=x86 \
+    cxxstd=17 \
+    cxxstd-dialect=iso
+```
+
+`toolset=gcc-mingw` sozinho não basta — o `--user-config` é quem ensina o b2 a achar o
+compilador MinGW (sem ele, b2 tenta usar o `g++` nativo e o resultado não roda no
+Windows).
+
+### OpenSSL
+
+Mesma lógica, worktree separado:
+
+```bash
+cd thirdparty/openssl
+git worktree add ../openssl-windows openssl-4.0.2   # a tag que você compilou pra Linux
+cd ../openssl-windows
+
+./Configure mingw64 \
+    no-ssl3 no-weak-ssl-ciphers no-legacy no-shared no-tests no-docs \
+    --cross-compile-prefix=x86_64-w64-mingw32- \
+    --prefix="$(pwd)" --openssldir="$(pwd)"
+make depend
+make -j"$(nproc)"
+make install
+```
+
+`--cross-compile-prefix` é a peça que faltava em relação ao build Linux — sem ela o
+`Configure` usa o `gcc` nativo e o resultado não é um binário Windows.
+
+> Mesmo problema de `make install` do build Linux pode aparecer aqui (ver seção 2):
+> se der erro em `install_dev` porque `--prefix` é a própria pasta de origem, os
+> `.a` já foram gerados na raiz — copie-os manualmente pra `lib64/` (`mkdir -p lib64 &&
+> cp libssl.a libcrypto.a lib64/`).
+
+### Config e build do módulo
+
+Como Windows precisa de caminhos diferentes dos do Linux, o `SCsub` lê
+`config.windows.cfg` no lugar de `config.cfg` quando `platform=windows` (ver
+"Configuração" — o mecanismo vale pra qualquer `config.<platform>.cfg`, não só
+Windows). Crie um a partir do `config.cfg` de exemplo, só trocando os caminhos:
+
+```ini
+[paths]
+boost_path = ../thirdparty/boost-windows
+openssl_path = ../thirdparty/openssl-windows
+
+[build]
+boost_mysql_mode = separate
+```
+
+```bash
+cd godot
+scons platform=windows arch=x86_64 target=editor \
+    custom_modules=../mysql \
+    precision=double \
+    d3d12=no \
+    -j"$(nproc)"
+```
+
+`d3d12=no` evita exigir o SDK do Direct3D 12, que não faz parte deste módulo — sem essa
+flag o SCons para cedo pedindo `install_d3d12_sdk_windows.py`. Godot no Linux, sem
+`use_mingw=1`, já detecta e usa o MinGW-w64 automaticamente por não achar o MSVC.
+
 ### Nota
 
-No momento só é possível compilar este módulo para Linux e Windows.
-Suporte a macOS ainda está em desenvolvimento. É perfeitamente possível
-compilar para outras plataformas como Android e iOS, mas esse suporte
-ainda não foi adicionado — ajuda é bem-vinda.
+Verificado: Linux e Windows (cross-compilado via MinGW). macOS espera hardware Apple
+disponível (ver o roadmap de reescrita); iOS e Web estão fora do escopo do módulo por
+enquanto — motivos e detalhes no roadmap. Android ainda não foi tentado nesta reescrita.
