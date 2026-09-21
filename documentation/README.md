@@ -9,11 +9,9 @@ Check out the Boost repository: [Boost.MySQL](https://github.com/boostorg/mysql?
 
 > **Em reescrita completa nesta branch (`4.x`).** Uma auditoria encontrou problemas
 > críticos de memória, TLS e concorrência no código anterior; em vez de corrigi-los no
-> lugar, o módulo está sendo reescrito do zero. Veja o plano fase a fase em
-> [roadmap.md](roadmap.md) e as decisões de design (com o porquê de cada uma) em
-> [design-notes.md](design-notes.md). Neste commit específico o código é um esqueleto
-> vazio — [capabilities.md](capabilities.md) descreve o design alvo, não o que já existe
-> implementado.
+> lugar, o módulo está sendo reescrito do zero, fase a fase.
+> [capabilities.md](capabilities.md) descreve o design alvo — consulte o histórico de
+> commits do módulo para o estado exato da implementação em cada momento.
 
 ##### This module works only with Godot 4. Minimum supported version: **4.6**.
 
@@ -32,22 +30,16 @@ Version 1.0 uses C++ MySQL Connector Library from [Oracle](https://dev.mysql.com
 ## Supported platforms
 
 Final target: Linux, Windows, macOS, Android, iOS. During this rewrite, development and
-testing happen only on **Linux x86_64** — the other platforms are ported afterwards
-(see [roadmap.md](roadmap.md), Fase 7).
+testing happen only on **Linux x86_64** — the other platforms are ported afterwards.
 
 ## Distribution
 
 Custom C++ module, built together with the engine (`custom_modules=`). GDExtension
-support is a future direction, out of scope for this rewrite (see
-[design-notes.md](design-notes.md)).
+support is a future direction, out of scope for this rewrite.
 
 ### [See the full list of features here.](capabilities.md)
 
 ### [Compilation instructions here!](compilation.md)
-
-### [Rewrite roadmap.](roadmap.md)
-
-### [Design notes and decisions.](design-notes.md)
 
 This module does not bundle nor build its dependencies. You need to
 compile Boost and OpenSSL yourself before compiling the module — see

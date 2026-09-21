@@ -1,9 +1,13 @@
 # Compilação
 
-> **Estado atual:** o módulo está em reescrita completa (ver `roadmap.md`). Durante a
-> reescrita, só o build em Linux x86_64 é validado a cada fase; as instruções abaixo
-> para Windows/macOS continuam aqui como referência, mas ainda não foram testadas nesta
-> reescrita.
+> **Estado atual:** o módulo está em reescrita completa. Durante a reescrita, só o build
+> em Linux x86_64 é validado a cada etapa; as instruções abaixo para Windows/macOS
+> continuam aqui como referência, mas ainda não foram testadas nesta reescrita.
+
+**Versões testadas nesta reescrita:** Boost `boost-1.92.0`, OpenSSL `openssl-4.0.2`
+(tags estáveis, sem submódulos de desenvolvimento). O `SCsub` verifica a versão mínima
+(Boost ≥ 1.85, OpenSSL ≥ 3.0) e os headers antes de compilar; versões mais novas
+provavelmente funcionam, mas só as citadas acima foram de fato testadas.
 
 Este módulo **não baixa nem compila** o Boost e o OpenSSL. Você precisa
 compilá-los manualmente antes de compilar o Godot com o módulo. Este guia
