@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* godot_convert.h */
 #pragma once
 

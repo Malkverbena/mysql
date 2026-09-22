@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* mysql_transaction.h */
 #pragma once
 

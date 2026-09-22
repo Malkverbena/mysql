@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* register_types.h */
 #pragma once
 

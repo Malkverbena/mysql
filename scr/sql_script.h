@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* sql_script.h */
 #pragma once
 

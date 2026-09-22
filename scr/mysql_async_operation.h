@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* mysql_async_operation.h */
 #pragma once
 

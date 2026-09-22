@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* prepared_statement_cache.h */
 #pragma once
 

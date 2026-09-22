@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* boost_mysql_src.cpp */
 
 // The only translation unit that instantiates Boost.MySQL in "separate" mode
