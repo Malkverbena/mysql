@@ -89,7 +89,7 @@ void MySQLStreamingCursor::close() {
 	if (!ok || !connection) {
 		return;
 	}
-	// Drena o resto do resultset em silêncio — ver comentário no header.
+	// Drain the rest of the resultset silently. See the comment in the header.
 	boost::mysql::error_code err;
 	boost::mysql::diagnostics diag;
 	while (!state.complete()) {

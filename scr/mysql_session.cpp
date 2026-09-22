@@ -8,129 +8,281 @@
 #include "mysql_connection.h"
 #include "mysql_error.h"
 #include "mysql_params.h"
+#include "mysql_pool.h"
 #include "mysql_streaming_cursor.h"
 #include "mysql_transaction.h"
 #include "prepared_statement_cache.h"
+#include "sql_script.h"
 
 #include "core/object/class_db.h"
 
 #include <boost/asio/cancel_after.hpp>
 #include <boost/mysql/client_errc.hpp>
+#include <boost/mysql/execution_state.hpp>
 #include <boost/mysql/format_sql.hpp>
-#include <boost/mysql/results.hpp>
+#include <boost/mysql/rows_view.hpp>
 #include <boost/mysql/statement.hpp>
 
 #include <chrono>
 
 namespace {
 
-// Divide um script SQL em instruções, respeitando literais entre aspas simples, duplas
-// e crase (com escape por barra invertida ou aspas dobradas) — não trata comentários SQL
-// (-- ou /* */), documentado como limitação conhecida.
-std::vector<std::string> split_sql_statements(const std::string &p_content) {
-	std::vector<std::string> statements;
-	std::string current;
-	char quote = 0;
+Dictionary make_not_connected_error() {
+	return mysql_module::make_error_dict(boost::mysql::make_error_code(boost::mysql::client_errc::not_connected), boost::mysql::diagnostics());
+}
 
-	auto push_trimmed = [&statements](const std::string &p_text) {
-		size_t start = p_text.find_first_not_of(" \t\r\n");
-		if (start == std::string::npos) {
-			return;
+// Keeps the connection protocol in sync after a `max_result_bytes` overflow: the resultset
+// (and any further ones) must be fully read before the next command, the same reason
+// `MySQLStreamingCursor::close()` drains instead of abandoning the read midway. Errors while
+// draining are not reported: the caller already has the real error (the limit overflow) to
+// return.
+void drain_execution_state(MySQLConnection &p_connection, boost::mysql::execution_state &p_state) {
+	boost::mysql::error_code error;
+	boost::mysql::diagnostics diagnostics;
+	while (!p_state.complete()) {
+		if (p_state.should_read_rows()) {
+			p_connection.native().read_some_rows(p_state, error, diagnostics);
+		} else { // should_read_head()
+			p_connection.native().read_resultset_head(p_state, error, diagnostics);
 		}
-		size_t stop = p_text.find_last_not_of(" \t\r\n");
-		statements.push_back(p_text.substr(start, stop - start + 1));
-	};
-
-	for (size_t i = 0; i < p_content.size(); i++) {
-		char c = p_content[i];
-
-		if (quote != 0) {
-			current += c;
-			if (c == quote) {
-				if (i + 1 < p_content.size() && p_content[i + 1] == quote) {
-					current += p_content[++i];
-				} else {
-					quote = 0;
-				}
-			} else if (c == '\\' && quote != '`' && i + 1 < p_content.size()) {
-				current += p_content[++i];
-			}
-			continue;
-		}
-
-		if (c == '\'' || c == '"' || c == '`') {
-			quote = c;
-			current += c;
-		} else if (c == ';') {
-			push_trimmed(current);
-			current.clear();
-		} else {
-			current += c;
+		if (error) {
+			break;
 		}
 	}
-	push_trimmed(current);
-	return statements;
+}
+
+// Blocking counterpart of the async chain in `start_async_execute()`/`AsyncHeadHandler`/
+// `AsyncRowsHandler` below: reads the result incrementally instead of with a single
+// `execute()` call, so a `max_result_bytes` overflow is caught as soon as it happens (bounding
+// peak memory) instead of after Boost.MySQL has already materialized the whole result.
+template <typename Request>
+Ref<MySQLResult> execute_with_limit(MySQLConnection &p_connection, Request &&p_request, const Ref<MySQLConfig> &p_config) {
+	boost::mysql::execution_state state;
+	boost::mysql::error_code error;
+	boost::mysql::diagnostics diagnostics;
+
+	p_connection.native().start_execution(std::forward<Request>(p_request), state, error, diagnostics);
+	if (error) {
+		return MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics));
+	}
+
+	MySQLResult::Builder builder;
+	builder.begin_resultset(state.meta());
+
+	int64_t max_bytes = p_config->get_max_result_bytes();
+
+	while (!state.complete()) {
+		if (state.should_read_rows()) {
+			boost::mysql::rows_view batch = p_connection.native().read_some_rows(state, error, diagnostics);
+			if (error) {
+				return MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics));
+			}
+			builder.add_rows(batch, state.meta(), p_config);
+			if (max_bytes > 0 && (int64_t)builder.get_estimated_bytes() > max_bytes) {
+				drain_execution_state(p_connection, state);
+				return MySQLResult::from_error(mysql_module::make_client_error_dict(vformat("Result exceeds max_result_bytes (%d bytes).", (int64_t)max_bytes)));
+			}
+		} else { // should_read_head()
+			builder.end_resultset(state.affected_rows(), state.last_insert_id(), state.info());
+			p_connection.native().read_resultset_head(state, error, diagnostics);
+			if (error) {
+				return MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics));
+			}
+			builder.begin_resultset(state.meta());
+		}
+	}
+	builder.end_resultset(state.affected_rows(), state.last_insert_id(), state.info());
+	return builder.finish();
+}
+
+// Async counterpart of execute_with_limit() above: the same incremental read, but as a chain
+// of completion handlers instead of a blocking loop, since Boost.MySQL's async operations
+// only run on the I/O thread's `io_context::run()`. Every handler below re-enters the chain
+// through async_advance() until execution_state::complete(), or finishes early on error or on
+// a max_result_bytes overflow.
+void async_advance(const Ref<MySQLAsyncOperation> &p_operation);
+void async_drain_step(const Ref<MySQLAsyncOperation> &p_operation, const Dictionary &p_error, boost::mysql::error_code p_drain_error);
+
+// Drains the rest of the result after a max_result_bytes overflow, the async counterpart of
+// drain_execution_state(). Network errors while draining are not reported: the caller already
+// has the real error (the limit overflow) to return.
+struct AsyncDrainRowsHandler {
+	Ref<MySQLAsyncOperation> operation;
+	Dictionary error;
+	void operator()(boost::mysql::error_code p_error, boost::mysql::rows_view p_rows) {
+		async_drain_step(operation, error, p_error);
+	}
+};
+
+struct AsyncDrainHeadHandler {
+	Ref<MySQLAsyncOperation> operation;
+	Dictionary error;
+	void operator()(boost::mysql::error_code p_error) {
+		async_drain_step(operation, error, p_error);
+	}
+};
+
+void async_drain_step(const Ref<MySQLAsyncOperation> &p_operation, const Dictionary &p_error, boost::mysql::error_code p_drain_error) {
+	if (p_drain_error || p_operation->exec_state.complete()) {
+		p_operation->call_deferred("_complete", MySQLResult::from_error(p_error));
+		return;
+	}
+	if (p_operation->exec_state.should_read_rows()) {
+		AsyncDrainRowsHandler handler{ p_operation, p_error };
+		p_operation->connection->native().async_read_some_rows(p_operation->exec_state, handler);
+	} else { // should_read_head()
+		AsyncDrainHeadHandler handler{ p_operation, p_error };
+		p_operation->connection->native().async_read_resultset_head(p_operation->exec_state, handler);
+	}
+}
+
+void issue_read_rows(const Ref<MySQLAsyncOperation> &p_operation);
+void issue_read_head(const Ref<MySQLAsyncOperation> &p_operation);
+
+// Completion of async_read_some_rows(): one batch of a resultset's rows.
+struct AsyncRowsHandler {
+	Ref<MySQLAsyncOperation> operation;
+	void operator()(boost::mysql::error_code p_error, boost::mysql::rows_view p_rows) {
+		if (p_error) {
+			operation->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_error_dict(p_error, operation->diagnostics)));
+			return;
+		}
+		operation->result_builder.add_rows(p_rows, operation->exec_state.meta(), operation->config);
+		int64_t max_bytes = operation->config->get_max_result_bytes();
+		if (max_bytes > 0 && (int64_t)operation->result_builder.get_estimated_bytes() > max_bytes) {
+			Dictionary limit_error = mysql_module::make_client_error_dict(vformat("Result exceeds max_result_bytes (%d bytes).", (int64_t)max_bytes));
+			async_drain_step(operation, limit_error, boost::mysql::error_code());
+			return;
+		}
+		async_advance(operation);
+	}
+};
+
+// Completion of async_start_execution() and async_read_resultset_head(): a resultset's head
+// (column metadata), whether it is the first one or one further along a multi-resultset
+// operation.
+struct AsyncHeadHandler {
+	Ref<MySQLAsyncOperation> operation;
+	void operator()(boost::mysql::error_code p_error) {
+		if (p_error) {
+			operation->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_error_dict(p_error, operation->diagnostics)));
+			return;
+		}
+		operation->result_builder.begin_resultset(operation->exec_state.meta());
+		async_advance(operation);
+	}
+};
+
+void issue_read_rows(const Ref<MySQLAsyncOperation> &p_operation) {
+	AsyncRowsHandler handler{ p_operation };
+	if (p_operation->timeout_ms > 0) {
+		p_operation->connection->native().async_read_some_rows(p_operation->exec_state, p_operation->diagnostics, boost::asio::cancel_after(std::chrono::milliseconds(p_operation->timeout_ms), handler));
+	} else {
+		p_operation->connection->native().async_read_some_rows(p_operation->exec_state, p_operation->diagnostics, handler);
+	}
+}
+
+void issue_read_head(const Ref<MySQLAsyncOperation> &p_operation) {
+	AsyncHeadHandler handler{ p_operation };
+	if (p_operation->timeout_ms > 0) {
+		p_operation->connection->native().async_read_resultset_head(p_operation->exec_state, p_operation->diagnostics, boost::asio::cancel_after(std::chrono::milliseconds(p_operation->timeout_ms), handler));
+	} else {
+		p_operation->connection->native().async_read_resultset_head(p_operation->exec_state, p_operation->diagnostics, handler);
+	}
+}
+
+void async_advance(const Ref<MySQLAsyncOperation> &p_operation) {
+	if (p_operation->exec_state.complete()) {
+		p_operation->result_builder.end_resultset(p_operation->exec_state.affected_rows(), p_operation->exec_state.last_insert_id(), p_operation->exec_state.info());
+		p_operation->call_deferred("_complete", p_operation->result_builder.finish());
+		return;
+	}
+	if (p_operation->exec_state.should_read_rows()) {
+		issue_read_rows(p_operation);
+	} else { // should_read_head()
+		p_operation->result_builder.end_resultset(p_operation->exec_state.affected_rows(), p_operation->exec_state.last_insert_id(), p_operation->exec_state.info());
+		issue_read_head(p_operation);
+	}
+}
+
+// `p_request` must stay valid until the operation ends: pass either the SQL string owned by
+// the operation or a bound statement whose parameters are owned by the operation.
+template <typename Request>
+void start_async_execute(MySQLConnection &p_connection, Request &&p_request, const Ref<MySQLAsyncOperation> &p_operation, int p_timeout_ms) {
+	p_operation->connection = &p_connection;
+	p_operation->timeout_ms = p_timeout_ms;
+	AsyncHeadHandler handler{ p_operation };
+	if (p_timeout_ms > 0) {
+		p_connection.native().async_start_execution(std::forward<Request>(p_request), p_operation->exec_state, p_operation->diagnostics, boost::asio::cancel_after(std::chrono::milliseconds(p_timeout_ms), handler));
+	} else {
+		p_connection.native().async_start_execution(std::forward<Request>(p_request), p_operation->exec_state, p_operation->diagnostics, handler);
+	}
 }
 
 } //namespace
 
 MySQLSession::~MySQLSession() {
-	if (io_thread_started) {
-		// Ordem importa: soltar o work_guard e parar o io_context ANTES de dar join
-		// garante que a thread saia de run() antes da Connection ser destruída — sem
-		// isso, a thread ficaria com uma referência pendente pro io_context/any_
-		// connection sendo destruídos (mesma classe de risco do S3 da auditoria, agora
-		// entre threads em vez de entre expressões).
-		io_work_guard.reset();
-		if (connection) {
-			connection->get_io_context().stop();
-		}
-		if (io_thread.joinable()) {
-			io_thread.join();
-		}
+	if (io_thread.is_started()) {
+		// The order matters: release the work guard and stop the `io_context` BEFORE
+		// joining, so the thread leaves `run()` before the connection is destroyed.
+		// Otherwise it would keep a dangling reference to the `io_context` and the
+		// `any_connection` being destroyed.
+		memdelete(io_work_guard);
+		io_work_guard = nullptr;
+		connection->get_io_context().stop();
+		io_thread.wait_to_finish();
 	}
 
-	if (release_to_pool && connection) {
-		release_to_pool(std::move(connection));
+	memdelete(statement_cache);
+	statement_cache = nullptr;
+
+	if (owner_pool.is_valid() && connection) {
+		owner_pool->release(connection);
+	} else {
+		memdelete(connection);
 	}
+	connection = nullptr;
+}
+
+void MySQLSession::_io_thread_main(void *p_session) {
+	MySQLSession *session = static_cast<MySQLSession *>(p_session);
+	session->connection->get_io_context().run();
 }
 
 void MySQLSession::_ensure_io_thread_started() {
-	if (io_thread_started) {
+	if (io_thread.is_started()) {
 		return;
 	}
-	io_work_guard = std::make_unique<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>>(
-			boost::asio::make_work_guard(connection->get_io_context()));
-	io_thread = std::thread([this]() {
-		connection->get_io_context().run();
-	});
-	io_thread_started = true;
+	// A pooled connection may have had its `io_context` stopped by a previous session.
+	connection->get_io_context().restart();
+	io_work_guard = memnew(IOWorkGuard(boost::asio::make_work_guard(connection->get_io_context())));
+	io_thread.start(&MySQLSession::_io_thread_main, this);
 }
 
-Ref<MySQLSession> MySQLSession::create_pooled(Ref<MySQLConfig> p_config, std::unique_ptr<MySQLConnection> p_connection, std::function<void(std::unique_ptr<MySQLConnection>)> p_release_to_pool) {
+Ref<MySQLSession> MySQLSession::create_pooled(const Ref<MySQLConfig> &p_config, MySQLConnection *p_connection, const Ref<MySQLPool> &p_owner_pool) {
 	Ref<MySQLSession> session;
 	session.instantiate();
 	session->config = p_config;
-	session->connection = std::move(p_connection);
-	session->statement_cache = std::make_unique<PreparedStatementCache>();
-	session->release_to_pool = std::move(p_release_to_pool);
+	session->connection = p_connection;
+	session->statement_cache = memnew(PreparedStatementCache(p_config->get_statement_cache_size()));
+	session->owner_pool = p_owner_pool;
 	return session;
 }
 
 void MySQLSession::set_config(const Ref<MySQLConfig> &p_config) {
-	ERR_FAIL_COND_MSG(connection != nullptr, "MySQLSession: a config não pode ser trocada depois que a conexão já foi criada.");
-	ERR_FAIL_COND_MSG(p_config.is_null(), "MySQLSession: a config não pode ser nula.");
+	ERR_FAIL_COND_MSG(connection != nullptr, "MySQLSession: The config cannot be changed after the connection has been created.");
+	ERR_FAIL_COND_MSG(p_config.is_null(), "MySQLSession: The config cannot be null.");
 	config = p_config;
-	connection = std::make_unique<MySQLConnection>(config);
-	statement_cache = std::make_unique<PreparedStatementCache>();
+	connection = memnew(MySQLConnection(config));
+	statement_cache = memnew(PreparedStatementCache(p_config->get_statement_cache_size()));
 }
 
 Dictionary MySQLSession::connect_db() {
 	if (!connection) {
-		return mysql_module::make_client_error_dict("MySQLSession: chame set_config() antes de connect_db().");
+		return mysql_module::make_client_error_dict("MySQLSession: Call set_config() before connect_db().");
 	}
 	if (connection->connect()) {
-		statement_cache->clear(); // handles de uma conexão anterior não valem mais.
+		statement_cache->clear(); // Handles from a previous connection are no longer valid.
 		return Dictionary();
 	}
 	return mysql_module::make_error_dict(connection->get_last_error(), connection->get_last_diagnostics());
@@ -154,17 +306,10 @@ bool MySQLSession::is_db_connected() const {
 
 Ref<MySQLResult> MySQLSession::_execute_text_std(const std::string &p_sql) {
 	if (!connection || !connection->is_connected()) {
-		return MySQLResult::from_error(mysql_module::make_error_dict(boost::mysql::make_error_code(boost::mysql::client_errc::not_connected), boost::mysql::diagnostics()));
+		return MySQLResult::from_error(make_not_connected_error());
 	}
 
-	boost::mysql::results results;
-	boost::mysql::error_code err;
-	boost::mysql::diagnostics diag;
-	connection->native().execute(p_sql, results, err, diag);
-	if (err) {
-		return MySQLResult::from_error(mysql_module::make_error_dict(err, diag));
-	}
-	return MySQLResult::from_boost_results(results, config);
+	return execute_with_limit(*connection, p_sql, config);
 }
 
 Ref<MySQLResult> MySQLSession::execute_text(const String &p_sql) {
@@ -173,7 +318,7 @@ Ref<MySQLResult> MySQLSession::execute_text(const String &p_sql) {
 
 Ref<MySQLResult> MySQLSession::_execute_formatted_std(const std::string &p_sql, const Array &p_params) {
 	if (!connection || !connection->is_connected()) {
-		return MySQLResult::from_error(mysql_module::make_error_dict(boost::mysql::make_error_code(boost::mysql::client_errc::not_connected), boost::mysql::diagnostics()));
+		return MySQLResult::from_error(make_not_connected_error());
 	}
 
 	mysql_module::FieldParams fields;
@@ -182,38 +327,38 @@ Ref<MySQLResult> MySQLSession::_execute_formatted_std(const std::string &p_sql, 
 		return MySQLResult::from_error(mysql_module::make_client_error_dict(error_message));
 	}
 
-	boost::system::result<boost::mysql::format_options> opts = connection->native().format_opts();
-	if (!opts) {
-		return MySQLResult::from_error(mysql_module::make_error_dict(opts.error(), boost::mysql::diagnostics()));
+	boost::system::result<boost::mysql::format_options> options = connection->native().format_opts();
+	if (!options) {
+		return MySQLResult::from_error(mysql_module::make_error_dict(options.error(), boost::mysql::diagnostics()));
 	}
 
-	// Formatação incremental (não with_params, que exige o número de argumentos fixo em
-	// tempo de compilação): divide p_sql em '?' e intercala trechos literais
-	// (boost::mysql::runtime — o molde vem do script, não de dado não confiável; ver
-	// documentation/design-notes.md) com valores escapados de verdade pelo Boost.MySQL,
-	// nunca por escaping próprio (resolve S7 da auditoria).
-	boost::mysql::format_context ctx(*opts);
-	size_t pos = 0;
+	// Incremental formatting (not `with_params`, which needs the number of arguments at
+	// compile time): the SQL is split at every `?`, literal segments are appended as
+	// `boost::mysql::runtime` (the template comes from the script, not from untrusted
+	// data), and the values are escaped by Boost.MySQL itself. There is never any
+	// home-made escaping.
+	boost::mysql::format_context context(*options);
+	size_t position = 0;
 	size_t param_index = 0;
 	while (true) {
-		size_t q = p_sql.find('?', pos);
-		size_t seg_end = (q == std::string::npos) ? p_sql.size() : q;
-		ctx.append_raw(boost::mysql::runtime(boost::mysql::string_view(p_sql.data() + pos, seg_end - pos)));
-		if (q == std::string::npos) {
+		size_t placeholder = p_sql.find('?', position);
+		size_t segment_end = (placeholder == std::string::npos) ? p_sql.size() : placeholder;
+		context.append_raw(boost::mysql::runtime(boost::mysql::string_view(p_sql.data() + position, segment_end - position)));
+		if (placeholder == std::string::npos) {
 			break;
 		}
-		if (param_index >= fields.views.size()) {
-			return MySQLResult::from_error(mysql_module::make_client_error_dict("execute_formatted: mais '?' no SQL do que parâmetros fornecidos."));
+		if (param_index >= (size_t)fields.views.size()) {
+			return MySQLResult::from_error(mysql_module::make_client_error_dict("execute_formatted: The SQL has more '?' placeholders than the parameters provided."));
 		}
-		ctx.append_value(fields.views[param_index]);
+		context.append_value(fields.views[param_index]);
 		param_index++;
-		pos = q + 1;
+		position = placeholder + 1;
 	}
-	if (param_index != fields.views.size()) {
-		return MySQLResult::from_error(mysql_module::make_client_error_dict("execute_formatted: mais parâmetros fornecidos do que '?' no SQL."));
+	if (param_index != (size_t)fields.views.size()) {
+		return MySQLResult::from_error(mysql_module::make_client_error_dict("execute_formatted: More parameters were provided than '?' placeholders in the SQL."));
 	}
 
-	boost::system::result<std::string> formatted = std::move(ctx).get();
+	boost::system::result<std::string> formatted = std::move(context).get();
 	if (!formatted) {
 		return MySQLResult::from_error(mysql_module::make_error_dict(formatted.error(), boost::mysql::diagnostics()));
 	}
@@ -225,9 +370,9 @@ Ref<MySQLResult> MySQLSession::execute_formatted(const String &p_sql, const Arra
 	return _execute_formatted_std(mysql_module::to_std_string(p_sql), p_params);
 }
 
-Ref<MySQLResult> MySQLSession::_execute_prepared_std(const std::string &p_sql, const Array &p_params) {
+Ref<MySQLResult> MySQLSession::execute_prepared(const String &p_sql, const Array &p_params) {
 	if (!connection || !connection->is_connected()) {
-		return MySQLResult::from_error(mysql_module::make_error_dict(boost::mysql::make_error_code(boost::mysql::client_errc::not_connected), boost::mysql::diagnostics()));
+		return MySQLResult::from_error(make_not_connected_error());
 	}
 
 	mysql_module::FieldParams fields;
@@ -236,44 +381,35 @@ Ref<MySQLResult> MySQLSession::_execute_prepared_std(const std::string &p_sql, c
 		return MySQLResult::from_error(mysql_module::make_client_error_dict(error_message));
 	}
 
-	boost::mysql::error_code err;
-	boost::mysql::diagnostics diag;
-	boost::mysql::statement stmt;
-	if (!statement_cache->get_or_prepare(*connection, p_sql, stmt, err, diag)) {
-		return MySQLResult::from_error(mysql_module::make_error_dict(err, diag));
+	boost::mysql::error_code error;
+	boost::mysql::diagnostics diagnostics;
+	boost::mysql::statement statement;
+	if (!statement_cache->get_or_prepare(*connection, p_sql, statement, error, diagnostics)) {
+		return MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics));
 	}
 
-	if ((size_t)stmt.num_params() != fields.views.size()) {
+	if ((int)statement.num_params() != (int)fields.views.size()) {
 		return MySQLResult::from_error(mysql_module::make_client_error_dict(
-				vformat("execute_prepared: a prepared statement espera %d parâmetro(s), recebeu %d.", (int)stmt.num_params(), (int)fields.views.size())));
+				vformat("execute_prepared: The prepared statement expects %d parameter(s), got %d.", (int)statement.num_params(), (int)fields.views.size())));
 	}
 
-	boost::mysql::results results;
-	connection->native().execute(stmt.bind(fields.views.begin(), fields.views.end()), results, err, diag);
-	if (err) {
-		return MySQLResult::from_error(mysql_module::make_error_dict(err, diag));
-	}
-	return MySQLResult::from_boost_results(results, config);
-}
-
-Ref<MySQLResult> MySQLSession::execute_prepared(const String &p_sql, const Array &p_params) {
-	return _execute_prepared_std(mysql_module::to_std_string(p_sql), p_params);
+	return execute_with_limit(*connection, statement.bind(fields.views.ptr(), fields.views.ptr() + fields.views.size()), config);
 }
 
 Array MySQLSession::execute_script(const String &p_content) {
 	Array out;
 
 	if (!config.is_valid() || !config->get_allow_sql_script_execution()) {
-		out.push_back(MySQLResult::from_error(mysql_module::make_client_error_dict("execute_script: allow_sql_script_execution está desligado na config.")));
+		out.push_back(MySQLResult::from_error(mysql_module::make_client_error_dict("execute_script: allow_sql_script_execution is disabled in the config.")));
 		return out;
 	}
 
-	std::vector<std::string> statements = split_sql_statements(mysql_module::to_std_string(p_content));
-	for (const std::string &statement_sql : statements) {
-		Ref<MySQLResult> result = _execute_text_std(statement_sql);
+	Vector<String> statements = mysql_module::split_sql_statements(p_content);
+	for (const String &statement_sql : statements) {
+		Ref<MySQLResult> result = _execute_text_std(mysql_module::to_std_string(statement_sql));
 		out.push_back(result);
 		if (!result->is_ok()) {
-			break; // Fail-fast — como um "mysql < script.sql" pararia no primeiro erro.
+			break; // Fail fast, like `mysql < script.sql` stopping at the first error.
 		}
 	}
 	return out;
@@ -285,104 +421,67 @@ Dictionary MySQLSession::run_control_statement(const String &p_sql) {
 }
 
 Ref<MySQLTransaction> MySQLSession::begin_transaction() {
-	Dictionary err = run_control_statement("START TRANSACTION");
-	if (!err.is_empty()) {
-		ERR_FAIL_V_MSG(Ref<MySQLTransaction>(), vformat("MySQLSession: begin_transaction() falhou: %s", String(err.get("message", "erro desconhecido"))));
+	Dictionary error = run_control_statement("START TRANSACTION");
+	if (!error.is_empty()) {
+		ERR_FAIL_V_MSG(Ref<MySQLTransaction>(), vformat("MySQLSession: begin_transaction() failed: %s", String(error.get("message", "unknown error"))));
 	}
 	return MySQLTransaction::create(Ref<MySQLSession>(this));
 }
 
 Ref<MySQLAsyncOperation> MySQLSession::async_execute_text(const String &p_sql) {
-	Ref<MySQLAsyncOperation> op;
-	op.instantiate();
+	Ref<MySQLAsyncOperation> operation;
+	operation.instantiate();
 
 	if (!connection || !connection->is_connected()) {
-		Ref<MySQLResult> error_result = MySQLResult::from_error(mysql_module::make_error_dict(boost::mysql::make_error_code(boost::mysql::client_errc::not_connected), boost::mysql::diagnostics()));
-		op->call_deferred("_complete", error_result);
-		return op;
+		operation->call_deferred("_complete", MySQLResult::from_error(make_not_connected_error()));
+		return operation;
 	}
 
 	_ensure_io_thread_started();
 
-	// sql_storage/results/diag precisam sobreviver até o callback rodar — capturados
-	// por shared_ptr no lambda, não por valor local (que morreria ao sair desta
-	// função). Mesma preocupação de lifetime do S3 da auditoria, agora atravessando
-	// threads em vez de expressões.
-	auto sql_storage = std::make_shared<std::string>(mysql_module::to_std_string(p_sql));
-	auto op_results = std::make_shared<boost::mysql::results>();
-	auto op_diag = std::make_shared<boost::mysql::diagnostics>();
-	Ref<MySQLConfig> config_copy = config;
-
-	auto on_done = [op, op_results, op_diag, config_copy](boost::mysql::error_code ec) {
-		Ref<MySQLResult> r = ec ? MySQLResult::from_error(mysql_module::make_error_dict(ec, *op_diag)) : MySQLResult::from_boost_results(*op_results, config_copy);
-		op->call_deferred("_complete", r);
-	};
-
-	int timeout_ms = config->get_async_timeout_ms();
-	if (timeout_ms > 0) {
-		connection->native().async_execute(*sql_storage, *op_results, *op_diag, boost::asio::cancel_after(std::chrono::milliseconds(timeout_ms), on_done));
-	} else {
-		connection->native().async_execute(*sql_storage, *op_results, *op_diag, on_done);
-	}
-
-	return op;
+	operation->config = config;
+	operation->sql = mysql_module::to_std_string(p_sql);
+	start_async_execute(*connection, operation->sql, operation, config->get_async_timeout_ms());
+	return operation;
 }
 
 Ref<MySQLAsyncOperation> MySQLSession::async_execute_prepared(const String &p_sql, const Array &p_params) {
-	Ref<MySQLAsyncOperation> op;
-	op.instantiate();
+	Ref<MySQLAsyncOperation> operation;
+	operation.instantiate();
 
 	if (!connection || !connection->is_connected()) {
-		Ref<MySQLResult> error_result = MySQLResult::from_error(mysql_module::make_error_dict(boost::mysql::make_error_code(boost::mysql::client_errc::not_connected), boost::mysql::diagnostics()));
-		op->call_deferred("_complete", error_result);
-		return op;
+		operation->call_deferred("_complete", MySQLResult::from_error(make_not_connected_error()));
+		return operation;
 	}
 
-	auto fields = std::make_shared<mysql_module::FieldParams>();
 	String error_message;
-	if (!mysql_module::array_to_field_params(p_params, *fields, error_message)) {
-		op->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_client_error_dict(error_message)));
-		return op;
+	if (!mysql_module::array_to_field_params(p_params, operation->params, error_message)) {
+		operation->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_client_error_dict(error_message)));
+		return operation;
 	}
 
-	boost::mysql::error_code prep_err;
-	boost::mysql::diagnostics prep_diag;
-	boost::mysql::statement stmt;
-	if (!statement_cache->get_or_prepare(*connection, mysql_module::to_std_string(p_sql), stmt, prep_err, prep_diag)) {
-		op->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_error_dict(prep_err, prep_diag)));
-		return op;
+	boost::mysql::error_code error;
+	boost::mysql::diagnostics diagnostics;
+	boost::mysql::statement statement;
+	if (!statement_cache->get_or_prepare(*connection, p_sql, statement, error, diagnostics)) {
+		operation->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics)));
+		return operation;
 	}
-	if ((size_t)stmt.num_params() != fields->views.size()) {
-		op->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_client_error_dict(vformat("async_execute_prepared: a prepared statement espera %d parâmetro(s), recebeu %d.", (int)stmt.num_params(), (int)fields->views.size()))));
-		return op;
+	if ((int)statement.num_params() != (int)operation->params.views.size()) {
+		operation->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_client_error_dict(vformat("async_execute_prepared: The prepared statement expects %d parameter(s), got %d.", (int)statement.num_params(), (int)operation->params.views.size()))));
+		return operation;
 	}
 
 	_ensure_io_thread_started();
 
-	auto op_results = std::make_shared<boost::mysql::results>();
-	auto op_diag = std::make_shared<boost::mysql::diagnostics>();
-	Ref<MySQLConfig> config_copy = config;
-
-	auto on_done = [op, op_results, op_diag, config_copy, fields](boost::mysql::error_code ec) {
-		// fields é capturado só pra manter os field_views (e os buffers atrás deles)
-		// vivos até aqui — não é usado depois disso.
-		Ref<MySQLResult> r = ec ? MySQLResult::from_error(mysql_module::make_error_dict(ec, *op_diag)) : MySQLResult::from_boost_results(*op_results, config_copy);
-		op->call_deferred("_complete", r);
-	};
-
-	int timeout_ms = config->get_async_timeout_ms();
-	if (timeout_ms > 0) {
-		connection->native().async_execute(stmt.bind(fields->views.begin(), fields->views.end()), *op_results, *op_diag, boost::asio::cancel_after(std::chrono::milliseconds(timeout_ms), on_done));
-	} else {
-		connection->native().async_execute(stmt.bind(fields->views.begin(), fields->views.end()), *op_results, *op_diag, on_done);
-	}
-
-	return op;
+	operation->config = config;
+	start_async_execute(*connection, statement.bind(operation->params.views.ptr(), operation->params.views.ptr() + operation->params.views.size()), operation, config->get_async_timeout_ms());
+	return operation;
 }
 
 Ref<MySQLStreamingCursor> MySQLSession::execute_streaming(const String &p_sql) {
 	if (!connection || !connection->is_connected()) {
-		return MySQLStreamingCursor::from_error(mysql_module::make_error_dict(boost::mysql::make_error_code(boost::mysql::client_errc::not_connected), boost::mysql::diagnostics()));
+		return MySQLStreamingCursor::from_error(make_not_connected_error());
 	}
 	return MySQLStreamingCursor::start(Ref<MySQLSession>(this), *connection, config, mysql_module::to_std_string(p_sql));
 }

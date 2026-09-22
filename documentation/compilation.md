@@ -1,46 +1,45 @@
-# Compilação
+# Compilation
 
-> **Estado atual:** o módulo está em reescrita completa. Durante a reescrita, só o build
-> em Linux x86_64 é validado a cada etapa; as instruções abaixo para Windows/macOS
-> continuam aqui como referência, mas ainda não foram testadas nesta reescrita.
+> **Current state:** the module is being fully rewritten. During the rewrite only the
+> Linux x86_64 build is validated at every step, plus a Windows cross-build from Linux
+> (section 4). The macOS and Android instructions have not been tested yet.
 
-**Versões testadas nesta reescrita:** Boost `boost-1.92.0`, OpenSSL `openssl-4.0.2`
-(tags estáveis, sem submódulos de desenvolvimento). O `SCsub` verifica a versão mínima
-(Boost ≥ 1.85, OpenSSL ≥ 3.0) e os headers antes de compilar; versões mais novas
-provavelmente funcionam, mas só as citadas acima foram de fato testadas.
+**Versions tested in this rewrite:** Boost `boost-1.92.0`, OpenSSL `openssl-4.0.2`
+(stable tags, no development submodules). The `SCsub` checks the minimum versions
+(Boost >= 1.85, OpenSSL >= 3.0) and the headers before building. Newer versions probably
+work, but only the ones above were actually tested.
 
-Este módulo **não baixa nem compila** o Boost e o OpenSSL. Você precisa
-compilá-los manualmente antes de compilar o Godot com o módulo. Este guia
-traz o passo a passo e as flags usadas.
+This module **does not download or build** Boost and OpenSSL. You must build them
+manually before building Godot with the module. This guide gives the steps and the flags
+used.
 
-## Requisitos
+## Requirements
 
-- Godot **4.6** ou mais recente.
-- Um compilador com suporte a C++17: GCC, Clang (Linux/macOS) ou Visual
-  C++ (Windows).
-- [**NASM**](https://www.nasm.us/pub/nasm/releasebuilds/) — só no Windows,
-  necessário para o OpenSSL.
+- Godot **4.6** or newer.
+- A compiler with C++17 support: GCC or Clang (Linux/macOS), or Visual C++ (Windows).
+- [**NASM**](https://www.nasm.us/pub/nasm/releasebuilds/), on Windows only, needed by
+  OpenSSL.
 - Git.
-- Todos os requisitos para compilar o Godot.
+- Everything required to build Godot itself.
 
-## Layout esperado
+## Expected layout
 
-O módulo espera, por padrão, que Boost e OpenSSL já compilados estejam em
-pastas **irmãs** do módulo:
+By default the module expects the already built Boost and OpenSSL to be in **sibling**
+folders of the module:
 
 ```
-seu_workspace/
+your_workspace/
 ├── godot/
-├── mysql/              <- este módulo
+├── mysql/              <- this module
 └── thirdparty/
-    ├── boost/          <- clone do Boost, compilado (passo abaixo)
-    └── openssl/        <- clone do OpenSSL, compilado (passo abaixo)
+    ├── boost/          <- Boost clone, built (step below)
+    └── openssl/        <- OpenSSL clone, built (step below)
 ```
 
-## Configuração (`config.cfg`)
+## Configuration (`config.cfg`)
 
-Os caminhos do Boost e do OpenSSL e as opções de compilação do módulo ficam
-em `mysql/config.cfg`, lido pelo `SCsub` a cada build:
+The Boost and OpenSSL paths and the module build options live in `mysql/config.cfg`,
+which the `SCsub` reads on every build:
 
 ```ini
 [paths]
@@ -51,63 +50,67 @@ openssl_path = ../thirdparty/openssl
 boost_mysql_mode = separate
 ```
 
-| Opção | Valores | Descrição |
+| Option | Values | Description |
 |---|---|---|
-| `boost_path` | pasta | Boost compilado (`boost/` com os headers e `stage/lib/`). Caminhos relativos partem da pasta do `config.cfg`. |
-| `openssl_path` | pasta | OpenSSL compilado (`include/` e `lib64/`). Mesma regra de caminhos relativos. |
-| `boost_mysql_mode` | `separate` (padrão) ou `header-only` | `separate`: define `BOOST_MYSQL_SEPARATE_COMPILATION` e o Boost.MySQL é compilado uma única vez, em `register_types.cpp`. `header-only`: o Boost.MySQL é instanciado em cada unidade de compilação (build mais lento). |
+| `boost_path` | folder | Built Boost (`boost/` with the headers and `stage/lib/`). Relative paths start from the folder of `config.cfg`. |
+| `openssl_path` | folder | Built OpenSSL (`include/` and `lib64/` or `lib/`). Same rule for relative paths. |
+| `boost_mysql_mode` | `separate` (default) or `header-only` | `separate` defines `BOOST_MYSQL_SEPARATE_COMPILATION` and Boost.MySQL is compiled once, in `boost_mysql_src.cpp`. `header-only` instantiates Boost.MySQL in every translation unit (slower build). |
 
-Se Boost/OpenSSL estiverem em outro local, edite `boost_path` e
-`openssl_path` no `config.cfg` — não há mais opções `boost_path=`/
-`openssl_path=` na linha do scons.
+If Boost/OpenSSL are somewhere else, edit `boost_path` and `openssl_path` in
+`config.cfg`. There are no `boost_path=`/`openssl_path=` options on the scons command
+line.
 
-## Padrões de linguagem
+To build for another platform with different paths, create a `config.<platform>.cfg`
+(for example `config.windows.cfg`). The `SCsub` reads it instead of `config.cfg` when
+the build uses that `platform=`.
 
-- **C++17** (`-std=c++17`, ou `/std:c++17` no MSVC), o mesmo padrão do Godot 4.
-- **Sem exceções (`no_exception`)**: o módulo não adiciona `-fexceptions` e
-  segue o padrão do Godot (`disable_exceptions=yes`). Os erros do
-  Boost.MySQL são tratados pelas sobrecargas com `error_code`/`diagnostics`,
-  e as operações assíncronas usam callbacks (`void(error_code)`), não
-  corrotinas C++20 nem `use_future`.
+## Language standard
 
-### Arquivos do módulo ligados a `no_exception`
+- **C++17** (`-std=c++17`, or `/std:c++17` on MSVC), the same as Godot 4.
+- **No exceptions (`no_exception`)**: the module does not add `-fexceptions` and follows
+  the Godot default (`disable_exceptions=yes`). Boost.MySQL errors are handled through
+  the `error_code`/`diagnostics` overloads, and asynchronous operations use callbacks
+  (`void(error_code)`), not C++20 coroutines or `use_future`.
 
-- `scr/throw_exception.cpp`: com `-fno-exceptions` o Boost declara
-  `boost::throw_exception()` mas não a define. O módulo a define: registra a
-  mensagem no Godot e aborta (`CRASH_NOW_MSG`). Não há como recuperar sem
-  exceções, então chegar ali é sempre fatal.
-- `scr/boost_mysql_src.cpp`: no modo `separate` instancia o Boost.MySQL. Faz o
-  papel de `<boost/mysql/src.hpp>`, mas sem `impl/connection_pool.ipp`, cujo
-  `try/catch(...)` não compila com `-fno-exceptions`. O módulo não usa o pool.
-  Ao atualizar o Boost, compare a lista de `.ipp` com a de `boost/mysql/src.hpp`.
+### Module files tied to `no_exception`
 
-## Bibliotecas linkadas
+- `scr/throw_exception.cpp`: with `-fno-exceptions` Boost declares
+  `boost::throw_exception()` but does not define it. The module defines it: it logs the
+  message in Godot and aborts (`CRASH_NOW_MSG`). There is no way to recover without
+  exceptions, so reaching it is always fatal.
+- `scr/boost_mysql_src.cpp`: in `separate` mode it instantiates Boost.MySQL. It plays the
+  role of `<boost/mysql/src.hpp>`, but without `impl/connection_pool.ipp`, whose
+  `try/catch(...)` does not compile with `-fno-exceptions`. The module has its own pool
+  (`MySQLPool`). When updating Boost, compare the list of `.ipp` files with the one in
+  `boost/mysql/src.hpp`.
 
-Segundo a documentação do Boost.MySQL ("Integrating Boost.MySQL"), os requisitos
-de link são:
+## Linked libraries
 
-| Biblioteca | Motivo |
+According to the Boost.MySQL documentation ("Integrating Boost.MySQL"), the link
+requirements are:
+
+| Library | Reason |
 |---|---|
-| `libboost_charconv` | Única dependência do Boost.MySQL com parte compilada (Boost >= 1.85). |
-| `libssl`, `libcrypto` | OpenSSL: TLS e autenticação `caching_sha2_password`. |
-| Threads (`pthread`) | Já é linkado pelo Godot. |
+| `libboost_charconv` | The only Boost.MySQL dependency with a compiled part (Boost >= 1.85). |
+| `libssl`, `libcrypto` | OpenSSL: TLS and `caching_sha2_password` authentication. |
+| Threads (`pthread`) | Already linked by Godot. |
 
-**`libquadmath`:** por padrão o `b2` detecta o `__float128` do GCC e o
-`libboost_charconv` passa a depender de `libquadmath` (`quadmath_snprintf`,
-`strtoflt128`, `isnanq`, `isinfq`). O `BOOST_CHARCONV_NO_QUADMATH` só vale no
-CMake, não no `b2`. Compilando com `cxxstd=17 cxxstd-dialect=iso` (comando acima)
-essa dependência some e o módulo não linka `libquadmath`.
+**`libquadmath`:** by default `b2` detects GCC's `__float128` and `libboost_charconv`
+starts depending on `libquadmath` (`quadmath_snprintf`, `strtoflt128`, `isnanq`,
+`isinfq`). `BOOST_CHARCONV_NO_QUADMATH` only works with CMake, not with `b2`. Building
+with `cxxstd=17 cxxstd-dialect=iso` (command below) removes that dependency, and the
+module does not link `libquadmath`.
 
-**Ordem no link:** `libssl` vem antes de `libcrypto` (a `libssl.a` depende da
-`libcrypto.a`). O `SCsub` já faz isso.
+**Link order:** `libssl` comes before `libcrypto` (`libssl.a` depends on `libcrypto.a`).
+The `SCsub` already does this.
 
-`libboost_thread` **não** é necessária. `Boost.Context` só seria necessária
-com `asio::spawn`/`yield_context`, que o módulo não usa.
+`libboost_thread` is **not** needed. `Boost.Context` would only be needed with
+`asio::spawn`/`yield_context`, which the module does not use.
 
-## 1. Compilando o Boost
+## 1. Building Boost
 
-O Boost.MySQL faz parte do Boost desde a versão 1.82; um clone completo do
-monorepo `boostorg/boost` já traz tudo que é preciso.
+Boost.MySQL is part of Boost since version 1.82; a full clone of the `boostorg/boost`
+monorepo already brings everything that is needed.
 
 ```bash
 git clone --recurse-submodules https://github.com/boostorg/boost.git thirdparty/boost
@@ -130,39 +133,37 @@ cd thirdparty/boost
     cxxstd-dialect=iso
 ```
 
-No Windows, troque `bootstrap.sh` por `bootstrap.bat` e `./b2` por `b2.exe`;
-ajuste `toolset` para `msvc` (ou `gcc-mingw`/`clang-mingw`, se estiver
-cruzando com MinGW), `target-os=windows` e `architecture`/`address-model`
-conforme o alvo.
+On Windows, replace `bootstrap.sh` with `bootstrap.bat` and `./b2` with `b2.exe`; set
+`toolset` to `msvc` (or `gcc-mingw`/`clang-mingw` if cross-compiling with MinGW),
+`target-os=windows`, and `architecture`/`address-model` for the target.
 
-### Por que essas flags
+### Why these flags
 
-| Flag | Motivo |
+| Flag | Reason |
 |---|---|
-| `link=static`, `runtime-link=static` | O módulo embarca o Boost estaticamente — quem joga o jogo não precisa ter `.so`/`.dll` do Boost instalado. |
-| `threading=multi` | Boost.MySQL usa Boost.Asio, que exige suporte a múltiplas threads. |
-| `variant=release` | Build de produção (sem símbolos de debug do Boost). |
-| `cxxstd=17`, `cxxstd-dialect=iso` | Mesmo padrão de linguagem do módulo (`-std=c++17`, sem extensões GNU). O dialeto `iso` também impede o `b2` de detectar o `__float128`, então o `libboost_charconv` não depende de `libquadmath` (ver "Bibliotecas linkadas"). |
-| `toolset` |
-| `toolset` | Precisa casar com o compilador usado para compilar o Godot — um Boost compilado com `gcc` não linka de forma confiável contra um Godot compilado com `clang`, e vice-versa. |
-| `--stagedir` | Onde as libs compiladas ficam (`stage/lib/`) — é o caminho `stage/lib` dentro do `boost_path` do `config.cfg`. |
+| `link=static`, `runtime-link=static` | The module embeds Boost statically, so whoever runs the game does not need Boost `.so`/`.dll` files installed. |
+| `threading=multi` | Boost.MySQL uses Boost.Asio, which requires multithreading support. |
+| `variant=release` | Production build (no Boost debug symbols). |
+| `cxxstd=17`, `cxxstd-dialect=iso` | The same language standard as the module (`-std=c++17`, no GNU extensions). The `iso` dialect also stops `b2` from detecting `__float128`, so `libboost_charconv` does not depend on `libquadmath` (see "Linked libraries"). |
+| `toolset` | Must match the compiler used to build Godot. A Boost built with `gcc` does not reliably link against a Godot built with `clang`, and vice versa. |
+| `--stagedir` | Where the built libraries go (`stage/lib/`), which is the `stage/lib` path inside the `boost_path` of `config.cfg`. |
 
-**Resultado:** headers em `thirdparty/boost/boost/` (gerados por `./b2 headers`;
-o `boost_path` do `config.cfg` aponta para `thirdparty/boost`, não para essa
-subpasta) e bibliotecas estáticas `libboost_*.a` em `thirdparty/boost/stage/lib/`.
+**Result:** headers in `thirdparty/boost/boost/` (generated by `./b2 headers`; the
+`boost_path` of `config.cfg` points to `thirdparty/boost`, not to that subfolder) and
+static libraries `libboost_*.a` in `thirdparty/boost/stage/lib/`.
 
-A compilação leva alguns minutos, pois o `b2` compila todas as bibliotecas do
-Boost. O módulo só linka `libboost_charconv` (ver "Bibliotecas linkadas").
-Para conferir: `ls thirdparty/boost/stage/lib/libboost_charconv.a` e
+The build takes a few minutes, because `b2` builds every Boost library. The module only
+links `libboost_charconv` (see "Linked libraries"). To check:
+`ls thirdparty/boost/stage/lib/libboost_charconv.a` and
 `ls thirdparty/boost/boost/mysql.hpp`.
 
-## 2. Compilando o OpenSSL
+## 2. Building OpenSSL
 
 ```bash
 git clone https://github.com/openssl/openssl.git thirdparty/openssl
 cd thirdparty/openssl
 
-# Linux x86_64 (troque o target abaixo para outra plataforma — ver tabela)
+# Linux x86_64 (change the target below for another platform, see the table)
 ./Configure linux-x86_64 \
     no-ssl3 \
     no-weak-ssl-ciphers \
@@ -178,13 +179,13 @@ make -j"$(nproc)"
 make install
 ```
 
-No Windows (com NASM instalado e um "VS toolset" no PATH), troque
-`./Configure` por `perl Configure` e use `nmake`/`nmake install` no lugar
-de `make`/`make install`; target `VC-WIN64A` (64 bits) ou `VC-WIN32`.
+On Windows (with NASM installed and a "VS toolset" in the PATH), replace `./Configure`
+with `perl Configure` and use `nmake`/`nmake install` instead of `make`/`make install`;
+target `VC-WIN64A` (64 bits) or `VC-WIN32`.
 
-### Targets comuns
+### Common targets
 
-| Plataforma / arquitetura | Target |
+| Platform / architecture | Target |
 |---|---|
 | Linux x86_64 (gcc) | `linux-x86_64` |
 | Linux x86_64 (clang) | `linux-x86_64-clang` |
@@ -193,30 +194,29 @@ de `make`/`make install`; target `VC-WIN64A` (64 bits) ou `VC-WIN32`.
 | macOS x86_64 | `darwin64-x86_64` |
 | macOS arm64 | `darwin64-arm64` |
 
-Compilação cruzada (Android, iOS, riscv, powerpc...) não está coberta por
-este guia — consulte a documentação oficial do
-[Boost.Build](https://www.boost.org/build/tutorial.html) e do
-[OpenSSL](https://wiki.openssl.org/index.php/Compilation_and_Installation)
-para as opções específicas de cada alvo.
+Cross-compilation (Android, iOS, riscv, powerpc...) is not covered by this guide. See
+the official documentation of [Boost.Build](https://www.boost.org/build/tutorial.html)
+and [OpenSSL](https://wiki.openssl.org/index.php/Compilation_and_Installation) for the
+options of each target.
 
-### Por que essas flags
+### Why these flags
 
-| Flag | Motivo |
+| Flag | Reason |
 |---|---|
-| `no-shared` | Gera `libssl.a`/`libcrypto.a` estáticas, mesmo raciocínio do `link=static` do Boost. |
-| `no-ssl3`, `no-weak-ssl-ciphers`, `no-legacy` | Remove protocolos e algoritmos obsoletos/inseguros que este módulo não usa — reduz superfície de ataque. |
-| `no-tests`, `no-docs` | Só encurta o tempo de build; não afeta o resultado final. |
+| `no-shared` | Produces static `libssl.a`/`libcrypto.a`, the same reasoning as `link=static` in Boost. |
+| `no-ssl3`, `no-weak-ssl-ciphers`, `no-legacy` | Removes obsolete or insecure protocols and algorithms that this module does not use, which reduces the attack surface. |
+| `no-tests`, `no-docs` | Only shortens the build time; it does not affect the final result. |
 
-**Resultado:** headers em `thirdparty/openssl/include/openssl/`, bibliotecas
-`libssl.a` e `libcrypto.a` em `thirdparty/openssl/lib64/` (algumas versões instalam em `lib/` — confira
-depois do `make install` e ajuste `openssl_path` no `config.cfg` e o caminho da lib no `SCsub` se for o caso).
+**Result:** headers in `thirdparty/openssl/include/openssl/`, and the libraries
+`libssl.a` and `libcrypto.a` in `thirdparty/openssl/lib64/`. Some versions install into
+`lib/` instead; the `SCsub` looks in both.
 
-## 3. Compilando o módulo junto com o Godot
+## 3. Building the module together with Godot
 
 ```bash
 git clone https://github.com/Malkverbena/mysql.git
-# (ou coloque este módulo dentro de godot/modules/, ou use custom_modules
-# apontando para fora da árvore do Godot, como no exemplo abaixo)
+# (or put this module inside godot/modules/, or use custom_modules
+# pointing outside the Godot tree, as in the example below)
 
 cd godot
 scons platform=linuxbsd arch=x86_64 target=editor \
@@ -225,32 +225,32 @@ scons platform=linuxbsd arch=x86_64 target=editor \
     -j"$(nproc)"
 ```
 
-É altamente recomendado compilar com `precision=double`.
+Building with `precision=double` is highly recommended.
 
-Se Boost/OpenSSL não estiverem no layout de pastas irmãs padrão, ajuste
-`boost_path` e `openssl_path` em `mysql/config.cfg` (ver "Configuração").
+If Boost/OpenSSL are not in the default sibling folder layout, adjust `boost_path` and
+`openssl_path` in `mysql/config.cfg` (see "Configuration").
 
-## 4. Cross-compilando pra Windows a partir do Linux (MinGW-w64)
+## 4. Cross-compiling for Windows from Linux (MinGW-w64)
 
-Verificado nesta reescrita: Boost e OpenSSL cross-compilados com MinGW-w64, módulo e
-Godot compilados com `platform=windows`, binário resultante rodado e testado (suite
-completa de `tests/`, 51 checagens) via [Wine](https://www.winehq.org/) contra um
-MariaDB de verdade.
+Verified in this rewrite: Boost and OpenSSL cross-compiled with MinGW-w64, the module and
+Godot built with `platform=windows`, and the resulting binary run and tested (the full
+`tests/smoke_test.gd` suite) through [Wine](https://www.winehq.org/) against a real
+MariaDB.
 
-### Pré-requisito
+### Prerequisite
 
-`x86_64-w64-mingw32-gcc`/`g++`/`ar`/`ranlib`/`windres` no PATH (pacote `mingw-w64` na
-maioria das distros Linux).
+`x86_64-w64-mingw32-gcc`/`g++`/`ar`/`ranlib`/`windres` in the PATH (the `mingw-w64`
+package on most Linux distributions).
 
 ### Boost
 
-Mesmo clone do Boost usado pra Linux, mas numa pasta separada — cada plataforma
-precisa do seu próprio `stage/lib` com objetos no formato certo (ELF para Linux,
-COFF/PE para Windows). Um `git worktree` evita reclonar o monorepo inteiro:
+The same Boost clone used for Linux, but in a separate folder. Each platform needs its
+own `stage/lib` with objects in the right format (ELF for Linux, COFF/PE for Windows). A
+`git worktree` avoids cloning the whole monorepo again:
 
 ```bash
 cd thirdparty/boost
-git worktree add ../boost-windows boost-1.92.0   # a tag que você compilou pra Linux
+git worktree add ../boost-windows boost-1.92.0   # the tag you built for Linux
 cd ../boost-windows
 git submodule update --init --recursive
 
@@ -275,17 +275,17 @@ EOF
     cxxstd-dialect=iso
 ```
 
-`toolset=gcc-mingw` sozinho não basta — o `--user-config` é quem ensina o b2 a achar o
-compilador MinGW (sem ele, b2 tenta usar o `g++` nativo e o resultado não roda no
-Windows).
+`toolset=gcc-mingw` alone is not enough. The `--user-config` is what teaches `b2` to find
+the MinGW compiler (without it, `b2` tries to use the native `g++` and the result does not
+run on Windows).
 
 ### OpenSSL
 
-Mesma lógica, worktree separado:
+The same idea, with a separate worktree:
 
 ```bash
 cd thirdparty/openssl
-git worktree add ../openssl-windows openssl-4.0.2   # a tag que você compilou pra Linux
+git worktree add ../openssl-windows openssl-4.0.2   # the tag you built for Linux
 cd ../openssl-windows
 
 ./Configure mingw64 \
@@ -297,20 +297,20 @@ make -j"$(nproc)"
 make install
 ```
 
-`--cross-compile-prefix` é a peça que faltava em relação ao build Linux — sem ela o
-`Configure` usa o `gcc` nativo e o resultado não é um binário Windows.
+`--cross-compile-prefix` is the piece that is missing compared with the Linux build.
+Without it `Configure` uses the native `gcc` and the result is not a Windows binary.
 
-> Mesmo problema de `make install` do build Linux pode aparecer aqui (ver seção 2):
-> se der erro em `install_dev` porque `--prefix` é a própria pasta de origem, os
-> `.a` já foram gerados na raiz — copie-os manualmente pra `lib64/` (`mkdir -p lib64 &&
-> cp libssl.a libcrypto.a lib64/`).
+> The same `make install` problem as in the Linux build can show up here (see section
+> 2): if it fails in `install_dev` because `--prefix` is the source folder itself, the
+> `.a` files were already generated in the root. Copy them manually to `lib64/`
+> (`mkdir -p lib64 && cp libssl.a libcrypto.a lib64/`).
 
-### Config e build do módulo
+### Module config and build
 
-Como Windows precisa de caminhos diferentes dos do Linux, o `SCsub` lê
-`config.windows.cfg` no lugar de `config.cfg` quando `platform=windows` (ver
-"Configuração" — o mecanismo vale pra qualquer `config.<platform>.cfg`, não só
-Windows). Crie um a partir do `config.cfg` de exemplo, só trocando os caminhos:
+Because Windows needs different paths from Linux, the `SCsub` reads `config.windows.cfg`
+instead of `config.cfg` when `platform=windows` (see "Configuration"; the mechanism works
+for any `config.<platform>.cfg`, not only Windows). The repository already has one, with
+only the paths changed:
 
 ```ini
 [paths]
@@ -330,12 +330,40 @@ scons platform=windows arch=x86_64 target=editor \
     -j"$(nproc)"
 ```
 
-`d3d12=no` evita exigir o SDK do Direct3D 12, que não faz parte deste módulo — sem essa
-flag o SCons para cedo pedindo `install_d3d12_sdk_windows.py`. Godot no Linux, sem
-`use_mingw=1`, já detecta e usa o MinGW-w64 automaticamente por não achar o MSVC.
+`d3d12=no` avoids requiring the Direct3D 12 SDK, which is not part of this module.
+Without this flag SCons stops early asking for `install_d3d12_sdk_windows.py`. Godot on
+Linux, without `use_mingw=1`, already detects and uses MinGW-w64 automatically because it
+does not find MSVC.
 
-### Nota
+### Note
 
-Verificado: Linux e Windows (cross-compilado via MinGW). macOS espera hardware Apple
-disponível (ver o roadmap de reescrita); iOS e Web estão fora do escopo do módulo por
-enquanto — motivos e detalhes no roadmap. Android ainda não foi tentado nesta reescrita.
+Verified: Linux and Windows (cross-compiled with MinGW). macOS is waiting for Apple
+hardware to be available, iOS is deferred for the same reason, and Web is out of scope
+for this module: browsers cannot open a raw TCP socket, which the MySQL protocol needs.
+Android has not been tried yet in this rewrite.
+
+## 5. Tests
+
+The tests live in `mysql/tests/`.
+
+**Unit tests (doctest).** Godot's own unit test runner. Every `tests/test_*.h` file is
+picked up automatically when the engine is built with `tests=yes`. They need no database
+server. `extra_suffix=tests` keeps this build separate from the normal one:
+
+```bash
+cd godot
+scons platform=linuxbsd arch=x86_64 target=editor \
+    custom_modules=../mysql \
+    precision=double \
+    tests=yes extra_suffix=tests \
+    -j"$(nproc)"
+
+./bin/godot.linuxbsd.editor.double.x86_64.tests --test --test-case="*MySQL*"
+```
+
+**Integration test (GDScript).** Runs against a real MySQL/MariaDB server. See
+[`../tests/README.md`](../tests/README.md).
+
+**Sanitizers.** Godot has built-in options: add `use_asan=yes use_ubsan=yes`, or
+`use_tsan=yes` (TSan cannot be combined with ASan), to the `scons` line and run the
+integration test with the resulting binary.

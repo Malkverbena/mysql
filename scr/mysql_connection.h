@@ -10,20 +10,16 @@
 #include <boost/mysql/diagnostics.hpp>
 #include <boost/mysql/error_code.hpp>
 
-// MySQLConnection — um único socket físico (any_connection do Boost.MySQL) e sua
-// máquina de estados (NONE -> CONFIGURED -> CONNECTING -> CONNECTED -> CLOSING ->
-// FAILED). Não é thread-safe (nem any_connection é — ver "Thread safety" em
-// any_connection.hpp): uso exclusivo de uma MySQLSession por vez. NÃO é exposta ao
-// GDScript — é o recurso que MySQLSession possui sozinha (caminho simples) ou que
-// MySQLPool gerencia em conjunto (caminho com pool, Fase 5).
+// A single physical socket (`any_connection` from Boost.MySQL) and its state machine
+// (NONE -> CONFIGURED -> CONNECTING -> CONNECTED -> CLOSING -> FAILED). It is not thread
+// safe (neither is `any_connection`, see "Thread safety" in `any_connection.hpp`): only one
+// `MySQLSession` uses it at a time. It is NOT exposed to GDScript. It is the resource a
+// `MySQLSession` owns by itself, or that a `MySQLPool` manages.
 //
-// Cada MySQLConnection tem seu próprio boost::asio::io_context nesta fase: ainda não
-// existe a thread de I/O dedicada da Fase 5, então connect()/close() são chamadas
-// síncronas e bloqueantes (as sobrecargas de connect()/close() com error_code do
-// Boost.MySQL não usam io_context::run() — são operações bloqueantes de verdade, ao
-// contrário do "assíncrono" antigo que a auditoria apontou como falso, C1).
-//
-// Ver documentation/roadmap.md (Fase 2).
+// Each `MySQLConnection` has its own `boost::asio::io_context`. `connect()` and `close()`
+// are synchronous and blocking (the `error_code` overloads of Boost.MySQL do not need
+// `io_context::run()`). The `async_*` operations of `MySQLSession` run this `io_context` on
+// a dedicated I/O thread.
 class MySQLConnection {
 public:
 	enum State {
@@ -39,9 +35,9 @@ private:
 	Ref<MySQLConfig> config;
 	State state = NONE;
 
-	// Ordem de declaração importa: ssl_context precisa ser construído antes e
-	// destruído depois de connection, que guarda um ponteiro pra ele (contrato de
-	// any_connection_params::ssl_context em any_connection.hpp).
+	// The declaration order matters: `ssl_context` must be constructed before, and destroyed
+	// after, `connection`, which keeps a pointer to it (see the contract of
+	// `any_connection_params::ssl_context` in `any_connection.hpp`).
 	boost::asio::io_context io_context;
 	boost::asio::ssl::context ssl_context;
 	boost::mysql::any_connection connection;
@@ -56,13 +52,14 @@ private:
 public:
 	explicit MySQLConnection(Ref<MySQLConfig> p_config);
 
-	// Move-only, como any_connection (ver Thread safety / Single outstanding operation
-	// em any_connection.hpp).
+	// Not copyable, like `any_connection` (see "Thread safety" and "Single outstanding
+	// operation" in `any_connection.hpp`).
 	MySQLConnection(const MySQLConnection &) = delete;
 	MySQLConnection &operator=(const MySQLConnection &) = delete;
 
-	// connect()/close() são síncronas e bloqueantes nesta fase (ver comentário acima).
-	// Devolvem false em erro; get_last_error()/get_last_diagnostics() têm o motivo.
+	// `connect()` and `close()` are synchronous and blocking (see the comment above). They
+	// return `false` on error, and `get_last_error()` and `get_last_diagnostics()` have the
+	// reason.
 	bool connect();
 	void close();
 
@@ -72,10 +69,10 @@ public:
 	const boost::mysql::error_code &get_last_error() const { return last_error; }
 	const boost::mysql::diagnostics &get_last_diagnostics() const { return last_diagnostics; }
 
-	// Uso interno de MySQLSession (Fase 4) pra executar queries na conexão real.
+	// Internal use by `MySQLSession` to run queries on the real connection.
 	boost::mysql::any_connection &native() { return connection; }
 
-	// Uso interno de MySQLSession (Fase 5): a thread de I/O dedicada roda este
-	// io_context pra processar as operações async_* desta conexão.
+	// Internal use by `MySQLSession`: the dedicated I/O thread runs this `io_context` to
+	// process the `async_*` operations of this connection.
 	boost::asio::io_context &get_io_context() { return io_context; }
 };

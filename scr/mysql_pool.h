@@ -6,42 +6,36 @@
 #include "mysql_session.h"
 
 #include "core/object/ref_counted.h"
-
-#include <condition_variable>
-#include <memory>
-#include <mutex>
-#include <vector>
+#include "core/os/condition_variable.h"
+#include "core/os/mutex.h"
+#include "core/templates/local_vector.h"
 
 class MySQLConnection;
 
-// MySQLPool — dona de N MySQLConnection; empresta uma por vez como MySQLSession
-// (acquire()), nunca a mesma Connection pra duas leases ao mesmo tempo. É a única peça
-// deste design pensada pra ser chamada de várias threads (any_connection não é
-// thread-safe por si só — ver comentário em mysql_connection.h). acquire() bloqueia se
-// o pool já está no tamanho máximo e não há conexão livre.
+// Owns up to `max_size` `MySQLConnection`s and leases them one at a time as a
+// `MySQLSession` (`acquire()`), never the same connection to two leases at once. It is the
+// only class of the module meant to be called from several threads (`any_connection` is
+// not thread safe by itself). `acquire()` blocks if the pool is at its maximum size and
+// no connection is free.
 //
-// A Session devolvida por acquire() ainda não está conectada — quem chama decide quando
-// (e se) chamar session.connect(), do mesmo jeito que no caminho sem pool.
-//
-// Ver documentation/roadmap.md (Fase 5).
+// The session returned by `acquire()` is not connected yet: the caller decides when (and
+// whether) to call `connect_db()`, the same way as without a pool.
 class MySQLPool : public RefCounted {
 	GDCLASS(MySQLPool, RefCounted);
 
 	Ref<MySQLConfig> config;
 	int max_size = 8;
 
-	std::mutex mutex;
-	std::condition_variable cv;
-	std::vector<std::unique_ptr<MySQLConnection>> idle;
+	BinaryMutex mutex;
+	ConditionVariable condition;
+	LocalVector<MySQLConnection *> idle;
 	int total_count = 0;
-
-	void _release(std::unique_ptr<MySQLConnection> p_connection);
 
 protected:
 	static void _bind_methods();
 
 public:
-	MySQLPool() = default;
+	~MySQLPool();
 
 	void set_config(const Ref<MySQLConfig> &p_config);
 	Ref<MySQLConfig> get_config() const { return config; }
@@ -49,6 +43,10 @@ public:
 	void set_max_size(int p_max_size);
 	int get_max_size() const { return max_size; }
 
-	// Bloqueia até haver uma conexão livre, se o pool já estiver no tamanho máximo.
+	// Blocks until a connection is free if the pool is already at its maximum size.
 	Ref<MySQLSession> acquire();
+
+	// Internal use by `MySQLSession`, which hands its connection back on destruction.
+	// Takes ownership of `p_connection`. Not bound.
+	void release(MySQLConnection *p_connection);
 };

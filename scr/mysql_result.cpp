@@ -10,61 +10,63 @@
 #include "core/object/class_db.h"
 
 #include <boost/mysql/metadata_collection_view.hpp>
-#include <boost/mysql/resultset_view.hpp>
 #include <boost/mysql/row_view.hpp>
 #include <boost/mysql/rows_view.hpp>
 
+void MySQLResult::Builder::begin_resultset(const boost::mysql::metadata_collection_view &p_meta) {
+	resultsets.push_back(ResultsetData());
+	ResultsetData &data = resultsets.write[resultsets.size() - 1];
+	for (std::size_t c = 0; c < p_meta.size(); c++) {
+		const boost::mysql::metadata &col_meta = p_meta[c];
+		boost::mysql::string_view name = col_meta.column_name();
+		data.column_names.push_back(mysql_module::to_godot_string(name.data(), name.size()));
+		data.column_types.push_back(col_meta.type());
+	}
+}
+
+void MySQLResult::Builder::add_rows(const boost::mysql::rows_view &p_rows, const boost::mysql::metadata_collection_view &p_meta, const Ref<MySQLConfig> &p_config) {
+	ERR_FAIL_COND_MSG(resultsets.is_empty(), "MySQLResult::Builder: add_rows() called before begin_resultset().");
+	ResultsetData &data = resultsets.write[resultsets.size() - 1];
+
+	int base = data.rows.size();
+	data.rows.resize(base + (int)p_rows.size());
+	for (std::size_t r = 0; r < p_rows.size(); r++) {
+		boost::mysql::row_view row = p_rows[r];
+		Array row_array;
+		row_array.resize((int)row.size());
+		for (std::size_t c = 0; c < row.size(); c++) {
+			row_array[(int)c] = mysql_module::field_to_variant(row[c], p_meta[c], p_config);
+			estimated_bytes += mysql_module::estimate_field_bytes(row[c]);
+		}
+		data.rows[base + (int)r] = row_array;
+	}
+}
+
+void MySQLResult::Builder::end_resultset(uint64_t p_affected_rows, uint64_t p_last_insert_id, const boost::mysql::string_view &p_info) {
+	ERR_FAIL_COND_MSG(resultsets.is_empty(), "MySQLResult::Builder: end_resultset() called before begin_resultset().");
+	ResultsetData &data = resultsets.write[resultsets.size() - 1];
+	data.affected_rows = mysql_module::uint64_to_variant(p_affected_rows);
+	data.last_insert_id = mysql_module::uint64_to_variant(p_last_insert_id);
+	data.info = mysql_module::to_godot_string(p_info.data(), p_info.size());
+}
+
+Ref<MySQLResult> MySQLResult::Builder::finish() {
+	Ref<MySQLResult> result;
+	result.instantiate();
+	result->ok = true;
+	result->resultsets = resultsets;
+	return result;
+}
+
 const MySQLResult::ResultsetData *MySQLResult::_get_resultset(int p_index) const {
 	if (p_index < 0 || p_index >= resultsets.size()) {
-		ERR_FAIL_V_MSG(nullptr, vformat("MySQLResult: índice de resultset inválido (%d), há %d", p_index, resultsets.size()));
+		ERR_FAIL_V_MSG(nullptr, vformat("MySQLResult: Invalid resultset index (%d), there are %d.", p_index, resultsets.size()));
 	}
 	return &resultsets[p_index];
 }
 
 uint64_t MySQLResult::_json_cache_key(int p_resultset, int p_row, int p_column) {
 	return ((uint64_t)(uint32_t)p_resultset << 48) | ((uint64_t)(uint32_t)p_column << 32) | (uint64_t)(uint32_t)p_row;
-}
-
-Ref<MySQLResult> MySQLResult::from_boost_results(const boost::mysql::results &p_results, const Ref<MySQLConfig> &p_config) {
-	Ref<MySQLResult> result;
-	result.instantiate();
-	result->ok = true;
-
-	std::size_t resultset_count = p_results.size();
-	result->resultsets.resize((int)resultset_count);
-
-	for (std::size_t i = 0; i < resultset_count; i++) {
-		boost::mysql::resultset_view rv = p_results[i];
-		ResultsetData &data = result->resultsets.write[(int)i];
-
-		boost::mysql::metadata_collection_view meta = rv.meta();
-		for (std::size_t c = 0; c < meta.size(); c++) {
-			const boost::mysql::metadata &col_meta = meta[c];
-			boost::mysql::string_view name = col_meta.column_name();
-			data.column_names.push_back(mysql_module::to_godot_string(name.data(), name.size()));
-			data.column_types.push_back(col_meta.type());
-		}
-
-		boost::mysql::rows_view rows = rv.rows();
-		data.rows.resize((int)rows.size());
-		for (std::size_t r = 0; r < rows.size(); r++) {
-			boost::mysql::row_view row = rows[r];
-			Array row_array;
-			row_array.resize((int)row.size());
-			for (std::size_t c = 0; c < row.size(); c++) {
-				row_array[(int)c] = mysql_module::field_to_variant(row[c], meta[c], p_config);
-			}
-			data.rows[(int)r] = row_array;
-		}
-
-		data.affected_rows = mysql_module::uint64_to_variant(rv.affected_rows());
-		data.last_insert_id = mysql_module::uint64_to_variant(rv.last_insert_id());
-
-		boost::mysql::string_view info = rv.info();
-		data.info = mysql_module::to_godot_string(info.data(), info.size());
-	}
-
-	return result;
 }
 
 Ref<MySQLResult> MySQLResult::from_error(const Dictionary &p_error) {
@@ -114,12 +116,11 @@ Variant MySQLResult::get_parsed_json(int p_resultset, int p_row, int p_column) {
 		return Variant();
 	}
 	ERR_FAIL_INDEX_V(p_column, data->column_types.size(), Variant());
-	// Sem checar column_types[p_column] == json de propósito: o MariaDB não tem um
-	// tipo JSON à parte no protocolo (JSON é alias de LONGTEXT lá, ver
-	// design-notes.md) — a coluna chega como "text" mesmo sendo JSON de verdade. Quem
-	// chama get_parsed_json() já está dizendo "isto é JSON" ao nomear a célula; se não
-	// for texto JSON válido, JSON::parse_string() volta null, sem gravar exceção nem
-	// travar nada.
+	// The column type is not checked against `json` on purpose: MariaDB has no separate
+	// JSON type in the protocol (`JSON` is an alias of `LONGTEXT` there), so the column
+	// arrives as text even when it holds real JSON. Whoever calls `get_parsed_json()` is
+	// already saying "this is JSON" by naming the cell. If the text is not valid JSON,
+	// `JSON::parse_string()` just returns null.
 
 	uint64_t key = _json_cache_key(p_resultset, p_row, p_column);
 	if (Variant *cached = json_cache.getptr(key)) {

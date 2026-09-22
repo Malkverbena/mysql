@@ -7,52 +7,60 @@
 
 #include "core/object/class_db.h"
 
+MySQLPool::~MySQLPool() {
+	// Every leased session holds a reference to the pool, so by now all connections
+	// are idle.
+	for (MySQLConnection *connection : idle) {
+		memdelete(connection);
+	}
+}
+
 void MySQLPool::set_config(const Ref<MySQLConfig> &p_config) {
-	ERR_FAIL_COND_MSG(total_count > 0, "MySQLPool: a config não pode ser trocada depois que alguma conexão já foi criada.");
-	ERR_FAIL_COND_MSG(p_config.is_null(), "MySQLPool: a config não pode ser nula.");
+	ERR_FAIL_COND_MSG(total_count > 0, "MySQLPool: The config cannot be changed after a connection has been created.");
+	ERR_FAIL_COND_MSG(p_config.is_null(), "MySQLPool: The config cannot be null.");
 	config = p_config;
 }
 
 void MySQLPool::set_max_size(int p_max_size) {
-	ERR_FAIL_COND_MSG(p_max_size < 1, "MySQLPool: max_size precisa ser pelo menos 1.");
+	ERR_FAIL_COND_MSG(p_max_size < 1, "MySQLPool: max_size must be at least 1.");
 	max_size = p_max_size;
 }
 
-void MySQLPool::_release(std::unique_ptr<MySQLConnection> p_connection) {
+void MySQLPool::release(MySQLConnection *p_connection) {
 	{
-		std::lock_guard<std::mutex> lock(mutex);
-		idle.push_back(std::move(p_connection));
+		MutexLock lock(mutex);
+		idle.push_back(p_connection);
 	}
-	cv.notify_one();
+	condition.notify_one();
 }
 
 Ref<MySQLSession> MySQLPool::acquire() {
-	ERR_FAIL_COND_V_MSG(config.is_null(), Ref<MySQLSession>(), "MySQLPool: chame set_config() antes de acquire().");
+	ERR_FAIL_COND_V_MSG(config.is_null(), Ref<MySQLSession>(), "MySQLPool: Call set_config() before acquire().");
 
-	std::unique_ptr<MySQLConnection> conn;
+	MySQLConnection *connection = nullptr;
+	bool create_new = false;
 	{
-		std::unique_lock<std::mutex> lock(mutex);
-		if (!idle.empty()) {
-			conn = std::move(idle.back());
-			idle.pop_back();
-		} else if (total_count < max_size) {
+		MutexLock lock(mutex);
+		if (idle.is_empty() && total_count < max_size) {
 			total_count++;
-			lock.unlock();
-			conn = std::make_unique<MySQLConnection>(config);
+			create_new = true;
 		} else {
-			cv.wait(lock, [this] { return !idle.empty(); });
-			conn = std::move(idle.back());
-			idle.pop_back();
+			while (idle.is_empty()) {
+				condition.wait(lock);
+			}
+			connection = idle[idle.size() - 1];
+			idle.remove_at(idle.size() - 1);
 		}
 	}
 
-	// self_ref mantém o Pool vivo enquanto a Session emprestada existir — a Session
-	// devolve a conexão pra ele no destrutor (release_to_pool), então o Pool precisa
-	// sobreviver até lá mesmo que o script solte a referência dele antes.
-	Ref<MySQLPool> self_ref(this);
-	return MySQLSession::create_pooled(config, std::move(conn), [self_ref](std::unique_ptr<MySQLConnection> p_conn) {
-		self_ref->_release(std::move(p_conn));
-	});
+	if (create_new) {
+		// Built outside the lock: creating the connection (TLS context included) is slow.
+		connection = memnew(MySQLConnection(config));
+	}
+
+	// The session keeps a reference to the pool, so the pool outlives every leased
+	// session even if the script drops its own reference first.
+	return MySQLSession::create_pooled(config, connection, Ref<MySQLPool>(this));
 }
 
 void MySQLPool::_bind_methods() {

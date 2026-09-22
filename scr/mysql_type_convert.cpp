@@ -39,9 +39,9 @@ Dictionary datetime_to_dict(const boost::mysql::datetime &p_dt) {
 }
 
 Dictionary time_to_dict(const boost::mysql::time &p_time) {
-	// boost::mysql::time é std::chrono::microseconds (assinado) — o sinal do TIME é
-	// preservado decompondo o valor absoluto e guardando o sinal à parte, ao invés de
-	// truncar/errar como no bug D4 da auditoria.
+	// `boost::mysql::time` is a signed `std::chrono::microseconds`. The sign of the TIME is
+	// kept by decomposing the absolute value and storing the sign separately, instead of
+	// truncating or getting it wrong for negative values.
 	int64_t total_us = p_time.count();
 	bool negative = total_us < 0;
 	uint64_t magnitude = (uint64_t)(negative ? -total_us : total_us);
@@ -61,12 +61,12 @@ bool is_width_one_tinyint(const boost::mysql::metadata &p_meta) {
 
 } //namespace
 
-Variant uint64_to_variant(std::uint64_t p_value) {
-	// BIGINT UNSIGNED acima de INT64_MAX vem como String (valor exato) — Variant::INT
-	// do Godot é assinado de 64 bits e não cabe o valor. Destacado em
-	// documentation/design-notes.md e documentation/capabilities.md: a mesma coluna
-	// pode devolver int ou String dependendo do valor da linha.
-	if (p_value > (std::uint64_t)INT64_MAX) {
+Variant uint64_to_variant(uint64_t p_value) {
+	// A `BIGINT UNSIGNED` above `INT64_MAX` comes as a `String` with the exact value,
+	// because Godot's `Variant::INT` is a signed 64-bit integer and cannot hold it. See
+	// `documentation/capabilities.md`: the same column can return an `int` or a `String`
+	// depending on the value of the row.
+	if (p_value > (uint64_t)INT64_MAX) {
 		return String::num_uint64(p_value);
 	}
 	return (int64_t)p_value;
@@ -78,7 +78,7 @@ Variant field_to_variant(const boost::mysql::field_view &p_field, const boost::m
 	}
 
 	if (p_field.is_int64()) {
-		std::int64_t v = p_field.get_int64();
+		int64_t v = p_field.get_int64();
 		if (p_config->get_tinyint1_mode() && is_width_one_tinyint(p_meta)) {
 			return v != 0;
 		}
@@ -86,7 +86,7 @@ Variant field_to_variant(const boost::mysql::field_view &p_field, const boost::m
 	}
 
 	if (p_field.is_uint64()) {
-		std::uint64_t v = p_field.get_uint64();
+		uint64_t v = p_field.get_uint64();
 		if (p_config->get_tinyint1_mode() && is_width_one_tinyint(p_meta)) {
 			return v != 0;
 		}
@@ -100,9 +100,9 @@ Variant field_to_variant(const boost::mysql::field_view &p_field, const boost::m
 		if (p_meta.type() == boost::mysql::column_type::json && p_config->get_json_result_mode() == MySQLConfig::PARSED_VARIANT) {
 			return JSON::parse_string(text);
 		}
-		// RAW_STRING e LAZY_PARSED_VARIANT devolvem o texto bruto aqui; a conversão
-		// sob demanda com cache do modo lazy é feita por MySQLResult, não aqui — esta
-		// função é pura e não guarda estado.
+		// `RAW_STRING` and `LAZY_PARSED_VARIANT` return the raw text here. The lazy mode
+		// parses on demand, with a cache, in `MySQLResult`, not here: this function is pure
+		// and keeps no state.
 		return text;
 	}
 
@@ -137,6 +137,21 @@ Variant field_to_variant(const boost::mysql::field_view &p_field, const boost::m
 	}
 
 	return Variant();
+}
+
+uint64_t estimate_field_bytes(const boost::mysql::field_view &p_field) {
+	if (p_field.is_string()) {
+		return (uint64_t)p_field.get_string().size();
+	}
+	if (p_field.is_blob()) {
+		return (uint64_t)p_field.get_blob().size();
+	}
+	if (p_field.is_null()) {
+		return 0;
+	}
+	// int64/uint64/float/double/date/datetime/time: small, fixed-size types. 8 bytes is a
+	// safe upper bound for all of them.
+	return 8;
 }
 
 } //namespace mysql_module

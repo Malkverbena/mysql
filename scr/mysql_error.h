@@ -8,22 +8,22 @@
 #include <boost/mysql/diagnostics.hpp>
 #include <boost/mysql/error_code.hpp>
 
-// Constrói o Dictionary de erro usado em todo o módulo — is_ok()/get_error() em vez de
-// estado de erro global ou por instância (resolve C5 da auditoria). Chaves: category,
-// message, server_message, is_fatal. Dictionary vazio == sem erro.
+// Builds the error `Dictionary` used across the module. Every fallible operation exposes
+// `is_ok()` and `get_error()` instead of a global or per-instance error state. Keys:
+// `category`, `message`, `server_message` and `is_fatal`. An empty `Dictionary` means no
+// error.
 //
-// message vem de diagnostics.client_message() quando disponível (nunca contém dado não
-// confiável do servidor); server_message vem só de diagnostics.server_message() —
-// mantido separado de propósito, porque o próprio Boost.MySQL avisa que pode conter
-// entrada não confiável (resolve S13 da auditoria: nada disso é logado automaticamente).
-// Ver documentation/design-notes.md.
+// `message` comes from `diagnostics.client_message()` when available (it never contains
+// untrusted server data). `server_message` comes only from
+// `diagnostics.server_message()` and is kept separate on purpose, because Boost.MySQL
+// warns that it may contain untrusted input. Nothing is logged automatically.
 namespace mysql_module {
 
 Dictionary make_error_dict(const boost::mysql::error_code &p_error, const boost::mysql::diagnostics &p_diagnostics);
 
-// Erro que não vem de uma operação do Boost.MySQL (guarda de estado do cliente: sessão
-// não conectada, contagem de parâmetros errada, tipo de Variant não suportado, etc.).
-// category fica sempre "mysql_module.client", is_fatal sempre false.
+// For errors that do not come from a Boost.MySQL operation (client-side guards: session
+// not connected, wrong parameter count, unsupported `Variant` type, etc.). The category is
+// always `mysql_module.client` and `is_fatal` is always `false`.
 Dictionary make_client_error_dict(const String &p_message);
 
 } //namespace mysql_module

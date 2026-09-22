@@ -1,124 +1,193 @@
-# Capacidades
+# Capabilities
 
-> **Design alvo da reescrita em andamento.** Este documento descreve o que o módulo faz
-> quando a reescrita estiver pronta. Neste ponto do desenvolvimento, nem todo o código
-> descrito aqui está implementado ainda — consulte o histórico de commits do módulo para
-> o estado exato da implementação.
+> **Target design of the ongoing rewrite.** This document describes what the module does
+> once the rewrite is finished. At this point in development, not everything described
+> here is implemented yet — check the module's commit history for the exact state.
 
-## Bancos suportados
+## Intended use
 
-MySQL e MariaDB. Recursos que só existem num dos dois (plugins de autenticação
-específicos, JSON nativo vs. `LONGTEXT` com `CHECK` no MariaDB, listas de collation
-diferentes) são documentados como exceção quando aparecerem, não assumidos como
-universais.
+**This module is for a headless Godot server or an internal tool, never for a game
+shipped to players.** It opens a real network connection to a MySQL/MariaDB server using
+credentials that live in `MySQLConfig`; anyone who can reach an exported game can also
+reach whatever that connection can reach. If the module ends up in a client build at all,
+the database user it connects with must have the minimum privileges the game actually
+needs (for example, only `SELECT`/`INSERT` on specific tables, never a database
+administrator account), and `transport_mode` should stay at `TCP_TLS_REQUIRED` (the
+default) unless there is a specific, trusted reason not to.
 
-## Conexão
+## Supported databases
 
-* Transportes (`transport_mode`): `TCP_TLS_DISABLED`, `TCP_TLS_PREFERRED`,
-  `TCP_TLS_REQUIRED` (padrão), `UNIX_SOCKET`. Não existe UNIX+TLS — socket UNIX é local
-  por natureza e nunca usa TLS.
-* TLS com validação de certificado ligada por padrão quando em uso; hostname de
-  verificação derivado do endpoint real da conexão.
-* Autenticação: `mysql_native_password` e `caching_sha2_password`.
-* Toda configuração que reduz segurança (TLS desligado, multi-queries ligado, etc.)
-  emite warning no momento em que é definida.
+MySQL and MariaDB. Features that exist in only one of them (specific authentication
+plugins, native JSON vs. `LONGTEXT` with a `CHECK` constraint on MariaDB, different
+collation lists) are documented as exceptions where they matter, never assumed to be
+universal.
 
-## Execução
+## Connection
 
-* Texto bruto, texto formatado (`with_params`/`format_sql`, sem escaping próprio) e
-  prepared statements, com cache LRU por sessão.
-* Multi-function operations e stored procedures.
-* Scripts SQL e multi-queries **desligados por padrão**, independentes entre si:
-  `allow_sql_script_execution` (API manual de scripts) e `allow_multi_queries`
-  (capacidade negociada com o servidor).
-* **Streaming:** leitura incremental de resultados grandes (`MySQLStreamingCursor`), sem
-  carregar tudo em memória de uma vez.
-* Assíncrono real: não bloqueia a thread chamadora (diferente de versões anteriores do
-  módulo); cada chamada `async_*` devolve um `MySQLAsyncOperation` usável com `await`
-  (`var result = await op.completed`). **Use `await`, não espera ativa em loop**
-  (`while not op.is_finished(): ...`): um loop assim nunca devolve o controle pro
-  `SceneTree` rodar frames, e é isso que entrega o resultado — a operação termina de
-  verdade, só nunca é observada. **Mantenha a `MySQLSession` (ou o `MySQLPool` de onde
-  ela veio) referenciada até a operação terminar**: se a única referência sair de
-  escopo antes disso, a Session é destruída e a thread de I/O pára no meio.
-* Transações (`MySQLTransaction`, obtida via `MySQLSession.begin_transaction()`) e pool
-  de conexões (`MySQLPool`), com suporte a multithread — cada thread usa sua própria
-  `MySQLSession`, nunca uma `Connection` compartilhada entre threads ao mesmo tempo.
+* Transports (`transport_mode`): `TCP_TLS_DISABLED`, `TCP_TLS_PREFERRED`,
+  `TCP_TLS_REQUIRED` (default), `UNIX_SOCKET`. There is no UNIX+TLS: a UNIX socket is
+  local by nature and never uses TLS.
+* TLS with certificate validation enabled by default when TLS is in use; the host name
+  used for verification is derived from the real connection endpoint.
+* Authentication methods: `mysql_native_password` and `caching_sha2_password`.
+* Every setting that lowers security (TLS disabled, multi-queries enabled, etc.) emits a
+  warning at the moment it is set.
 
-### Rollback automático
+## Methods
 
-Toda `MySQLTransaction` precisa ser fechada explicitamente com `commit()` ou
-`rollback()`. **Se ela for destruída (todas as referências ao objeto soltas) sem
-nenhum dos dois ter sido chamado, o módulo faz `ROLLBACK` automaticamente** e registra
-um aviso (warning) no Godot avisando que isso aconteceu.
+* Text queries: MySQL calls this the "text protocol", because all information is passed
+  as text (as opposed to prepared statements). Raw text and formatted text
+  (`with_params`/`format_sql`, no home-made escaping) are both supported.
+* Prepared statements: MySQL calls this the "binary protocol", because the result of
+  executing a prepared statement is sent in binary format rather than text. Statements
+  are kept in a per-session LRU cache, sized by `statement_cache_size` (default 512).
+  When the cache is full, the least recently used statement is closed on the server
+  before being dropped. `statement_cache_size` is per connection; a server's
+  `max_prepared_stmt_count` system variable is a single limit shared by every connection
+  on that server, so raising it a lot on a pool with many connections is worth checking
+  against that limit.
+* Multi-function operations. They can contain stored procedures.
+* Stored procedures.
+* SQL scripts and multi-queries are **disabled by default** and independent of each
+  other: `allow_sql_script_execution` (manual script API) and `allow_multi_queries`
+  (capability negotiated with the server).
+* **Streaming:** incremental reading of large results (`MySQLStreamingCursor`), without
+  loading everything in memory at once.
+* Real asynchronous methods: they do not block the calling thread (unlike earlier
+  versions of the module). Each `async_*` call returns a `MySQLAsyncOperation` that can
+  be awaited (`var result = await op.completed`). **Use `await`, not a busy-wait loop**
+  (`while not op.is_finished(): ...`): such a loop never gives control back to the
+  `SceneTree` to run frames, and running frames is what delivers the result — the
+  operation does finish, it is just never observed. **Keep the `MySQLSession` (or the
+  `MySQLPool` it came from) referenced until the operation finishes**: if the only
+  reference goes out of scope first, the session is destroyed and its I/O thread stops
+  in the middle of the operation.
+* A session runs one operation at a time. Starting an `async_*` call while another one is
+  still in flight on the same session does not queue it: the second operation finishes
+  with an explicit error (category `mysql.client`), and the first one is not affected.
+  Use one session per parallel operation, for example leased from a `MySQLPool`.
+* Transactions (`MySQLTransaction`, obtained via `MySQLSession.begin_transaction()`) and
+  a connection pool (`MySQLPool`), with multithreading support — each thread uses its
+  own `MySQLSession`, never a connection shared between threads at the same time.
 
-Isso é uma rede de segurança contra transação esquecida aberta na conexão — por
-exemplo, se o script sair de escopo cedo demais, lançar um erro antes de chegar ao
-`commit()`, ou simplesmente esquecer. **Não é um fluxo recomendado**: sempre feche a
-transação você mesmo, no caminho de sucesso e no de erro (`commit()` num, `rollback()`
-no outro). Depender do rollback automático significa que a transação fica aberta por
-mais tempo do que precisa, até o coletor de referências do Godot destruir o objeto.
+### Automatic rollback
 
-## Modelo de erro
+Every `MySQLTransaction` must be closed explicitly with `commit()` or `rollback()`.
+**If it is destroyed (all references released) without either having been called, the
+module issues a `ROLLBACK` automatically** and logs a warning in Godot saying so.
 
-Sem exceções em nenhuma camada (`no_exception`, como o padrão do Godot). Toda operação
-fallível expõe `is_ok()` e `get_error() -> Dictionary`, com as chaves `category`,
-`message`, `server_message` e `is_fatal`. Não há estado de erro global nem por instância
-— cada chamada carrega o próprio resultado.
+This is a safety net against a forgotten transaction left open on the connection — for
+example, if the script leaves scope too early, raises an error before reaching
+`commit()`, or simply forgets. **It is not a recommended flow**: always close the
+transaction yourself, on the success path and on the error path (`commit()` on one,
+`rollback()` on the other). Relying on the automatic rollback keeps the transaction open
+for longer than needed, until Godot's reference counting destroys the object.
 
-## Tipos de dados
+## Limits
 
-| Tipo MySQL/MariaDB | Tipo Godot | Observação |
-|---|---|---|
-| `NULL` | `null` | |
-| `TINYINT(1)` | `bool` | Só quando a largura de exibição da coluna é 1; outras larguras de `TINYINT` viram `int` |
-| `TINYINT`, `SMALLINT`, `MEDIUMINT`, `INT`, `BIGINT` (assinados) | `int` | |
-| `BIGINT UNSIGNED` até `INT64_MAX` | `int` | |
-| `BIGINT UNSIGNED` acima de `INT64_MAX` | `String` | ⚠️ **Ver aviso abaixo** |
-| `FLOAT`, `DOUBLE` | `float` | |
-| `BINARY`, `VARBINARY`, `BLOB`, `GEOMETRY` | `PackedByteArray` | |
-| `CHAR`, `VARCHAR`, `TEXT`, `ENUM`, `DECIMAL`, `NUMERIC` | `String` | Sempre `utf8mb4` |
-| `JSON` | conforme `json_result_mode` | ver abaixo |
-| `DATE`, `TIME`, `DATETIME`, `TIMESTAMP` | `Dictionary` | Com microssegundos e `TIME` negativo corretos |
-| `SET` | `PackedStringArray` | |
+* `max_buffer_size` (default 64 MB): limits the size of a single protocol packet — one
+  request sent, or one row received. Boost.MySQL enforces this itself; the config option
+  only exposes it instead of leaving it hardcoded. It does **not** limit the total size of
+  a result: a resultset with many rows can still add up to far more than
+  `max_buffer_size` in total.
+* `max_result_bytes` (default `0`, no limit): limits the total estimated size (every
+  resultset, every row added up) of a single `execute_*`/`async_execute_*` call. Enforced
+  by reading the result incrementally and aborting as soon as the running total goes over
+  the limit — the call fails explicitly with a client-side error instead of the result
+  being silently truncated, and peak memory is actually bounded instead of only being
+  checked after the fact. The size counted per cell is an estimate (the exact byte length
+  for strings/blobs, a small fixed cost for every other type), not the protocol wire size.
+  Does not apply to `MySQLStreamingCursor`, which already reads incrementally and hands
+  control back to the caller between batches.
+* `async_timeout_ms` (default 30000, `0` = no timeout): applied per network round trip of
+  an asynchronous operation (each step of reading the result), not once for the whole
+  call — a result read in several batches or with several resultsets gets a fresh budget
+  on every step instead of one shared deadline for all of them.
 
-> ⚠️ **`BIGINT UNSIGNED` acima de `INT64_MAX` (9223372036854775807) vem como `String`,
-> não `int`.** `Variant::INT` do Godot é assinado de 64 bits e não cabe o valor exato
-> nesses casos. Isso significa que **a mesma coluna pode devolver `int` na maioria das
-> linhas e `String` só nas linhas com valor grande** — sempre confira o tipo
-> (`typeof(valor) == TYPE_STRING`) antes de fazer conta com um campo `BIGINT UNSIGNED`.
+## Error model
+
+No exceptions in any layer (`no_exception`, like the Godot default). Every fallible
+operation exposes `is_ok()` and `get_error() -> Dictionary`, with the keys `category`,
+`message`, `server_message` and `is_fatal`. There is no global or per-instance error
+state — each call carries its own result.
+
+## Equivalent data types
+
+### Results (MySQL/MariaDB to Godot)
+
+| Data type | Godot data type | C++ data type (Boost.MySQL) | MySQL data type | Notes |
+| :---: | :---: | :---: | :---: | :--- |
+| NULL | `null` | `std::nullptr_t` (`field_view()`) | NULL | |
+| BOOL | `bool` | `std::int64_t` / `std::uint64_t` | `TINYINT(1)` | Only when `tinyint1_mode` is enabled **and** the column display width is 1; any other `TINYINT` width becomes `int` |
+| INT | `int` | `std::int64_t` | signed `TINYINT`, `SMALLINT`, `MEDIUMINT`, `INT`, `BIGINT` | |
+| UINT | `int` | `std::uint64_t` | `UNSIGNED` `TINYINT`, `SMALLINT`, `MEDIUMINT`, `INT`, `BIGINT` (up to `INT64_MAX`), `YEAR`, `BIT` | |
+| UINT (large) | `String` | `std::uint64_t` | `BIGINT UNSIGNED` above `INT64_MAX` | ⚠️ See the warning below |
+| FLOAT | `float` | `float` | `FLOAT` | |
+| DOUBLE | `float` | `double` | `DOUBLE` | |
+| BINARY | `PackedByteArray` | `boost::mysql::blob_view` | `BINARY`, `VARBINARY`, `BLOB` (all sizes), `GEOMETRY` | |
+| CHAR | `String` | `boost::mysql::string_view` | `CHAR`, `VARCHAR`, `TEXT` (all sizes), `ENUM`, `SET`, `DECIMAL`, `NUMERIC` | Always `utf8mb4`. `SET` arrives as the comma-separated text the server sends |
+| JSON | depends on `json_result_mode` | `boost::mysql::string_view` | `JSON` | See `json_result_mode` below |
+| DATE | `Dictionary` | `boost::mysql::date` (`std::chrono::time_point<std::chrono::system_clock, days>`) | `DATE` | Keys: `year`, `month`, `day` |
+| TIME | `Dictionary` | `boost::mysql::time` (`std::chrono::microseconds`) | `TIME` | Keys: `negative`, `hours`, `minutes`, `seconds`, `microsecond`. Hours can exceed 24 and the sign is kept separately |
+| DATETIME | `Dictionary` | `boost::mysql::datetime` (`std::chrono::time_point<std::chrono::system_clock, std::chrono::duration<std::int64_t, std::micro>>`) | `DATETIME`, `TIMESTAMP` | Keys: `year`, `month`, `day`, `hour`, `minute`, `second`, `microsecond` |
+
+> ⚠️ **`BIGINT UNSIGNED` above `INT64_MAX` (9223372036854775807) arrives as a `String`,
+> not an `int`.** Godot's `Variant::INT` is a signed 64-bit integer and cannot hold the
+> exact value in these cases. This means **the same column can return `int` for most
+> rows and `String` only for the rows with a large value** — always check the type
+> (`typeof(value) == TYPE_STRING`) before doing arithmetic with a `BIGINT UNSIGNED`
+> field.
+
+### Parameters (Godot to MySQL/MariaDB)
+
+Used by `execute_formatted()`, `execute_prepared()` and `async_execute_prepared()`.
+
+| Godot data type | C++ data type (Boost.MySQL) | Sent as | Notes |
+| :---: | :---: | :---: | :--- |
+| `null` | `field_view()` | `NULL` | |
+| `bool` | `std::int64_t` | `BIGINT` (0 or 1) | Sent as an integer, not as a distinct boolean type |
+| `int` | `std::int64_t` | `BIGINT` | |
+| `float` | `double` | `DOUBLE` | |
+| `String`, `StringName` | `boost::mysql::string_view` | `VARCHAR`/`TEXT` | Sent as `utf8mb4`, with its length, never as a C string |
+| `PackedByteArray` | `boost::mysql::blob_view` | `BLOB` | |
+| any other type | — | — | Explicit error, never a silent `NULL`. `Dictionary` (`DATE`/`TIME`/`DATETIME`) is **not** accepted as a parameter yet |
 
 ### `json_result_mode`
 
-* `RAW_STRING`: devolve o texto exatamente como veio do servidor.
-* `PARSED_VARIANT`: converte imediatamente para `Dictionary`/`Array`/`Variant`, via
-  classe `JSON` do Godot.
-* `LAZY_PARSED_VARIANT` (**padrão**): guarda a string e só converte quando pedido; o
-  resultado convertido pode ficar em cache.
+* `RAW_STRING`: returns the text exactly as it came from the server.
+* `PARSED_VARIANT`: converts immediately to `Dictionary`/`Array`/`Variant`, using Godot's
+  `JSON` class.
+* `LAZY_PARSED_VARIANT` (**default**): keeps the string and only converts when asked; the
+  converted result may be cached.
 
-> ⚠️ **No MariaDB, `PARSED_VARIANT` se comporta como `RAW_STRING`.** A detecção
-> automática de qual coluna é JSON depende do servidor reportar um tipo `JSON` distinto
-> na metadata — o MySQL faz isso, mas o **MariaDB não**: lá `JSON` é só um alias de
-> `LONGTEXT` com uma restrição `CHECK` por trás, e a coluna chega como texto comum. Pra
-> converter JSON explicitamente independente do banco, use `get_parsed_json(resultset,
-> row, column)` — ela não depende do tipo da coluna, converte o texto que você indicar.
+> ⚠️ **On MariaDB, `PARSED_VARIANT` behaves like `RAW_STRING`.** Automatic detection of
+> which column is JSON depends on the server reporting a distinct `JSON` type in the
+> metadata — MySQL does that, but **MariaDB does not**: there, `JSON` is just an alias
+> of `LONGTEXT` with a `CHECK` constraint behind it, and the column arrives as plain
+> text. To convert JSON explicitly regardless of the database, use
+> `get_parsed_json(resultset, row, column)` — it does not depend on the column type and
+> parses whatever text you point at.
 
-## Plataformas
+## Platforms
 
-Alvo confirmado nesta reescrita: Linux, Windows, macOS, Android. Desenvolvimento e
-testes acontecem só em **Linux x86_64**; as demais entram depois, quando o módulo
-funcionar por completo em Linux.
+Confirmed targets for this rewrite: Linux, Windows, macOS, Android.
 
-**iOS não está na lista por enquanto** — compilar e testar pra iOS exige um Mac com
-Xcode, que não existe no ambiente de desenvolvimento atual. Não é uma decisão técnica
-nem um descarte: entra quando houver esse hardware disponível (por exemplo, via
-contribuição externa).
+* **Linux x86_64**: primary development and testing platform.
+* **Windows x86_64**: cross-compiled from Linux with MinGW-w64 and verified running under
+  Wine against a real server, including the asynchronous methods (native IOCP on
+  Windows). See `compilation.md`, section 4, for the exact steps.
+* **macOS, Android**: not done yet on this rewrite.
 
-## Distribuição
+**iOS is not on the list for now** — building and testing for iOS requires a Mac with
+Xcode, which does not exist in the current development environment. This is neither a
+technical decision nor a discard: it comes in when that hardware is available (for
+example, through an external contribution).
 
-Módulo customizado em C++, compilado junto com a engine (`custom_modules=`). Suporte a
-GDExtension é uma direção futura — não faz parte desta reescrita.
+## Distribution
+
+Custom C++ module, compiled together with the engine (`custom_modules=`). GDExtension
+support is a future direction — it is not part of this rewrite.
 
 ## Godot
 
-Versão mínima suportada: **4.6**.
+Minimum supported version: **4.6**.

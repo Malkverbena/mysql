@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MySQLStreamingCursor" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Reads a [method MySQLSession.execute_streaming] result incrementally, in batches, instead of all at once.
+	</brief_description>
+	<description>
+		Returned by [method MySQLSession.execute_streaming]. Unlike [method MySQLSession.execute_text], which loads every row into memory before returning, this reads and returns rows a batch at a time via [method next_batch], which is useful for a query that can return more rows than comfortably fit in memory at once.
+		Typical use: check [method is_ok] first, then loop while [method has_more] is [code]true[/code], calling [method next_batch] each time.
+		Only one cursor can be open per connection ([MySQLSession]) at a time: opening another one, or running any other query on the same session, waits for this one to finish or be closed. Only reads a single resultset, even if [member MySQLConfig.allow_multi_queries] is enabled on the session's config. If closed before being fully read (explicitly with [method close], or by being destroyed), it drains the rest of the resultset by itself first, since the underlying connection needs it fully read before running anything else.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="close">
+			<return type="void" />
+			<description>
+				Closes the cursor. If it still had rows left to read, they are drained (read and discarded) first, so the connection is usable again right after this returns. Safe to call more than once, and called automatically when the cursor is destroyed.
+			</description>
+		</method>
+		<method name="get_column_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Column names of the resultset, in order. Available as soon as the cursor is opened, before any [method next_batch] call.
+			</description>
+		</method>
+		<method name="get_error" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				The error, if [method is_ok] is [code]false[/code]; an empty [Dictionary] otherwise. Same shape as [method MySQLResult.get_error].
+			</description>
+		</method>
+		<method name="has_more" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if [method next_batch] can still return more rows: the cursor is ok, not closed, and the resultset is not fully read yet.
+			</description>
+		</method>
+		<method name="is_ok" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the cursor opened without error and no read has failed since. Stays [code]true[/code] after the resultset has been fully read (exhausted is not the same as failed); check [method has_more] to tell those apart.
+			</description>
+		</method>
+		<method name="next_batch">
+			<return type="Array" />
+			<description>
+				Reads and returns the next batch of rows (an [Array] of [Array]s, same row shape as [method MySQLResult.get_rows]). The batch size is not fixed: it depends on the connection's buffer size and how much data the server has ready. Returns an empty [Array] once [method has_more] is [code]false[/code], or if a read fails (check [method is_ok] afterwards).
+			</description>
+		</method>
+	</methods>
+</class>

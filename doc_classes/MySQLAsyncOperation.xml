@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MySQLAsyncOperation" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A pending [method MySQLSession.async_execute_text]/[method MySQLSession.async_execute_prepared] call.
+	</brief_description>
+	<description>
+		Returned immediately by [method MySQLSession.async_execute_text] and [method MySQLSession.async_execute_prepared], before the server has answered. Wait for it with [code]await async_op.completed[/code] in GDScript, or poll [method is_finished] across frames (driven by [method Object.call_deferred] under the hood, so it only progresses while the [SceneTree] is processing frames, never from a busy [code]while[/code] loop).
+		Once finished, [method get_result] returns the same [MySQLResult] that [signal completed] carries.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_result" qualifiers="const">
+			<return type="MySQLResult" />
+			<description>
+				The [MySQLResult] of this operation, or [code]null[/code] if it has not finished yet (check [method is_finished] first).
+			</description>
+		</method>
+		<method name="is_finished" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] once [signal completed] has fired and [method get_result] is available.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="completed">
+			<param index="0" name="result" type="MySQLResult" />
+			<description>
+				Emitted once, when the operation finishes (successfully or not). [code]result[/code] is the same [MySQLResult] [method get_result] then returns.
+			</description>
+		</signal>
+	</signals>
+</class>

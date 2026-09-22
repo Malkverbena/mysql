@@ -22,8 +22,8 @@ bool wants_tls(MySQLConfig::TransportMode p_mode) {
 boost::asio::ssl::context MySQLConnection::_make_ssl_context(const Ref<MySQLConfig> &p_config) {
 	boost::asio::ssl::context ctx(boost::asio::ssl::context::tls_client);
 	if (wants_tls(p_config->get_transport_mode())) {
-		// Validação de certificado ligada por padrão, com hostname derivado do
-		// endpoint real da conexão (nunca um valor fixo) — resolve S5 da auditoria.
+		// Certificate validation is on by default, with the host name derived from the real
+		// connection endpoint (never a fixed value).
 		ctx.set_verify_mode(boost::asio::ssl::verify_peer);
 		ctx.set_default_verify_paths();
 		std::string host = mysql_module::to_std_string(p_config->get_host());
@@ -53,7 +53,7 @@ boost::mysql::connect_params MySQLConnection::_make_connect_params() const {
 
 	if (config->get_transport_mode() == MySQLConfig::UNIX_SOCKET) {
 		params.server_address = boost::mysql::unix_path{ mysql_module::to_std_string(config->get_unix_socket_path()) };
-		// Sem UNIX+TLS — socket UNIX é local e nunca usa TLS (ver design-notes.md).
+		// There is no UNIX+TLS: a UNIX socket is local and never uses TLS.
 		params.ssl = boost::mysql::ssl_mode::disable;
 	} else {
 		boost::mysql::host_and_port address;
@@ -96,11 +96,9 @@ bool MySQLConnection::connect() {
 		return false;
 	}
 
-	// Padrão do Boost.MySQL é metadata_mode::minimal, que deixa column_name() vazio —
-	// MySQLResult::get_column_names() é uma capacidade documentada do módulo, não algo
-	// opcional, então full é obrigatório aqui (achado ao testar contra um servidor de
-	// verdade: toda checagem por nome de coluna falhava em silêncio, caindo no índice
-	// -1 do GDScript e lendo a última coluna por coincidência).
+	// The Boost.MySQL default is `metadata_mode::minimal`, which leaves `column_name()`
+	// empty. `MySQLResult::get_column_names()` is a documented capability, so `full` is
+	// required here.
 	connection.set_meta_mode(boost::mysql::metadata_mode::full);
 
 	state = CONNECTED;
@@ -117,7 +115,7 @@ void MySQLConnection::close() {
 
 	connection.close(last_error, last_diagnostics);
 
-	// Erro ao fechar não é fatal pro chamador: a conexão deixa de ser utilizável de
-	// qualquer forma. Registrado em last_error() pra quem quiser inspecionar.
+	// An error while closing is not fatal for the caller: the connection is unusable anyway.
+	// It is kept in `last_error` for whoever wants to inspect it.
 	state = last_error ? FAILED : NONE;
 }

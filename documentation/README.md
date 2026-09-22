@@ -7,11 +7,17 @@ Boost.MySQL is part of Boost.
 This module is written in C++17 and, like Godot's default, is built without C++ exceptions (`no_exception`).
 Check out the Boost repository: [Boost.MySQL](https://github.com/boostorg/mysql?tab=readme-ov-file).
 
-> **Em reescrita completa nesta branch (`4.x`).** Uma auditoria encontrou problemas
-> críticos de memória, TLS e concorrência no código anterior; em vez de corrigi-los no
-> lugar, o módulo está sendo reescrito do zero, fase a fase.
-> [capabilities.md](capabilities.md) descreve o design alvo — consulte o histórico de
-> commits do módulo para o estado exato da implementação em cada momento.
+> **Being fully rewritten on this branch (`4.x`).** An audit found critical memory, TLS and
+> concurrency problems in the previous code. Instead of patching them in place, the module
+> is being rewritten from scratch, phase by phase. [capabilities.md](capabilities.md)
+> describes the target design; check the module's commit history for the exact state of the
+> implementation at any point.
+
+> **This module is for a headless Godot server or an internal tool, never for a game
+> shipped to players.** It opens a real network connection to a MySQL/MariaDB server;
+> anyone who can reach an exported game can also reach whatever that connection can
+> reach. See "Intended use" in [capabilities.md](capabilities.md) before using it in
+> anything a player runs.
 
 ##### This module works only with Godot 4. Minimum supported version: **4.6**.
 
