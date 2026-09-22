@@ -248,7 +248,8 @@ Used by `execute_formatted()`, `execute_prepared()` and `async_execute_prepared(
 | `float` | `double` | `DOUBLE` | |
 | `String`, `StringName` | `boost::mysql::string_view` | `VARCHAR`/`TEXT` | Sent as `utf8mb4`, with its length, never as a C string |
 | `PackedByteArray` | `boost::mysql::blob_view` | `BLOB` | |
-| any other type | — | — | Explicit error, never a silent `NULL`. `Dictionary` (`DATE`/`TIME`/`DATETIME`) is **not** accepted as a parameter yet |
+| `Dictionary` | `boost::mysql::date`/`datetime`/`time` | `DATE`/`DATETIME`/`TIME` | Which one depends on the `Dictionary`'s keys — the same shape `get_rows()` returns for that type (see "Results" above): `{year, month, day}` for `DATE`, `{year, month, day, hour, minute, second, microsecond}` for `DATETIME`, `{negative, hours, minutes, seconds, microsecond}` for `TIME`. A `Dictionary` matching none of the three shapes, or with an out-of-range component, is an explicit error naming the problem, never a value silently clamped or wrapped around |
+| any other type | — | — | Explicit error, never a silent `NULL` |
 
 ### `json_result_mode`
 

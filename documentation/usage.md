@@ -83,6 +83,26 @@ print(result.get_last_insert_id())
 The same SQL text reuses one prepared statement across calls (a per-session LRU cache,
 `MySQLConfig.statement_cache_size`) instead of preparing it again every time.
 
+### Date and time parameters
+
+`DATE`/`DATETIME`/`TIME` parameters use the same `Dictionary` shape `get_rows()` returns
+for that type — round-tripping a value read earlier needs no conversion:
+
+```gdscript
+var birthday = {"year": 1990, "month": 5, "day": 12}
+session.execute_prepared("UPDATE users SET birthday = ? WHERE id = ?", [birthday, user_id])
+
+var logged_in_at = {
+    "year": 2026, "month": 9, "day": 22,
+    "hour": 14, "minute": 30, "second": 0, "microsecond": 0,
+}
+session.execute_prepared("UPDATE users SET last_login = ? WHERE id = ?", [logged_in_at, user_id])
+```
+
+A `Dictionary` that does not match the `DATE`, `DATETIME` or `TIME` shape (or has a
+component out of range) fails the call explicitly — see "Parameters" in
+[features.md](features.md) for the exact shapes.
+
 ### Multiple statements in one call
 
 ```gdscript
