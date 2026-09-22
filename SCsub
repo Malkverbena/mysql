@@ -12,13 +12,20 @@ mysql_env = env.Clone()
 ##### CONFIG (config.cfg) #####
 
 # The Boost and OpenSSL paths and the build mode come from config.cfg, in the module
-# folder. See documentation/compilation.md.
+# folder. See documentation/instructions.md.
 #
 # Building for more than one platform from the same module folder needs different paths per
 # platform (each one has its own compiled Boost and OpenSSL). When a config.<platform>.cfg
 # exists (for example config.windows.cfg), it is read instead of config.cfg for the build
 # with that platform=. Without it, the main config.cfg (usually the Linux one) applies to
 # any platform= that has no file of its own.
+#
+# Android additionally builds one .so per architecture (arch=arm64/arm32/x86_64/x86_32),
+# each needing its own Boost/OpenSSL (different ABI/instruction set). config.android.cfg
+# points at the *root* of the per-arch tree (thirdparty/boost-android,
+# thirdparty/openssl-android); env["arch"] is appended below to reach the actual build
+# (thirdparty/boost-android/arm64, etc). This is Android-specific: no other platform in
+# this module builds more than one architecture from the same module folder.
 
 import os
 import re
@@ -38,6 +45,8 @@ print("mysql: using " + _config_file)
 
 def _cfg_path(key):
 	path = os.path.normpath(os.path.join(_module_dir, os.path.expanduser(_cfg.get("paths", key))))
+	if env["platform"] == "android":
+		path = os.path.join(path, env["arch"])
 	if not os.path.isdir(path):
 		print("mysql: config.cfg [paths] %s points to a folder that does not exist: %s" % (key, path))
 		Exit(255)
@@ -106,7 +115,7 @@ if boost_mysql_mode not in ("header-only", "separate"):
 boost_include_path = boost_path
 boost_lib_path = os.path.join(boost_path, "stage", "lib")
 if not os.path.isfile(os.path.join(boost_lib_path, "libboost_charconv.a")):
-	print("mysql: libboost_charconv.a not found in %s. Run b2 as described in documentation/compilation.md" % boost_lib_path)
+	print("mysql: libboost_charconv.a not found in %s. Run b2 as described in documentation/instructions.md" % boost_lib_path)
 	Exit(255)
 
 openssl_include_path = _check_openssl_include(openssl_path)
