@@ -13,12 +13,12 @@ Written in C++17 and, like Godot's own default, built without C++ exceptions
 > reach. See "Intended use" in [documentation/features.md](documentation/features.md)
 > before using it in anything a player runs.
 
-> **Being fully rewritten on this branch (`4.x`).** An audit found critical memory, TLS
-> and concurrency problems in the previous code. Instead of patching them in place, the
-> module is being rewritten from scratch, phase by phase.
-> [documentation/features.md](documentation/features.md) describes the target design;
-> check the module's commit history for the exact state of the implementation at any
-> point.
+> **This branch (`4.x`) is a full rewrite of the module and breaks compatibility with
+> earlier versions.** An audit found critical memory, TLS and concurrency problems in the
+> previous code, so this version rewrites the module from scratch instead of patching
+> around them. None of the old classes or methods carry over unchanged — if your project
+> used an earlier version, update it against the API in
+> [documentation/usage.md](documentation/usage.md) before upgrading.
 
 Minimum supported Godot version: **4.6**. Supported platforms: Linux, Windows, macOS,
 Android (see [documentation/features.md](documentation/features.md) for the status of
@@ -32,6 +32,7 @@ hardware is available to build and test it.
 | [documentation/features.md](documentation/features.md) | Everything the module does: connection, methods, limits, error model, data types, platform status, with diagrams of the module's structure. |
 | [documentation/instructions.md](documentation/instructions.md) | How to configure, compile and test the module together with Godot, per platform. |
 | [documentation/usage.md](documentation/usage.md) | How to use the module from GDScript: class overview and worked examples. |
+| [documentation/tests.md](documentation/tests.md) | How to run the unit tests, the desktop integration test and the Android integration test. |
 | [doc_classes/](doc_classes/) | The reference used by Godot's own built-in help (`F1` in the editor), one XML file per class. |
 
 ## Old version note
@@ -39,7 +40,7 @@ hardware is available to build and test it.
 Version 1.0 used the C++ MySQL Connector Library from
 [Oracle](https://dev.mysql.com/doc/connector-cpp/8.3/en/):
 [Godot MySQL 2.0](https://github.com/Malkverbena/mysql/releases/tag/V2.0). There are no
-plans to back-port this rewrite to Godot 3.x, but help from anyone who wants to port it
+plans to back-port this module to Godot 3.x, but help from anyone who wants to port it
 is welcome.
 
 ## Contributing / feedback

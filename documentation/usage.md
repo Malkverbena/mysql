@@ -6,7 +6,7 @@ How to use this module from GDScript, once it is compiled into your Godot build 
 use Godot's own built-in help (`F1` in the editor, or hover a class name) — it is
 generated from [`../doc_classes/`](../doc_classes/).
 
-## Classes at a glance
+## Classes Overview
 
 | Class | What it is |
 |---|---|
@@ -103,13 +103,19 @@ var op = session.async_execute_text("SELECT SLEEP(1)")
 var result = await op.completed
 ```
 
-Always `await`, never poll in a loop (`while not op.is_finished(): pass`) — that starves
-the `SceneTree` of the frames that deliver the result. Keep the `MySQLSession` (or the
-`MySQLPool` it came from) referenced until the operation finishes; if it is freed first,
-its I/O thread stops mid-operation. A session processes one asynchronous operation at a
-time — a second call on the same session while one is running fails explicitly instead of
-queuing (use one session per parallel operation, e.g. from a `MySQLPool`). See
-"Asynchronous methods" in [features.md](features.md) for the full explanation.
+Three rules apply to every asynchronous call:
+
+* **Always `await` the operation.** Do not poll it in a loop
+  (`while not op.is_finished(): pass`) — that loop blocks the `SceneTree` from processing
+  frames, and processing frames is what delivers the result.
+* **Keep the `MySQLSession` (or the `MySQLPool` it came from) referenced until the
+  operation finishes.** Freeing it earlier stops its I/O thread mid-operation.
+* **A session runs one asynchronous operation at a time.** A second call on the same
+  session, started while the first one is still running, fails immediately instead of
+  queuing. Use a separate session per parallel operation — for example, one leased from a
+  `MySQLPool`.
+
+See "Asynchronous methods" in [features.md](features.md) for the full explanation.
 
 ## Transactions
 
@@ -182,20 +188,29 @@ for i in result.get_resultset_count():
 
 ## Error handling
 
-Every fallible call follows the same shape — check `is_ok()` (or an empty `Dictionary`
-for `connect_db()`/`close_db()`/`commit()`/`rollback()`), then read `get_error()`:
+This module never throws (`no_exception`, like Godot's own default) and keeps no global
+error state. Every call reports its own outcome directly, one of two ways:
+
+* `MySQLResult` and `MySQLStreamingCursor` expose `is_ok() -> bool` and
+  `get_error() -> Dictionary`.
+* `connect_db()`, `close_db()`, `commit()` and `rollback()` return the error
+  `Dictionary` directly: check `.is_empty()` instead of calling `is_ok()`.
+
+The error `Dictionary` always has the same four keys:
+
+| Key | Meaning |
+|---|---|
+| `category` | Where the error came from: `"mysql.common-server"` for one the server reported, `"mysql_module.client"` for one the module detected on its own (bad parameters, a limit reached, and so on) before talking to the server. |
+| `message` | A description written by the module. |
+| `server_message` | The server's own error text; empty for a client-side error. |
+| `is_fatal` | `true` if the connection itself is no longer usable (for example, after a failed TLS handshake); `false` if the session still accepts further calls. |
 
 ```gdscript
+var result = session.execute_text("SELECT * FROM users")
 if not result.is_ok():
     var error = result.get_error()
-    match error.category:
-        "mysql.common-server":
-            print("Server rejected the SQL: ", error.server_message)
-        "mysql_module.client":
-            print("Client-side problem (bad params, limit hit, etc.): ", error.message)
-        _:
-            print(error)
+    print("%s: %s" % [error.category, error.message])
+    if not error.server_message.is_empty():
+        print("Server said: ", error.server_message)
+    return
 ```
-
-There are no exceptions anywhere in this module (`no_exception`, like Godot's own
-default) and no global error state — every call carries its own result.

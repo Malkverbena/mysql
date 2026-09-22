@@ -1,20 +1,24 @@
 # Instructions
 
-Configuration, compilation and testing of this module, together with Godot, on every
-supported platform. Building **Godot itself** (its own requirements, SCons options, how a
-custom module folder is picked up with `custom_modules=`) is covered by
+Configuration and compilation of this module, together with Godot, on every supported
+platform. See [tests.md](tests.md) for how to run the tests. Building **Godot itself**
+(its own requirements, SCons options, how a custom module folder is picked up with
+`custom_modules=`) is covered by
 [Godot's own compiling documentation](https://docs.godotengine.org/en/stable/engine_details/development/compiling/index.html) —
 this page only covers what is specific to this module: its dependencies (Boost, OpenSSL)
 and the extra `scons` options it reads.
 
-> **Current state:** the module is being fully rewritten. Linux x86_64 is validated at
-> every step; Windows (cross-compiled from Linux) and Android are also fully verified
-> (see below). macOS has not been tried yet on this rewrite.
+> **Current state:** Linux x86_64 is validated at every step; Windows (cross-compiled
+> from Linux) and Android are also fully verified (see below). macOS has not been tried
+> yet.
 
-**Versions tested in this rewrite:** Boost `boost-1.92.0`, OpenSSL `openssl-4.0.2`
-(stable tags, no development submodules). The `SCsub` checks the minimum versions
-(Boost >= 1.85, OpenSSL >= 3.0) and the headers before building. Newer versions probably
-work, but this rewrite tested only the versions above.
+**Minimum versions: Boost 1.85, OpenSSL 3.0.** Boost.MySQL has required a compiled
+Boost.Charconv since Boost 1.85; the `SCsub` checks both minimums, and the headers, before
+building, and stops with an explicit error naming the problem if either is older.
+
+**Versions tested:** Boost `boost-1.92.0`, OpenSSL `openssl-4.0.2` (stable tags, no
+development submodules). Newer versions probably work; testing so far covered only the
+versions above.
 
 This module **does not download or build** Boost and OpenSSL. You must build them
 manually before building Godot with the module. This guide gives the steps and the flags
@@ -111,8 +115,7 @@ The `SCsub` already does this.
 
 ## Building Boost and OpenSSL, per platform
 
-Boost.MySQL is part of Boost since version 1.82; a full clone of the `boostorg/boost`
-monorepo already brings everything that is needed:
+A full clone of the `boostorg/boost` monorepo already brings everything that is needed:
 
 ```bash
 git clone --recurse-submodules https://github.com/boostorg/boost.git thirdparty/boost
@@ -159,9 +162,9 @@ Boost flags stay the same except `architecture`/`address-model`.
 set `toolset=msvc`, `target-os=windows`. For OpenSSL, replace `./Configure` with
 `perl Configure` and use `nmake`/`nmake install` instead of `make`/`make install`;
 target `VC-WIN64A` (64 bits) or `VC-WIN32`. NASM must be installed and on the `PATH`.
-Not tested in this rewrite.
+Not tested yet.
 
-**Cross-compiling from Linux with MinGW-w64 — verified in this rewrite**, including the
+**Cross-compiling from Linux with MinGW-w64 — verified**, including the
 resulting binary run and tested (the full `tests/smoke_test.gd` suite) through
 [Wine](https://www.winehq.org/) against a real MariaDB.
 
@@ -228,16 +231,15 @@ Without it `Configure` uses the native `gcc` and the result is not a Windows bin
 
 ### macOS
 
-Not attempted yet in this rewrite — waiting on access to Apple hardware to generate the
-cross-compilation SDK (`osxcross`). The module supported macOS before this rewrite (see
-its commit history); this rewrite will reassess that support against the current
-architecture once Apple hardware is available. Native OpenSSL `Configure` targets are
-`darwin64-x86_64` and `darwin64-arm64`.
+Not attempted yet — waiting on access to Apple hardware to generate the cross-compilation
+SDK (`osxcross`). An earlier version of the module supported macOS (see the commit
+history); this will be reassessed against the current architecture once Apple hardware is
+available. Native OpenSSL `Configure` targets are `darwin64-x86_64` and `darwin64-arm64`.
 
 ### Android
 
 Cross-compiled with the Android NDK's own Clang (side-by-side NDK,
-`$ANDROID_HOME/ndk/<version>`) — **verified in this rewrite**: all four ABIs build and
+`$ANDROID_HOME/ndk/<version>`) — **verified**: all four ABIs build and
 link, and the full integration test suite (97 checks) passed on two real devices
 (arm64-v8a). See `platform/android/detect.py` in the Godot source for the NDK version
 and minimum API level Godot itself requires; the same values are used here.
@@ -344,54 +346,5 @@ scons platform=android arch=arm64 target=template_debug \
 
 ## Tests
 
-The tests live in `mysql/tests/`.
-
-**Unit tests (doctest).** Godot's own unit test runner. Every `tests/test_*.h` file is
-picked up automatically when the engine is built with `tests=yes`. They need no database
-server. `extra_suffix=tests` keeps this build separate from the normal one:
-
-```bash
-cd godot
-scons platform=linuxbsd arch=x86_64 target=editor \
-    custom_modules=../mysql \
-    precision=double \
-    tests=yes extra_suffix=tests \
-    -j"$(nproc)"
-
-./bin/godot.linuxbsd.editor.double.x86_64.tests --test --test-case="*MySQL*"
-```
-
-**Integration test (GDScript), desktop.** Runs against a real MySQL/MariaDB server via
-`--headless --script`. See [`../tests/README.md`](../tests/README.md).
-
-**Integration test, Android.** An exported Android app cannot use `--script` the way
-desktop/Wine can — reasons and the working alternative below. To run
-`tests/smoke_test.gd` on a device:
-
-1. Build a small Godot project whose only content is `tests/smoke_test.gd` (or a symlink
-   to it) and a minimal main scene (a `.tscn` with a single empty `Node` is enough).
-2. In its Project Settings, set **Run > Main Loop Type** to `MySQLSmokeTest` (the
-   `class_name` the script declares) — **do not** rely on `command_line/extra_args =
-   "--script res://smoke_test.gd"`. That argument does reach the native layer intact
-   (visible in `adb logcat`), but was found to silently never execute on Android in this
-   Godot build, reproduced on two different-vendor devices. `main_loop_type` is a
-   supported, documented Godot mechanism and does not have this problem; it does need
-   `run/main_scene` to point at a valid scene too (a bare script is not accepted there).
-3. Export a **debug** APK (`--export-debug`) with that project. `INTERNET` permission is
-   required.
-4. Credentials: an installed app has no shell environment to read `MYSQL_TEST_*` from.
-   `smoke_test.gd` falls back to `user://test_credentials.txt` (`KEY=VALUE` lines) when
-   the environment variables are unset. Push it with `run-as` (needs a debug/debuggable
-   build): `adb push credentials.txt /data/local/tmp/test_credentials.txt && adb shell
-   run-as <package> cp /data/local/tmp/test_credentials.txt files/test_credentials.txt`.
-5. A physical device (not the emulator) reaches the host's MySQL through
-   `adb reverse tcp:3306 tcp:3306`, then the default `MYSQL_TEST_HOST` (`127.0.0.1`)
-   works unchanged. (`10.0.2.2` is an emulator-only alias — do not use it on a real
-   device.)
-6. `adb shell am start -n <package>/<launcher activity>`, then read the result from
-   `adb logcat` (tag `godot`); the script prints `OK`/`FAIL` per check and calls
-   `quit(0)`/`quit(1)` at the end.
-
-**Sanitizers.** Godot has built-in options: add `use_asan=yes use_ubsan=yes`, or
-`use_tsan=yes` (TSan cannot be combined with ASan), to the `scons` line and run the
-integration test with the resulting binary.
+See [tests.md](tests.md): how to run the unit tests, the desktop integration test and
+the Android integration test.
