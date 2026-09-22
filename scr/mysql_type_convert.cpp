@@ -64,7 +64,7 @@ bool is_width_one_tinyint(const boost::mysql::metadata &p_meta) {
 Variant uint64_to_variant(uint64_t p_value) {
 	// A `BIGINT UNSIGNED` above `INT64_MAX` comes as a `String` with the exact value,
 	// because Godot's `Variant::INT` is a signed 64-bit integer and cannot hold it. See
-	// `documentation/capabilities.md`: the same column can return an `int` or a `String`
+	// `documentation/features.md`: the same column can return an `int` or a `String`
 	// depending on the value of the row.
 	if (p_value > (uint64_t)INT64_MAX) {
 		return String::num_uint64(p_value);

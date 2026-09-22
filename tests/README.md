@@ -8,7 +8,7 @@ Two kinds of local tests, both versioned in the repository:
 | Integration test (GDScript) | `smoke_test.gd` | Yes, MySQL or MariaDB | `--headless --script` |
 
 The build instructions for both are in
-[`../documentation/compilation.md`](../documentation/compilation.md), section 5.
+[`../documentation/instructions.md`](../documentation/instructions.md), "Tests" section.
 
 ## Unit tests (doctest)
 
@@ -45,7 +45,7 @@ connection), multiple resultsets and `execute_script`.
 ### Prerequisites
 
 - The module already built together with Godot (see
-  [`../documentation/compilation.md`](../documentation/compilation.md)).
+  [`../documentation/instructions.md`](../documentation/instructions.md)).
 - A MySQL or MariaDB server reachable, with a user and a schema **dedicated to
   testing**. The test creates and drops its own table in that schema and touches nothing
   else. Do not use a production schema.
@@ -87,4 +87,4 @@ This is expected and part of the test: section 0 confirms that `TCP_TLS_REQUIRED
 rejects an untrusted certificate instead of silently accepting it. The rest of the test
 connects with `TCP_TLS_DISABLED` on purpose, assuming a trusted local or test network.
 That is not the recommended setting for production (see
-[`../documentation/capabilities.md`](../documentation/capabilities.md)).
+[`../documentation/features.md`](../documentation/features.md)).
