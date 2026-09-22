@@ -1,75 +1,54 @@
-# MySQL Module to Godot 4.
+# MySQL Module for Godot 4
 
-### **This module is a wrapper for Boost.MySQL.**
+A custom C++ module that wraps [Boost.MySQL](https://github.com/boostorg/mysql) — a
+MySQL/MariaDB client built on Boost.Asio — so Godot 4 projects can talk to a
+MySQL/MariaDB server directly, without a separate backend process.
 
-Boost.MySQL is a client for MySQL and MariaDB database servers, based on Boost.Asio.
-Boost.MySQL is part of Boost.
-This module is written in C++17 and, like Godot's default, is built without C++ exceptions (`no_exception`).
-Check out the Boost repository: [Boost.MySQL](https://github.com/boostorg/mysql?tab=readme-ov-file).
-
-> **Being fully rewritten on this branch (`4.x`).** An audit found critical memory, TLS and
-> concurrency problems in the previous code. Instead of patching them in place, the module
-> is being rewritten from scratch, phase by phase. [capabilities.md](capabilities.md)
-> describes the target design; check the module's commit history for the exact state of the
-> implementation at any point.
+Written in C++17 and, like Godot's own default, built without C++ exceptions
+(`no_exception`); errors are reported through explicit return values, never thrown.
 
 > **This module is for a headless Godot server or an internal tool, never for a game
 > shipped to players.** It opens a real network connection to a MySQL/MariaDB server;
 > anyone who can reach an exported game can also reach whatever that connection can
-> reach. See "Intended use" in [capabilities.md](capabilities.md) before using it in
-> anything a player runs.
+> reach. See "Intended use" in [documentation/features.md](documentation/features.md)
+> before using it in anything a player runs.
 
-##### This module works only with Godot 4. Minimum supported version: **4.6**.
+> **Being fully rewritten on this branch (`4.x`).** An audit found critical memory, TLS
+> and concurrency problems in the previous code. Instead of patching them in place, the
+> module is being rewritten from scratch, phase by phase.
+> [documentation/features.md](documentation/features.md) describes the target design;
+> check the module's commit history for the exact state of the implementation at any
+> point.
 
-I have no plans to back port this module to Godot 3.x, but I will accept help from anyone who wants to port it.
+Minimum supported Godot version: **4.6**. Supported platforms: Linux, Windows, macOS,
+Android (see [documentation/features.md](documentation/features.md) for the status of
+each). iOS is not on the list for now — not a technical decision, just deferred until
+Apple hardware is available to build and test it.
 
+## Where to go next
 
-##### If you use this module, let me know it. Leave a star ;).
+| Document | Content |
+|---|---|
+| [documentation/features.md](documentation/features.md) | Everything the module does: connection, methods, limits, error model, data types, platform status, with diagrams of the module's structure. |
+| [documentation/instructions.md](documentation/instructions.md) | How to configure, compile and test the module together with Godot, per platform. |
+| [documentation/usage.md](documentation/usage.md) | How to use the module from GDScript: class overview and worked examples. |
+| [doc_classes/](doc_classes/) | The reference used by Godot's own built-in help (`F1` in the editor), one XML file per class. |
 
-##### Do you have any suggestion? Would you like to share experiences while using the module? Please open a issue.
+## Old version note
 
-##### Old version note:
+Version 1.0 used the C++ MySQL Connector Library from
+[Oracle](https://dev.mysql.com/doc/connector-cpp/8.3/en/):
+[Godot MySQL 2.0](https://github.com/Malkverbena/mysql/releases/tag/V2.0). There are no
+plans to back-port this rewrite to Godot 3.x, but help from anyone who wants to port it
+is welcome.
 
-Version 1.0 uses C++ MySQL Connector Library from [Oracle](https://dev.mysql.com/doc/connector-cpp/8.3/en/). You can find it here: [Godot MySQL 2.0](https://github.com/Malkverbena/mysql/releases/tag/V2.0).
+## Contributing / feedback
 
-
-## Supported platforms
-
-Confirmed target for this rewrite: Linux, Windows, macOS, Android. During this rewrite,
-development and testing happen only on **Linux x86_64** — the other platforms are
-ported afterwards.
-
-iOS is not on the list for now — building and testing for iOS needs a Mac with Xcode,
-which isn't part of the current development environment. Not a technical decision or a
-drop, just deferred until that hardware is available (e.g. through an external
-contribution).
-
-## Distribution
-
-Custom C++ module, built together with the engine (`custom_modules=`). GDExtension
-support is a future direction, out of scope for this rewrite.
-
-### [See the full list of features here.](capabilities.md)
-
-### [Compilation instructions here!](compilation.md)
-
-This module does not bundle nor build its dependencies. You need to
-compile Boost and OpenSSL yourself before compiling the module — see
-[compilation.md](compilation.md) for the exact steps and flags.
-
-
-## Usage:
-
-* **[Documentation.](https://github.com/Malkverbena/mysql/wiki)**
-* **[Check out some exemples here.](https://github.com/Malkverbena/mysql/wiki)**
-
+If you use this module, a star is appreciated. Suggestions, shared experiences and bug
+reports are all welcome as issues.
 
 ## License
 
-MIT — see [LICENSE](../LICENSE).
+MIT — see [LICENSE](LICENSE).
 
-
-# Disclaimer
-
-> THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-> HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

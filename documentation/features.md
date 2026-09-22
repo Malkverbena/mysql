@@ -1,8 +1,95 @@
-# Capabilities
+# Features
 
 > **Target design of the ongoing rewrite.** This document describes what the module does
 > once the rewrite is finished. At this point in development, not everything described
 > here is implemented yet — check the module's commit history for the exact state.
+
+## Module structure
+
+Seven classes are exposed to GDScript. `MySQLSession` is the entry point for a single
+connection; `MySQLPool` hands out sessions from a shared pool for multithreaded use.
+Every fallible call returns/fills an object with `is_ok()`/`get_error()` instead of
+throwing (see "Error model" below).
+
+```mermaid
+classDiagram
+    class MySQLConfig {
+      +host, port, database
+      +transport_mode
+      +tinyint1_mode
+      +json_result_mode
+      +statement_cache_size
+      +max_buffer_size, max_result_bytes
+      +set_password(password)
+    }
+    class MySQLSession {
+      +set_config(config)
+      +connect_db() Dictionary
+      +close_db()
+      +is_db_connected() bool
+      +execute_text(sql) MySQLResult
+      +execute_formatted(sql, params) MySQLResult
+      +execute_prepared(sql, params) MySQLResult
+      +execute_script(script) Array
+      +execute_streaming(sql) MySQLStreamingCursor
+      +async_execute_text(sql) MySQLAsyncOperation
+      +async_execute_prepared(sql, params) MySQLAsyncOperation
+      +begin_transaction() MySQLTransaction
+    }
+    class MySQLPool {
+      +set_config(config)
+      +acquire() MySQLSession
+    }
+    class MySQLResult {
+      +is_ok() bool
+      +get_error() Dictionary
+      +get_rows() Array
+      +get_column_names() PackedStringArray
+      +get_affected_rows() int
+      +get_last_insert_id() int
+      +get_resultset_count() int
+      +get_parsed_json(...) Variant
+    }
+    class MySQLStreamingCursor {
+      +next_batch() Array
+      +has_more() bool
+      +close()
+      +is_ok() bool
+    }
+    class MySQLAsyncOperation {
+      +is_finished() bool
+      +get_result() MySQLResult
+      +completed signal
+    }
+    class MySQLTransaction {
+      +commit() Dictionary
+      +rollback() Dictionary
+    }
+
+    MySQLSession --> MySQLConfig : set_config
+    MySQLPool --> MySQLConfig : set_config
+    MySQLPool ..> MySQLSession : acquire
+    MySQLSession ..> MySQLResult : execute_*
+    MySQLSession ..> MySQLStreamingCursor : execute_streaming
+    MySQLSession ..> MySQLAsyncOperation : async_execute_*
+    MySQLSession ..> MySQLTransaction : begin_transaction
+    MySQLAsyncOperation ..> MySQLResult : get_result
+```
+
+Internally (not exposed to GDScript), `MySQLSession` wraps a single `any_connection`
+(Boost.MySQL) plus a per-session prepared-statement LRU cache; `async_*` calls run on a
+dedicated I/O thread per session, delivering the result back to the main thread via
+`call_deferred`, never directly from the background thread.
+
+```mermaid
+flowchart LR
+    A[GDScript] -->|execute_text / execute_prepared| B[MySQLSession]
+    A -->|async_execute_* + await| B
+    A -->|pool.acquire| C[MySQLPool] --> B
+    B -->|sync, blocks caller| D[(MySQL / MariaDB)]
+    B -->|async, dedicated I/O thread| E[I/O thread] -->|call_deferred| A
+    E --> D
+```
 
 ## Intended use
 
@@ -175,8 +262,13 @@ Confirmed targets for this rewrite: Linux, Windows, macOS, Android.
 * **Linux x86_64**: primary development and testing platform.
 * **Windows x86_64**: cross-compiled from Linux with MinGW-w64 and verified running under
   Wine against a real server, including the asynchronous methods (native IOCP on
-  Windows). See `compilation.md`, section 4, for the exact steps.
-* **macOS, Android**: not done yet on this rewrite.
+  Windows).
+* **Android (arm64-v8a, armeabi-v7a, x86_64, x86_32)**: cross-compiled with the NDK; the
+  full integration test suite (97 checks) verified on two real devices (arm64-v8a), not
+  just an emulator.
+* **macOS**: not done yet on this rewrite — waiting on Apple hardware to build the SDK.
+
+See [instructions.md](instructions.md) for the exact build steps per platform.
 
 **iOS is not on the list for now** — building and testing for iOS requires a Mac with
 Xcode, which does not exist in the current development environment. This is neither a

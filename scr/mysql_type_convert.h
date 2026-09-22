@@ -11,7 +11,7 @@
 
 // MySQL/MariaDB to Godot conversion. These are pure functions: they do no I/O and keep no
 // state. Given a `field_view` (the value of a cell) and the column metadata, they return
-// the matching `Variant`, following the rules in `documentation/capabilities.md`
+// the matching `Variant`, following the rules in `documentation/features.md`
 // (`tinyint1_mode`, `json_result_mode`, `BIGINT UNSIGNED` above `INT64_MAX` as a `String`,
 // and `TIME`/`DATE`/`DATETIME` with correct microseconds and sign).
 //

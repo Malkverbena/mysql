@@ -1,8 +1,15 @@
-# Compilation
+# Instructions
 
-> **Current state:** the module is being fully rewritten. During the rewrite only the
-> Linux x86_64 build is validated at every step, plus a Windows cross-build from Linux
-> (section 4). The macOS and Android instructions have not been tested yet.
+Configuration, compilation and testing of this module, together with Godot, on every
+supported platform. Building **Godot itself** (its own requirements, SCons options, how a
+custom module folder is picked up with `custom_modules=`) is covered by
+[Godot's own compiling documentation](https://docs.godotengine.org/en/stable/engine_details/development/compiling/index.html) —
+this page only covers what is specific to this module: its dependencies (Boost, OpenSSL)
+and the extra `scons` options it reads.
+
+> **Current state:** the module is being fully rewritten. Linux x86_64 is validated at
+> every step; Windows (cross-compiled from Linux) and Android are also fully verified
+> (see below). macOS has not been tried yet on this rewrite.
 
 **Versions tested in this rewrite:** Boost `boost-1.92.0`, OpenSSL `openssl-4.0.2`
 (stable tags, no development submodules). The `SCsub` checks the minimum versions
@@ -11,30 +18,17 @@ work, but only the ones above were actually tested.
 
 This module **does not download or build** Boost and OpenSSL. You must build them
 manually before building Godot with the module. This guide gives the steps and the flags
-used.
+used, per platform.
 
 ## Requirements
 
-- Godot **4.6** or newer.
-- A compiler with C++17 support: GCC or Clang (Linux/macOS), or Visual C++ (Windows).
+- Godot **4.6** or newer, and everything required to build Godot itself for your target
+  platform (see Godot's compiling documentation, linked above).
+- A compiler with C++17 support: GCC or Clang (Linux/macOS/Android NDK), or Visual C++
+  (Windows).
 - [**NASM**](https://www.nasm.us/pub/nasm/releasebuilds/), on Windows only, needed by
   OpenSSL.
 - Git.
-- Everything required to build Godot itself.
-
-## Expected layout
-
-By default the module expects the already built Boost and OpenSSL to be in **sibling**
-folders of the module:
-
-```
-your_workspace/
-├── godot/
-├── mysql/              <- this module
-└── thirdparty/
-    ├── boost/          <- Boost clone, built (step below)
-    └── openssl/        <- OpenSSL clone, built (step below)
-```
 
 ## Configuration (`config.cfg`)
 
@@ -56,13 +50,21 @@ boost_mysql_mode = separate
 | `openssl_path` | folder | Built OpenSSL (`include/` and `lib64/` or `lib/`). Same rule for relative paths. |
 | `boost_mysql_mode` | `separate` (default) or `header-only` | `separate` defines `BOOST_MYSQL_SEPARATE_COMPILATION` and Boost.MySQL is compiled once, in `boost_mysql_src.cpp`. `header-only` instantiates Boost.MySQL in every translation unit (slower build). |
 
-If Boost/OpenSSL are somewhere else, edit `boost_path` and `openssl_path` in
-`config.cfg`. There are no `boost_path=`/`openssl_path=` options on the scons command
-line.
+By default the module expects the already built Boost and OpenSSL in **sibling** folders
+of the module (`../thirdparty/boost`, `../thirdparty/openssl`). If they are somewhere
+else, edit `boost_path`/`openssl_path` — there are no equivalent options on the `scons`
+command line.
 
 To build for another platform with different paths, create a `config.<platform>.cfg`
-(for example `config.windows.cfg`). The `SCsub` reads it instead of `config.cfg` when
-the build uses that `platform=`.
+(for example `config.windows.cfg`, already in the repository). The `SCsub` reads it
+instead of `config.cfg` when the build uses that `platform=`.
+
+**Android is a special case**: it builds one `.so` per architecture
+(`arch=arm64/arm32/x86_64/x86_32`), and each needs its own compiled Boost/OpenSSL.
+`config.android.cfg` points at the **root** of a per-arch tree
+(`thirdparty/boost-android`, `thirdparty/openssl-android`); the `SCsub` appends the
+current `arch=` automatically to reach the real build
+(`thirdparty/boost-android/arm64/`, etc). See the Android subsection below.
 
 ## Language standard
 
@@ -107,16 +109,19 @@ The `SCsub` already does this.
 `libboost_thread` is **not** needed. `Boost.Context` would only be needed with
 `asio::spawn`/`yield_context`, which the module does not use.
 
-## 1. Building Boost
+## Building Boost and OpenSSL, per platform
 
 Boost.MySQL is part of Boost since version 1.82; a full clone of the `boostorg/boost`
-monorepo already brings everything that is needed.
+monorepo already brings everything that is needed:
 
 ```bash
 git clone --recurse-submodules https://github.com/boostorg/boost.git thirdparty/boost
-cd thirdparty/boost
+```
 
-# Linux/macOS
+### Linux
+
+```bash
+cd thirdparty/boost
 ./bootstrap.sh --prefix="$(pwd)" --libdir="$(pwd)/stage/lib" --includedir="$(pwd)/include"
 ./b2 headers
 ./b2 -j"$(nproc)" \
@@ -133,120 +138,38 @@ cd thirdparty/boost
     cxxstd-dialect=iso
 ```
 
-On Windows, replace `bootstrap.sh` with `bootstrap.bat` and `./b2` with `b2.exe`; set
-`toolset` to `msvc` (or `gcc-mingw`/`clang-mingw` if cross-compiling with MinGW),
-`target-os=windows`, and `architecture`/`address-model` for the target.
-
-### Why these flags
-
-| Flag | Reason |
-|---|---|
-| `link=static`, `runtime-link=static` | The module embeds Boost statically, so whoever runs the game does not need Boost `.so`/`.dll` files installed. |
-| `threading=multi` | Boost.MySQL uses Boost.Asio, which requires multithreading support. |
-| `variant=release` | Production build (no Boost debug symbols). |
-| `cxxstd=17`, `cxxstd-dialect=iso` | The same language standard as the module (`-std=c++17`, no GNU extensions). The `iso` dialect also stops `b2` from detecting `__float128`, so `libboost_charconv` does not depend on `libquadmath` (see "Linked libraries"). |
-| `toolset` | Must match the compiler used to build Godot. A Boost built with `gcc` does not reliably link against a Godot built with `clang`, and vice versa. |
-| `--stagedir` | Where the built libraries go (`stage/lib/`), which is the `stage/lib` path inside the `boost_path` of `config.cfg`. |
-
-**Result:** headers in `thirdparty/boost/boost/` (generated by `./b2 headers`; the
-`boost_path` of `config.cfg` points to `thirdparty/boost`, not to that subfolder) and
-static libraries `libboost_*.a` in `thirdparty/boost/stage/lib/`.
-
-The build takes a few minutes, because `b2` builds every Boost library. The module only
-links `libboost_charconv` (see "Linked libraries"). To check:
-`ls thirdparty/boost/stage/lib/libboost_charconv.a` and
-`ls thirdparty/boost/boost/mysql.hpp`.
-
-## 2. Building OpenSSL
-
 ```bash
 git clone https://github.com/openssl/openssl.git thirdparty/openssl
 cd thirdparty/openssl
 
-# Linux x86_64 (change the target below for another platform, see the table)
 ./Configure linux-x86_64 \
-    no-ssl3 \
-    no-weak-ssl-ciphers \
-    no-legacy \
-    no-shared \
-    no-tests \
-    no-docs \
-    --prefix="$(pwd)" \
-    --openssldir="$(pwd)"
-
+    no-ssl3 no-weak-ssl-ciphers no-legacy no-shared no-tests no-docs \
+    --prefix="$(pwd)" --openssldir="$(pwd)"
 make depend
 make -j"$(nproc)"
 make install
 ```
 
-On Windows (with NASM installed and a "VS toolset" in the PATH), replace `./Configure`
-with `perl Configure` and use `nmake`/`nmake install` instead of `make`/`make install`;
-target `VC-WIN64A` (64 bits) or `VC-WIN32`.
+For a non-x86_64 Linux target (e.g. `linux-aarch64`), just change the `Configure`
+target; the Boost flags stay the same except `architecture`/`address-model`.
 
-### Common targets
+### Windows
 
-| Platform / architecture | Target |
-|---|---|
-| Linux x86_64 (gcc) | `linux-x86_64` |
-| Linux x86_64 (clang) | `linux-x86_64-clang` |
-| Linux arm64 | `linux-aarch64` |
-| Windows x86_64 (MSVC) | `VC-WIN64A` |
-| macOS x86_64 | `darwin64-x86_64` |
-| macOS arm64 | `darwin64-arm64` |
+**Native (MSVC):** replace `bootstrap.sh` with `bootstrap.bat` and `./b2` with `b2.exe`;
+set `toolset=msvc`, `target-os=windows`. For OpenSSL, replace `./Configure` with
+`perl Configure` and use `nmake`/`nmake install` instead of `make`/`make install`;
+target `VC-WIN64A` (64 bits) or `VC-WIN32`. NASM must be installed and on the `PATH`.
+Not tested in this rewrite.
 
-Cross-compilation (Android, iOS, riscv, powerpc...) is not covered by this guide. See
-the official documentation of [Boost.Build](https://www.boost.org/build/tutorial.html)
-and [OpenSSL](https://wiki.openssl.org/index.php/Compilation_and_Installation) for the
-options of each target.
+**Cross-compiling from Linux with MinGW-w64 — verified in this rewrite**, including the
+resulting binary run and tested (the full `tests/smoke_test.gd` suite) through
+[Wine](https://www.winehq.org/) against a real MariaDB.
 
-### Why these flags
+Prerequisite: `x86_64-w64-mingw32-gcc`/`g++`/`ar`/`ranlib`/`windres` in the `PATH` (the
+`mingw-w64` package on most Linux distributions).
 
-| Flag | Reason |
-|---|---|
-| `no-shared` | Produces static `libssl.a`/`libcrypto.a`, the same reasoning as `link=static` in Boost. |
-| `no-ssl3`, `no-weak-ssl-ciphers`, `no-legacy` | Removes obsolete or insecure protocols and algorithms that this module does not use, which reduces the attack surface. |
-| `no-tests`, `no-docs` | Only shortens the build time; it does not affect the final result. |
-
-**Result:** headers in `thirdparty/openssl/include/openssl/`, and the libraries
-`libssl.a` and `libcrypto.a` in `thirdparty/openssl/lib64/`. Some versions install into
-`lib/` instead; the `SCsub` looks in both.
-
-## 3. Building the module together with Godot
-
-```bash
-git clone https://github.com/Malkverbena/mysql.git
-# (or put this module inside godot/modules/, or use custom_modules
-# pointing outside the Godot tree, as in the example below)
-
-cd godot
-scons platform=linuxbsd arch=x86_64 target=editor \
-    custom_modules=../mysql \
-    precision=double \
-    -j"$(nproc)"
-```
-
-Building with `precision=double` is highly recommended.
-
-If Boost/OpenSSL are not in the default sibling folder layout, adjust `boost_path` and
-`openssl_path` in `mysql/config.cfg` (see "Configuration").
-
-## 4. Cross-compiling for Windows from Linux (MinGW-w64)
-
-Verified in this rewrite: Boost and OpenSSL cross-compiled with MinGW-w64, the module and
-Godot built with `platform=windows`, and the resulting binary run and tested (the full
-`tests/smoke_test.gd` suite) through [Wine](https://www.winehq.org/) against a real
-MariaDB.
-
-### Prerequisite
-
-`x86_64-w64-mingw32-gcc`/`g++`/`ar`/`ranlib`/`windres` in the PATH (the `mingw-w64`
-package on most Linux distributions).
-
-### Boost
-
-The same Boost clone used for Linux, but in a separate folder. Each platform needs its
-own `stage/lib` with objects in the right format (ELF for Linux, COFF/PE for Windows). A
-`git worktree` avoids cloning the whole monorepo again:
+Each platform needs its own `stage/lib` with objects in the right format (ELF for Linux,
+COFF/PE for Windows). A `git worktree` avoids cloning the whole monorepo again:
 
 ```bash
 cd thirdparty/boost
@@ -279,10 +202,6 @@ EOF
 the MinGW compiler (without it, `b2` tries to use the native `g++` and the result does not
 run on Windows).
 
-### OpenSSL
-
-The same idea, with a separate worktree:
-
 ```bash
 cd thirdparty/openssl
 git worktree add ../openssl-windows openssl-4.0.2   # the tag you built for Linux
@@ -300,49 +219,129 @@ make install
 `--cross-compile-prefix` is the piece that is missing compared with the Linux build.
 Without it `Configure` uses the native `gcc` and the result is not a Windows binary.
 
-> The same `make install` problem as in the Linux build can show up here (see section
-> 2): if it fails in `install_dev` because `--prefix` is the source folder itself, the
-> `.a` files were already generated in the root. Copy them manually to `lib64/`
-> (`mkdir -p lib64 && cp libssl.a libcrypto.a lib64/`).
+> The `make install` step can fail in `install_dev` when `--prefix` is the source folder
+> itself: the `.a` files are already generated in the root by then. Copy them manually to
+> `lib64/` (`mkdir -p lib64 && cp libssl.a libcrypto.a lib64/`).
 
-### Module config and build
+`mysql/config.windows.cfg` already exists in the repository and points at
+`thirdparty/boost-windows`/`thirdparty/openssl-windows`.
 
-Because Windows needs different paths from Linux, the `SCsub` reads `config.windows.cfg`
-instead of `config.cfg` when `platform=windows` (see "Configuration"; the mechanism works
-for any `config.<platform>.cfg`, not only Windows). The repository already has one, with
-only the paths changed:
+### macOS
 
-```ini
-[paths]
-boost_path = ../thirdparty/boost-windows
-openssl_path = ../thirdparty/openssl-windows
+Not attempted yet in this rewrite — waiting on access to Apple hardware to generate the
+cross-compilation SDK (`osxcross`). Basic support existed before this rewrite (see the
+module's commit history); it will be reassessed against the current architecture once
+that hardware is available. Native OpenSSL `Configure` targets are `darwin64-x86_64`
+and `darwin64-arm64`.
 
-[build]
-boost_mysql_mode = separate
+### Android
+
+Cross-compiled with the Android NDK's own Clang (side-by-side NDK,
+`$ANDROID_HOME/ndk/<version>`) — **verified in this rewrite**: all four ABIs build and
+link, and the full integration test suite (97 checks) passed on two real devices
+(arm64-v8a). See `platform/android/detect.py` in the Godot source for the NDK version
+and minimum API level Godot itself requires; the same values are used here.
+
+Android builds one `.so` **per architecture** (`arch=arm64`, `arm32`, `x86_64`,
+`x86_32`), so Boost and OpenSSL are built **four times**, once per arch, each in its own
+folder under `thirdparty/boost-android/<arch>/` and `thirdparty/openssl-android/<arch>/`
+(a `git worktree` per arch, same idea as the Windows cross-build above). Target triples
+and minimum API level (24, matching Godot's own minimum):
+
+| `arch=` | NDK target triple |
+|---|---|
+| `arm64` | `aarch64-linux-android` |
+| `arm32` | `armv7a-linux-androideabi` |
+| `x86_64` | `x86_64-linux-android` |
+| `x86_32` | `i686-linux-android` |
+
+**Boost:** built with `toolset=clang-<name>` pointing at the NDK's per-API-level Clang
+wrapper (`<NDK>/toolchains/llvm/prebuilt/linux-x86_64/bin/<triple>24-clang++`) via a
+`user-config.jam`, `target-os=android`. Unlike Linux/Windows, **only `--with-charconv`**
+is built (not the full Boost tree the other platforms build) — the module only links
+`libboost_charconv`, and skipping the rest noticeably shortens four separate builds.
+
+```jam
+using clang : android_arm64 : /path/to/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++ : <archiver>llvm-ar <ranlib>llvm-ranlib ;
 ```
 
 ```bash
+./b2 -j"$(nproc)" \
+    --user-config=user-config.jam \
+    link=static threading=multi runtime-link=static variant=release \
+    --stagedir="$(pwd)/stage" \
+    toolset=clang-android_arm64 target-os=android \
+    address-model=64 architecture=arm \
+    cxxstd=17 cxxstd-dialect=iso \
+    --with-charconv
+```
+
+(Repeat per arch with the matching toolset/address-model/architecture: `arm32` ->
+`address-model=32 architecture=arm`; `x86_64` -> `address-model=64 architecture=x86`;
+`x86_32` -> `address-model=32 architecture=x86`.)
+
+**OpenSSL:** `./Configure android-arm64|android-arm|android-x86_64|android-x86
+-D__ANDROID_API__=24 no-asm no-ssl3 no-weak-ssl-ciphers no-legacy no-shared no-tests
+no-docs`, with `ANDROID_NDK_ROOT` set and the NDK's `toolchains/llvm/prebuilt/.../bin`
+on the `PATH` (see OpenSSL's own `NOTES-ANDROID.md`).
+
+**`no-asm` is required, not optional.** OpenSSL's hand-written ARM64 assembly for
+`poly1305` (`poly1305-armv9-sve2`) addresses a `.globl` symbol from another translation
+unit with `adrp`/`add :lo12:` (an absolute-page-relative reference). Android's linker
+(`ld.lld`) refuses this when linking a **shared library** (`.so`) — the symbol could be
+overridden at runtime — with `relocation R_AARCH64_ADR_PREL_PG_HI21 cannot be used
+against symbol 'poly1305_blocks_sve2'; recompile with -fPIC`. `-fPIC` alone does not fix
+it, because it is hand-written assembly, not C compiled without `-fPIC`. This never
+shows up on Linux/Windows, where the module links into an **executable**, not a shared
+library, so the symbol-preemption rule the linker is enforcing does not apply there.
+`no-asm` was chosen over patching just that one routine, to avoid the same class of bug
+surfacing later in an untested routine (AES, SHA, ChaCha) — it trades some crypto
+performance for a build that will not silently regress on the next OpenSSL update.
+
+```bash
+export ANDROID_NDK_ROOT=/path/to/ndk
+export PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+
+./Configure android-arm64 -D__ANDROID_API__=24 no-asm \
+    no-ssl3 no-weak-ssl-ciphers no-legacy no-shared no-tests no-docs \
+    --prefix="$(pwd)" --openssldir="$(pwd)"
+make depend
+make -j"$(nproc)"
+```
+
+> The same `install_dev`/self-copy issue as Linux/Windows can happen here (see above):
+> copy `libssl.a`/`libcrypto.a` to `lib/` manually if `make install` fails there.
+
+`mysql/config.android.cfg` already exists in the repository and points at the per-arch
+roots described above.
+
+## Building the module together with Godot
+
+```bash
 cd godot
-scons platform=windows arch=x86_64 target=editor \
+scons platform=linuxbsd arch=x86_64 target=editor \
     custom_modules=../mysql \
     precision=double \
-    d3d12=no \
     -j"$(nproc)"
 ```
 
-`d3d12=no` avoids requiring the Direct3D 12 SDK, which is not part of this module.
-Without this flag SCons stops early asking for `install_d3d12_sdk_windows.py`. Godot on
-Linux, without `use_mingw=1`, already detects and uses MinGW-w64 automatically because it
-does not find MSVC.
+Building with `precision=double` is highly recommended. For Windows (cross-compiled),
+add `d3d12=no` (avoids requiring the Direct3D 12 SDK, not part of this module) and
+`platform=windows`; Godot on Linux, without `use_mingw=1`, already detects and uses
+MinGW-w64 automatically when it does not find MSVC.
 
-### Note
+For Android, build once per architecture — `platform=android` only produces one `.so`
+per invocation:
 
-Verified: Linux and Windows (cross-compiled with MinGW). macOS is waiting for Apple
-hardware to be available, iOS is deferred for the same reason, and Web is out of scope
-for this module: browsers cannot open a raw TCP socket, which the MySQL protocol needs.
-Android has not been tried yet in this rewrite.
+```bash
+cd godot
+scons platform=android arch=arm64 target=template_debug \
+    custom_modules=../mysql \
+    -j"$(nproc)"
+# repeat with arch=arm32, arch=x86_64, arch=x86_32
+```
 
-## 5. Tests
+## Tests
 
 The tests live in `mysql/tests/`.
 
@@ -361,8 +360,36 @@ scons platform=linuxbsd arch=x86_64 target=editor \
 ./bin/godot.linuxbsd.editor.double.x86_64.tests --test --test-case="*MySQL*"
 ```
 
-**Integration test (GDScript).** Runs against a real MySQL/MariaDB server. See
-[`../tests/README.md`](../tests/README.md).
+**Integration test (GDScript), desktop.** Runs against a real MySQL/MariaDB server via
+`--headless --script`. See [`../tests/README.md`](../tests/README.md).
+
+**Integration test, Android.** An exported Android app cannot use `--script` the way
+desktop/Wine can — reasons and the working alternative below. To run
+`tests/smoke_test.gd` on a device:
+
+1. Build a small Godot project whose only content is `tests/smoke_test.gd` (or a symlink
+   to it) and a minimal main scene (a `.tscn` with a single empty `Node` is enough).
+2. In its Project Settings, set **Run > Main Loop Type** to `MySQLSmokeTest` (the
+   `class_name` the script declares) — **do not** rely on `command_line/extra_args =
+   "--script res://smoke_test.gd"`. That argument does reach the native layer intact
+   (visible in `adb logcat`), but was found to silently never execute on Android in this
+   Godot build, reproduced on two different-vendor devices. `main_loop_type` is a
+   supported, documented Godot mechanism and does not have this problem; it does need
+   `run/main_scene` to point at a valid scene too (a bare script is not accepted there).
+3. Export a **debug** APK (`--export-debug`) with that project. `INTERNET` permission is
+   required.
+4. Credentials: an installed app has no shell environment to read `MYSQL_TEST_*` from.
+   `smoke_test.gd` falls back to `user://test_credentials.txt` (`KEY=VALUE` lines) when
+   the environment variables are unset. Push it with `run-as` (needs a debug/debuggable
+   build): `adb push credentials.txt /data/local/tmp/test_credentials.txt && adb shell
+   run-as <package> cp /data/local/tmp/test_credentials.txt files/test_credentials.txt`.
+5. A physical device (not the emulator) reaches the host's MySQL through
+   `adb reverse tcp:3306 tcp:3306`, then the default `MYSQL_TEST_HOST` (`127.0.0.1`)
+   works unchanged. (`10.0.2.2` is an emulator-only alias — do not use it on a real
+   device.)
+6. `adb shell am start -n <package>/<launcher activity>`, then read the result from
+   `adb logcat` (tag `godot`); the script prints `OK`/`FAIL` per check and calls
+   `quit(0)`/`quit(1)` at the end.
 
 **Sanitizers.** Godot has built-in options: add `use_asan=yes use_ubsan=yes`, or
 `use_tsan=yes` (TSan cannot be combined with ASan), to the `scons` line and run the
