@@ -6,59 +6,59 @@
 #include "mysql_result.h"
 
 #include "core/object/ref_counted.h"
+#include "core/os/thread.h"
 #include "core/variant/array.h"
 #include "core/variant/dictionary.h"
 
 #include <boost/asio/executor_work_guard.hpp>
 #include <boost/asio/io_context.hpp>
 
-#include <functional>
-#include <memory>
 #include <string>
-#include <thread>
 
 class MySQLConnection;
+class MySQLPool;
 class PreparedStatementCache;
 class MySQLTransaction;
 class MySQLAsyncOperation;
 class MySQLStreamingCursor;
 
-// MySQLSession — API principal exposta ao GDScript: execute_text/execute_formatted/
-// execute_prepared/execute_script, begin_transaction(). Dona de uma MySQLConnection
-// (própria, no caminho simples, ou emprestada por um MySQLPool — Fase 5) e do seu
-// PreparedStatementCache. Não é thread-safe: uma Session por thread/fluxo de cada vez —
-// ver documentation/design-notes.md.
+// Main class exposed to GDScript: `execute_text()`, `execute_formatted()`,
+// `execute_prepared()`, `execute_script()`, `begin_transaction()` and the asynchronous and
+// streaming variants. It owns a `MySQLConnection` (its own, or one leased from a
+// `MySQLPool`) and the `PreparedStatementCache` of that connection.
 //
-// Precisa de MySQLConfig antes de ser usada: `MySQLSession.new()` (exigido pelo
-// ClassDB pra instanciar via GDScript) cria a Session vazia, e set_config() é quem
-// constrói a MySQLConnection interna de fato. Todo método que precisa de conexão
-// devolve um erro explícito (categoria "mysql_module.client") se chamado antes de
-// set_config() — nunca derrefencia um ponteiro nulo (resolve S4 da auditoria).
+// A session is not thread safe: use one session per thread.
 //
-// Ver documentation/roadmap.md (Fases 2-5).
+// A session needs a `MySQLConfig` before it can be used. `MySQLSession.new()` (required by
+// `ClassDB` to instantiate it from GDScript) creates an empty session, and `set_config()`
+// builds the internal connection. Every method that needs the connection returns an
+// explicit error (category `mysql_module.client`) when called before `set_config()`, and
+// never dereferences a null pointer.
 class MySQLSession : public RefCounted {
 	GDCLASS(MySQLSession, RefCounted);
 
+	typedef boost::asio::executor_work_guard<boost::asio::io_context::executor_type> IOWorkGuard;
+
 	Ref<MySQLConfig> config;
-	std::unique_ptr<MySQLConnection> connection;
-	std::unique_ptr<PreparedStatementCache> statement_cache;
+	MySQLConnection *connection = nullptr;
+	PreparedStatementCache *statement_cache = nullptr;
 
-	// Só definido quando a Session veio de um MySQLPool (Fase 5): devolve a conexão pro
-	// pool ao ser destruída, em vez de destruí-la.
-	std::function<void(std::unique_ptr<MySQLConnection>)> release_to_pool;
+	// Only set when the session was leased from a pool: the connection goes back to the
+	// pool on destruction instead of being destroyed. Holding a reference also keeps the
+	// pool alive for as long as the session exists.
+	Ref<MySQLPool> owner_pool;
 
-	// Thread de I/O dedicada (Fase 5), criada sob demanda no primeiro async_*. O
-	// work_guard impede io_context::run() de retornar quando não há operação pendente
-	// no momento — a thread fica viva entre chamadas assíncronas.
-	std::unique_ptr<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>> io_work_guard;
-	std::thread io_thread;
-	bool io_thread_started = false;
+	// Dedicated I/O thread, started on demand by the first `async_*` call. The work guard
+	// keeps `io_context::run()` from returning while no operation is pending, so the thread
+	// stays alive between asynchronous calls.
+	IOWorkGuard *io_work_guard = nullptr;
+	Thread io_thread;
 
+	static void _io_thread_main(void *p_session);
 	void _ensure_io_thread_started();
 
 	Ref<MySQLResult> _execute_text_std(const std::string &p_sql);
 	Ref<MySQLResult> _execute_formatted_std(const std::string &p_sql, const Array &p_params);
-	Ref<MySQLResult> _execute_prepared_std(const std::string &p_sql, const Array &p_params);
 
 protected:
 	static void _bind_methods();
@@ -67,16 +67,15 @@ public:
 	MySQLSession() = default;
 	~MySQLSession();
 
-	// Uso interno de MySQLPool (Fase 5) — não é bind_method.
-	static Ref<MySQLSession> create_pooled(Ref<MySQLConfig> p_config, std::unique_ptr<MySQLConnection> p_connection, std::function<void(std::unique_ptr<MySQLConnection>)> p_release_to_pool);
+	// Internal use by `MySQLPool`, not bound.
+	static Ref<MySQLSession> create_pooled(const Ref<MySQLConfig> &p_config, MySQLConnection *p_connection, const Ref<MySQLPool> &p_owner_pool);
 
 	void set_config(const Ref<MySQLConfig> &p_config);
 	Ref<MySQLConfig> get_config() const { return config; }
 
-	// Nomeadas *_db de propósito: Object já reserva connect()/close()/is_connected()
-	// pra sinais — usar os mesmos nomes pra "conectar ao banco" ia esconder os métodos
-	// de sinal da classe (viraria impossível fazer session.connect("sinal", callable)
-	// do jeito normal do Godot).
+	// Named `*_db` on purpose: `Object` already reserves `connect()`, `close()` and
+	// `is_connected()` for signals. Reusing those names would hide the signal methods and
+	// make `session.connect("signal", callable)` impossible.
 	Dictionary connect_db();
 	Dictionary close_db();
 	bool is_db_connected() const;
@@ -84,21 +83,19 @@ public:
 	Ref<MySQLResult> execute_text(const String &p_sql);
 	Ref<MySQLResult> execute_formatted(const String &p_sql, const Array &p_params);
 	Ref<MySQLResult> execute_prepared(const String &p_sql, const Array &p_params);
-	// Recebe o conteúdo do script (não um caminho de arquivo — corrige um defeito da
-	// versão anterior). Divide em instruções, respeitando literais entre aspas (não
-	// trata comentários SQL), e executa uma a uma, parando na primeira que falhar. Só
-	// funciona com allow_sql_script_execution habilitado na config.
+	// Takes the script content, not a file path. It splits the content into statements
+	// (see `split_sql_statements()`) and runs them one by one, stopping at the first one
+	// that fails. Only works with `allow_sql_script_execution` enabled in the config.
 	Array execute_script(const String &p_content);
 
 	Ref<MySQLTransaction> begin_transaction();
-	// Uso interno de MySQLTransaction — não é bind_method.
+	// Internal use by `MySQLTransaction`, not bound.
 	Dictionary run_control_statement(const String &p_sql);
 
-	// Fase 5: assíncrono real (thread de I/O dedicada) e streaming.
 	Ref<MySQLAsyncOperation> async_execute_text(const String &p_sql);
 	Ref<MySQLAsyncOperation> async_execute_prepared(const String &p_sql, const Array &p_params);
 	Ref<MySQLStreamingCursor> execute_streaming(const String &p_sql);
 
-	// Uso interno de MySQLPool (Fase 5).
-	MySQLConnection *get_connection() const { return connection.get(); }
+	// Internal use by `MySQLPool`.
+	MySQLConnection *get_connection() const { return connection; }
 };

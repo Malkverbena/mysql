@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 /* boost_mysql_src.cpp */
 
-// Única unidade de compilação que instancia o Boost.MySQL no modo "separate"
-// (config.cfg: boost_mysql_mode = separate).
+// The only translation unit that instantiates Boost.MySQL in "separate" mode
+// (`config.cfg`: `boost_mysql_mode = separate`).
 //
-// Equivale a <boost/mysql/src.hpp>, exceto por impl/connection_pool.ipp: o pool de
-// conexões usa try/catch, que não compila com -fno-exceptions, e este módulo não o usa.
-// Ao atualizar o Boost, compare esta lista com a de boost/mysql/src.hpp.
+// It is equivalent to `<boost/mysql/src.hpp>`, except for `impl/connection_pool.ipp`: the
+// Boost connection pool uses `try`/`catch`, which does not compile with `-fno-exceptions`,
+// and this module has its own pool. When updating Boost, compare this list with the one in
+// `boost/mysql/src.hpp`.
 
 #ifdef BOOST_MYSQL_SEPARATE_COMPILATION
 

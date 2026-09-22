@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 /* throw_exception.cpp */
 
-// Com -fno-exceptions o Boost define BOOST_NO_EXCEPTIONS e deixa boost::throw_exception()
-// sem definição: o programa precisa fornecê-la. Sem exceções não há como recuperar, então
-// qualquer chegada aqui é fatal: registra a mensagem no Godot e aborta.
+// With `-fno-exceptions` Boost defines `BOOST_NO_EXCEPTIONS` and leaves
+// `boost::throw_exception()` undefined, so the program must provide it. Without exceptions
+// there is no way to recover, so reaching this point is always fatal: it logs the message
+// in Godot and aborts.
 //
-// O módulo usa só as sobrecargas com error_code/diagnostics do Boost.MySQL, então isto é
-// uma rede de segurança para invariantes violados dentro do Boost (Asio, MySQL, ...).
+// The module only uses the `error_code` and `diagnostics` overloads of Boost.MySQL, so this
+// is a safety net for invariants violated inside Boost (Asio, MySQL, ...).
 
 #include <boost/throw_exception.hpp>
 

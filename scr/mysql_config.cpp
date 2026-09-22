@@ -10,8 +10,8 @@
 #include <openssl/crypto.h>
 
 void MySQLConfig::_wipe_password() {
-	// OPENSSL_cleanse (não memset) porque o compilador não pode otimizar a escrita
-	// como "morta" antes de destruir/trocar o buffer — resolve S6 da auditoria.
+	// `OPENSSL_cleanse()` instead of `memset()`, because the compiler cannot optimize the
+	// write away as dead before the buffer is destroyed or replaced.
 	if (!password.empty()) {
 		OPENSSL_cleanse(password.data(), password.size());
 	}
@@ -72,10 +72,9 @@ String MySQLConfig::get_database() const {
 }
 
 void MySQLConfig::set_transport_mode(TransportMode p_mode) {
-	// Regra fixa: toda configuração insegura emite warning no momento em que é
-	// definida (ver design-notes.md).
+	// Every insecure setting emits a warning at the moment it is set.
 	if (p_mode == TCP_TLS_DISABLED) {
-		WARN_PRINT("MySQLConfig: transport_mode = TCP_TLS_DISABLED desliga TLS — a conexão trafega credenciais e dados sem criptografia.");
+		WARN_PRINT("MySQLConfig: transport_mode = TCP_TLS_DISABLED turns TLS off. The connection sends credentials and data unencrypted.");
 	}
 	transport_mode = p_mode;
 }
@@ -102,7 +101,7 @@ MySQLConfig::JsonResultMode MySQLConfig::get_json_result_mode() const {
 
 void MySQLConfig::set_allow_sql_script_execution(bool p_allowed) {
 	if (p_allowed) {
-		WARN_PRINT("MySQLConfig: allow_sql_script_execution = true habilita execução manual de scripts SQL (múltiplos comandos de uma vez).");
+		WARN_PRINT("MySQLConfig: allow_sql_script_execution = true enables manual execution of SQL scripts (several commands at once).");
 	}
 	allow_sql_script_execution = p_allowed;
 }
@@ -113,7 +112,7 @@ bool MySQLConfig::get_allow_sql_script_execution() const {
 
 void MySQLConfig::set_allow_multi_queries(bool p_allowed) {
 	if (p_allowed) {
-		WARN_PRINT("MySQLConfig: allow_multi_queries = true habilita múltiplas instruções por chamada de execução (CLIENT_MULTI_STATEMENTS).");
+		WARN_PRINT("MySQLConfig: allow_multi_queries = true enables several statements per execution call (CLIENT_MULTI_STATEMENTS).");
 	}
 	allow_multi_queries = p_allowed;
 }
@@ -128,6 +127,15 @@ void MySQLConfig::set_async_timeout_ms(int p_timeout_ms) {
 
 void MySQLConfig::set_max_buffer_size(int p_size) {
 	max_buffer_size = p_size;
+}
+
+void MySQLConfig::set_max_result_bytes(int64_t p_size) {
+	max_result_bytes = p_size;
+}
+
+void MySQLConfig::set_statement_cache_size(int p_size) {
+	ERR_FAIL_COND_MSG(p_size < 1, "MySQLConfig: statement_cache_size must be at least 1.");
+	statement_cache_size = p_size;
 }
 
 void MySQLConfig::_bind_methods() {
@@ -148,7 +156,7 @@ void MySQLConfig::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "user"), "set_user", "get_user");
 
 	ClassDB::bind_method(D_METHOD("set_password", "password"), &MySQLConfig::set_password);
-	// Sem get_password() de propósito — ver comentário no header (S6 da auditoria).
+	// There is no get_password() on purpose. See the comment in the header.
 
 	ClassDB::bind_method(D_METHOD("set_database", "database"), &MySQLConfig::set_database);
 	ClassDB::bind_method(D_METHOD("get_database"), &MySQLConfig::get_database);
@@ -181,6 +189,14 @@ void MySQLConfig::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_max_buffer_size", "size"), &MySQLConfig::set_max_buffer_size);
 	ClassDB::bind_method(D_METHOD("get_max_buffer_size"), &MySQLConfig::get_max_buffer_size);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_buffer_size"), "set_max_buffer_size", "get_max_buffer_size");
+
+	ClassDB::bind_method(D_METHOD("set_max_result_bytes", "size"), &MySQLConfig::set_max_result_bytes);
+	ClassDB::bind_method(D_METHOD("get_max_result_bytes"), &MySQLConfig::get_max_result_bytes);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_result_bytes"), "set_max_result_bytes", "get_max_result_bytes");
+
+	ClassDB::bind_method(D_METHOD("set_statement_cache_size", "size"), &MySQLConfig::set_statement_cache_size);
+	ClassDB::bind_method(D_METHOD("get_statement_cache_size"), &MySQLConfig::get_statement_cache_size);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "statement_cache_size"), "set_statement_cache_size", "get_statement_cache_size");
 
 	BIND_ENUM_CONSTANT(TCP_TLS_DISABLED);
 	BIND_ENUM_CONSTANT(TCP_TLS_PREFERRED);

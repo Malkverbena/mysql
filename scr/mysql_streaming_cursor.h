@@ -15,20 +15,18 @@
 class MySQLConnection;
 class MySQLSession;
 
-// MySQLStreamingCursor — leitura incremental (next_batch()/has_more()/close()) sobre
-// execution_state/read_some_rows do Boost.MySQL; is_ok()/get_error() (Dictionary). Se
-// fechada no meio, drena o resto do resultset: o protocolo exige o resultset drenado
-// por completo antes do próximo comando na mesma conexão, senão a conexão desalinha
-// (mesmo efeito do S8 da auditoria, só que causado pelo consumidor em vez de um bug de
-// leitura). Só uma por conexão por vez — quem quiser rodar outra query espera esta
-// fechar. Síncrona nesta fase (bloqueia em next_batch()); uma variante assíncrona é uma
-// extensão natural sobre a mesma engine da Fase 5, mas não faz parte deste lote.
+// Incremental reading (`next_batch()`, `has_more()`, `close()`) on top of `execution_state`
+// and `read_some_rows()` from Boost.MySQL, with `is_ok()` and `get_error()` (a
+// `Dictionary`). If it is closed midway, it drains the rest of the resultset: the protocol
+// requires the resultset to be fully read before the next command on the same connection,
+// otherwise the connection gets out of sync. Only one cursor can be open per connection at
+// a time; anyone who wants to run another query waits for it to close. It is synchronous
+// (it blocks in `next_batch()`); an asynchronous variant would be a natural extension on
+// the same I/O thread engine.
 //
-// Guarda um Ref<MySQLSession> (não a MySQLConnection direto) pra manter a Session — e a
-// conexão por trás dela — viva enquanto o cursor existir, pela mesma razão de
-// MySQLTransaction (evita o padrão de ponteiro pendente do S3 da auditoria).
-//
-// Ver documentation/roadmap.md (Fase 5).
+// It holds a `Ref<MySQLSession>` (not the `MySQLConnection` directly) to keep the session,
+// and the connection behind it, alive while the cursor exists, for the same reason as
+// `MySQLTransaction`.
 class MySQLStreamingCursor : public RefCounted {
 	GDCLASS(MySQLStreamingCursor, RefCounted);
 
@@ -44,7 +42,7 @@ protected:
 	static void _bind_methods();
 
 public:
-	// Uso interno de MySQLSession::execute_streaming() — não são bind_method.
+	// Internal use by `MySQLSession::execute_streaming()`, not bound.
 	static Ref<MySQLStreamingCursor> start(Ref<MySQLSession> p_session, MySQLConnection &p_connection, const Ref<MySQLConfig> &p_config, const std::string &p_sql);
 	static Ref<MySQLStreamingCursor> from_error(const Dictionary &p_error);
 

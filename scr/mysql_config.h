@@ -7,18 +7,15 @@
 
 #include <string>
 
-// MySQLConfig — configuração de conexão: credenciais, transport_mode, tinyint1_mode,
-// json_result_mode, allow_sql_script_execution, allow_multi_queries. Pensada pra ser
-// imutável depois do primeiro connect() (convenção de uso, não travada em C++ — quem
-// monta a conexão, MySQLSession/MySQLPool na Fase 2+, não deve reconfigurar um
-// MySQLConfig já em uso). Compartilhada por referência entre todas as MySQLConnection
-// nascidas dela, inclusive dentro de um MySQLPool.
+// Connection configuration: credentials, `transport_mode`, `tinyint1_mode`,
+// `json_result_mode`, `allow_sql_script_execution` and `allow_multi_queries`. It is meant
+// to be immutable after the first `connect_db()` (a usage convention, not enforced in C++:
+// whoever builds the connection must not reconfigure a `MySQLConfig` already in use). It is
+// shared by reference between all the `MySQLConnection`s created from it, including the
+// ones inside a `MySQLPool`.
 //
-// Sem get_password(): a senha nunca é devolvida ao GDScript (resolve S6 da auditoria —
-// a versão anterior do módulo expunha a senha em texto puro). Fica só em
-// get_password_std(), de uso interno (Fase 2), nunca vinculada via ClassDB.
-//
-// Ver documentation/design-notes.md e documentation/roadmap.md (Fases 2-5).
+// There is no `get_password()`: the password is never returned to GDScript. It is only
+// available through `get_password_std()`, for internal use, which is never bound.
 class MySQLConfig : public RefCounted {
 	GDCLASS(MySQLConfig, RefCounted);
 
@@ -41,7 +38,9 @@ private:
 	int port = 3306;
 	String unix_socket_path;
 	String user;
-	std::string password; // Nunca exposta de volta ao GDScript — ver S6 da auditoria.
+	// A `std::string` on purpose: the buffer is wiped explicitly with `OPENSSL_cleanse()`
+	// and Boost.MySQL takes the password as a `string_view`. Never exposed to GDScript.
+	std::string password;
 	String database;
 
 	TransportMode transport_mode = TCP_TLS_REQUIRED;
@@ -50,11 +49,30 @@ private:
 	bool allow_sql_script_execution = false;
 	bool allow_multi_queries = false;
 
-	// Timeout de operações assíncronas (Fase 5, resolve parte do S9). 0 = sem timeout.
+	// Timeout of asynchronous operations. 0 means no timeout. Applied per network round trip
+	// (per Boost.MySQL async call chained while reading a result), not once for the whole
+	// logical execute_*() call: a result with many batches/resultsets gets a fresh budget on
+	// every hop instead of one shared deadline for all of them.
 	int async_timeout_ms = 30000;
-	// Limite de tamanho de pacote/linha (S9); o Boost.MySQL já vem com um padrão de
-	// 64MB, aqui só o expomos como opção em vez de ficar embutido sem controle.
+	// Limit on the size of a packet or row. Boost.MySQL already defaults to 64 MB; this only
+	// exposes it as an option instead of leaving it hardcoded. This is NOT a limit on the
+	// total size of a result (see `max_result_bytes`): Boost.MySQL enforces it per protocol
+	// packet, so it bounds a single row, not the sum of all of them.
 	int max_buffer_size = 0x4000000;
+	// Limit on the total estimated size (all resultsets, all rows) of a single execute_*()
+	// result. 0 means no limit. Unlike `max_buffer_size`, this is enforced by reading the
+	// result incrementally (`start_execution`/`read_some_rows`) and aborting as soon as the
+	// running total goes over the limit, instead of letting Boost.MySQL materialize the whole
+	// result first and checking afterwards - so it actually bounds peak memory instead of just
+	// failing after the fact. The size counted per cell is an estimate (exact byte length for
+	// strings/blobs, a fixed small cost for every other type), not the wire size.
+	int64_t max_result_bytes = 0;
+	// Max number of prepared statements kept per connection by `PreparedStatementCache`
+	// (LRU: the least recently used one is closed server-side to make room). Kept small
+	// enough that `MySQLPool::max_size` connections, each filling this cache with distinct
+	// SQL text, stay comfortably under a MySQL/MariaDB server's default global
+	// `max_prepared_stmt_count` (16382) with headroom for other sessions on the same server.
+	int statement_cache_size = 512;
 
 	void _wipe_password();
 
@@ -75,7 +93,7 @@ public:
 	String get_user() const;
 
 	void set_password(const String &p_password);
-	// Uso interno (MySQLConnection, Fase 2) — não é bind_method, não vaza pro GDScript.
+	// Internal use by `MySQLConnection`. Not bound, so it never reaches GDScript.
 	const std::string &get_password_std() const;
 
 	void set_database(const String &p_database);
@@ -101,6 +119,12 @@ public:
 
 	void set_max_buffer_size(int p_size);
 	int get_max_buffer_size() const { return max_buffer_size; }
+
+	void set_max_result_bytes(int64_t p_size);
+	int64_t get_max_result_bytes() const { return max_result_bytes; }
+
+	void set_statement_cache_size(int p_size);
+	int get_statement_cache_size() const { return statement_cache_size; }
 
 	MySQLConfig() = default;
 	~MySQLConfig();

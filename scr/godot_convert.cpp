@@ -6,8 +6,8 @@
 namespace mysql_module {
 
 std::string to_std_string(const String &p_string) {
-	// CharString utf8 vive até o fim desta função — get_data() só é usado enquanto ela
-	// está viva, e o conteúdo é copiado para o std::string antes de retornar.
+	// The `CharString` lives until the end of this function, and its content is copied
+	// into the `std::string` before returning.
 	CharString utf8 = p_string.utf8();
 	return std::string(utf8.get_data(), (size_t)utf8.length());
 }

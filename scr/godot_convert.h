@@ -6,21 +6,19 @@
 
 #include <string>
 
-// Fronteira entre tipos do Godot e std::string, usada em todo o módulo (camada interna
-// que conversa com o Boost — ver documentation/design-notes.md, regra de STL só aqui).
+// Boundary between Godot strings and `std::string`, used wherever the module talks to
+// Boost.MySQL, whose API takes and returns `std::string` and `string_view`.
 //
-// Regra fixa (Fase 1 do roadmap, resolve S3/S12 da auditoria): nunca guardar o retorno
-// de String::utf8().get_data() numa variável própria — o CharString temporário é
-// destruído ao fim da expressão que o criou e o ponteiro fica pendente. As funções
-// abaixo sempre copiam o conteúdo para um std::string antes de devolver.
+// Rule: never keep the result of `String::utf8().get_data()` in a variable. The temporary
+// `CharString` is destroyed at the end of the expression that created it, which leaves the
+// pointer dangling. These functions always copy the content before returning.
 namespace mysql_module {
 
-// Copia o conteúdo UTF-8 de uma Godot String para um std::string próprio.
+// Copies the UTF-8 content of a Godot `String` into an owned `std::string`.
 std::string to_std_string(const String &p_string);
 
-// Constrói uma Godot String a partir de bytes UTF-8 do servidor (conexão sempre em
-// utf8mb4 — ver design-notes.md), com comprimento explícito. Nunca assume terminador
-// nulo (resolve S11 da auditoria).
+// Builds a Godot `String` from UTF-8 bytes sent by the server (the connection is always
+// `utf8mb4`), with an explicit length. It never assumes a NUL terminator.
 String to_godot_string(const char *p_data, size_t p_len);
 String to_godot_string(const std::string &p_string);
 

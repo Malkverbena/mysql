@@ -17,7 +17,7 @@ Ref<MySQLTransaction> MySQLTransaction::create(Ref<MySQLSession> p_session) {
 
 Dictionary MySQLTransaction::commit() {
 	if (finished) {
-		return mysql_module::make_client_error_dict("MySQLTransaction: commit() chamado numa transação já finalizada.");
+		return mysql_module::make_client_error_dict("MySQLTransaction: commit() called on a transaction that is already finished.");
 	}
 	finished = true;
 	return session->run_control_statement("COMMIT");
@@ -25,17 +25,17 @@ Dictionary MySQLTransaction::commit() {
 
 Dictionary MySQLTransaction::rollback() {
 	if (finished) {
-		return mysql_module::make_client_error_dict("MySQLTransaction: rollback() chamado numa transação já finalizada.");
+		return mysql_module::make_client_error_dict("MySQLTransaction: rollback() called on a transaction that is already finished.");
 	}
 	finished = true;
 	return session->run_control_statement("ROLLBACK");
 }
 
 MySQLTransaction::~MySQLTransaction() {
-	// Rede de segurança: sem commit()/rollback() explícito, a transação não fica
-	// pendurada aberta na conexão indefinidamente.
+	// Safety net: without an explicit commit() or rollback(), the transaction would stay
+	// open on the connection indefinitely.
 	if (!finished && session.is_valid()) {
-		WARN_PRINT("MySQLTransaction: destruída sem commit()/rollback() explícito — fazendo ROLLBACK automático.");
+		WARN_PRINT("MySQLTransaction: Destroyed without an explicit commit() or rollback(). Rolling back automatically.");
 		session->run_control_statement("ROLLBACK");
 	}
 }

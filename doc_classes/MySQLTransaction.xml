@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MySQLTransaction" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A transaction started by [method MySQLSession.begin_transaction]: [method commit] or [method rollback] it.
+	</brief_description>
+	<description>
+		Returned by [method MySQLSession.begin_transaction], which already ran [code]START TRANSACTION[/code]. Run statements through the same [MySQLSession] as usual, then call [method commit] or [method rollback] to end the transaction.
+		If every reference to this [MySQLTransaction] is dropped without either having been called, it rolls back automatically as a safety net when it is destroyed (a warning is printed). Relying on this is not a substitute for calling [method commit]/[method rollback] explicitly: it only exists to avoid leaving a transaction open by accident, for example if an early [code]return[/code] skips the intended call.
+		Holds a reference to the [MySQLSession] it was created from, keeping it (and its connection) alive for as long as the transaction exists.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="commit">
+			<return type="Dictionary" />
+			<description>
+				Runs [code]COMMIT[/code]. Returns an empty [Dictionary] on success, or an error [Dictionary] (same shape as [method MySQLResult.get_error]) otherwise — including when called on a transaction that has already been committed or rolled back.
+			</description>
+		</method>
+		<method name="rollback">
+			<return type="Dictionary" />
+			<description>
+				Runs [code]ROLLBACK[/code]. Returns an empty [Dictionary] on success, or an error [Dictionary] (same shape as [method MySQLResult.get_error]) otherwise — including when called on a transaction that has already been committed or rolled back.
+			</description>
+		</method>
+	</methods>
+</class>
