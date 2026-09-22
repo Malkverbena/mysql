@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: MIT
 # config.py
 
 

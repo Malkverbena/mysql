@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* register_types.cpp */
 
 #include "register_types.h"

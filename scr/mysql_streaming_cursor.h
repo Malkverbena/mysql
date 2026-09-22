@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* mysql_streaming_cursor.h */
 #pragma once
 

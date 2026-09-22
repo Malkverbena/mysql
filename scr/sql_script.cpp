@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* sql_script.cpp */
 
 #include "sql_script.h"

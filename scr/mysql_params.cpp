@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* mysql_params.cpp */
 
 #include "mysql_params.h"

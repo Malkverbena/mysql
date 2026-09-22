@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* mysql_type_convert.cpp */
 
 #include "mysql_type_convert.h"

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* throw_exception.cpp */
 
 // With `-fno-exceptions` Boost defines `BOOST_NO_EXCEPTIONS` and leaves

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 /* test_mysql_type_convert.h */
 #pragma once
 

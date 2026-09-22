@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: MIT
 # tests/smoke_test.gd
 #
 # Local integration test against a real MySQL/MariaDB server. It is not a unit test: it
@@ -87,7 +86,6 @@ func read_credential(name: String) -> String:
 	if not value.is_empty():
 		return value
 	return _read_credentials_file().get(name, "")
-	return ""
 
 
 func make_config(host: String, port: int, user: String, password: String, database: String) -> MySQLConfig:
