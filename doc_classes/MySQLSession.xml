@@ -49,7 +49,7 @@
 			<param index="0" name="sql" type="String" />
 			<param index="1" name="params" type="Array" />
 			<description>
-				Runs [code]sql[/code] with [code]?[/code] placeholders filled in from [code]params[/code], escaped by Boost.MySQL itself (never by the module's own code) and sent as a single formatted text query, not a prepared statement. Blocks until the server answers. Fails explicitly, without running anything, if the number of placeholders and parameters do not match, or if a parameter is of an unsupported [Variant] type.
+				Runs [code]sql[/code] with [code]?[/code] placeholders filled in from [code]params[/code], escaped by Boost.MySQL itself (never by the module's own code) and sent as a single formatted text query, not a prepared statement. Blocks until the server answers. Fails explicitly, without running anything, if the number of placeholders and parameters do not match, or if a parameter is of an unsupported [Variant] type. A [Dictionary] parameter is read as [code]DATE[/code]/[code]DATETIME[/code]/[code]TIME[/code], using the same shape [method MySQLResult.get_rows] returns for that type.
 			</description>
 		</method>
 		<method name="execute_prepared">
@@ -57,7 +57,7 @@
 			<param index="0" name="sql" type="String" />
 			<param index="1" name="params" type="Array" />
 			<description>
-				Runs [code]sql[/code] as a server-side prepared statement bound to [code]params[/code]. The prepared statement is cached per connection (see [member MySQLConfig.statement_cache_size]), so calling this repeatedly with the same [code]sql[/code] text only prepares it once. Blocks until the server answers. Fails explicitly if the number of parameters does not match what the statement expects, or if a parameter is of an unsupported [Variant] type.
+				Runs [code]sql[/code] as a server-side prepared statement bound to [code]params[/code]. The prepared statement is cached per connection (see [member MySQLConfig.statement_cache_size]), so calling this repeatedly with the same [code]sql[/code] text only prepares it once. Blocks until the server answers. Fails explicitly if the number of parameters does not match what the statement expects, or if a parameter is of an unsupported [Variant] type. A [Dictionary] parameter is read as [code]DATE[/code]/[code]DATETIME[/code]/[code]TIME[/code], using the same shape [method MySQLResult.get_rows] returns for that type.
 			</description>
 		</method>
 		<method name="execute_script">
