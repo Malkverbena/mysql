@@ -13,10 +13,30 @@
 #   MYSQL_TEST_HOST (default 127.0.0.1), MYSQL_TEST_PORT (default 3306),
 #   MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, MYSQL_TEST_DATABASE (required).
 #
+# Android has no shell environment to inherit, and an exported activity strips
+# command-line Intent extras by default (GodotActivity.shouldSanitizeLaunchIntent()), so
+# on that platform the same names are instead read from KEY=VALUE lines of a file at
+# user:// (getFilesDir(), the app's private internal storage — needs `run-as` to reach
+# from adb, since it is not externally writable), e.g., for a debug-signed/debuggable
+# export:
+#   adb push credentials.txt /data/local/tmp/test_credentials.txt
+#   adb shell run-as <package> cp /data/local/tmp/test_credentials.txt files/test_credentials.txt
+# Environment variables are tried first everywhere, so desktop/Wine usage is unchanged.
+#
 # It creates and drops its own table (t_mysql_module_smoke_test) in the given schema and
 # touches nothing else in the database.
+#
+# class_name lets this script also run as a packaged app's main loop (Project Settings ->
+# Application -> Run -> Main Loop Type, with any minimal Main Scene set). This is how the
+# Android smoke test runs it: `--script`, baked into the export as
+# command_line/extra_args, reaches the native layer (confirmed in logcat) but silently
+# never executes on Android in this Godot build (reproduced on two different devices) —
+# main_loop_type is the workaround. See notes/android_smoke_project/ in the mysql_dev
+# workspace (outside this repository).
 
 extends SceneTree
+
+class_name MySQLSmokeTest
 
 const TABLE := "t_mysql_module_smoke_test"
 
@@ -36,6 +56,38 @@ func check(condition: bool, description: String) -> void:
 func fail_and_quit(message: String) -> void:
 	printerr(message)
 	quit(1)
+
+
+# Cached on first call: the KEY=VALUE lines of user://test_credentials.txt, if present
+# (the Android fallback; see the file header). Parsed once, not once per credential.
+var _credentials_file: Dictionary
+var _credentials_file_read: bool = false
+
+
+func _read_credentials_file() -> Dictionary:
+	if _credentials_file_read:
+		return _credentials_file
+	_credentials_file_read = true
+	var file := FileAccess.open("user://test_credentials.txt", FileAccess.READ)
+	if file == null:
+		return _credentials_file
+	while not file.eof_reached():
+		var line := file.get_line()
+		var separator := line.find("=")
+		if separator > 0:
+			_credentials_file[line.substr(0, separator)] = line.substr(separator + 1)
+	return _credentials_file
+
+
+# Environment variables first (desktop/Wine); falls back to user://test_credentials.txt
+# (Android, which has no shell environment to inherit and strips Intent command-line args
+# from an exported activity by default).
+func read_credential(name: String) -> String:
+	var value := OS.get_environment(name)
+	if not value.is_empty():
+		return value
+	return _read_credentials_file().get(name, "")
+	return ""
 
 
 func make_config(host: String, port: int, user: String, password: String, database: String) -> MySQLConfig:
@@ -85,14 +137,14 @@ func _pool_worker(pool: MySQLPool, index: int) -> int:
 
 
 func _initialize() -> void:
-	var host := OS.get_environment("MYSQL_TEST_HOST")
+	var host := read_credential("MYSQL_TEST_HOST")
 	if host.is_empty():
 		host = "127.0.0.1"
-	var port_str := OS.get_environment("MYSQL_TEST_PORT")
+	var port_str := read_credential("MYSQL_TEST_PORT")
 	var port := 3306 if port_str.is_empty() else int(port_str)
-	var user := OS.get_environment("MYSQL_TEST_USER")
-	var password := OS.get_environment("MYSQL_TEST_PASSWORD")
-	var database := OS.get_environment("MYSQL_TEST_DATABASE")
+	var user := read_credential("MYSQL_TEST_USER")
+	var password := read_credential("MYSQL_TEST_PASSWORD")
+	var database := read_credential("MYSQL_TEST_DATABASE")
 
 	if user.is_empty() or password.is_empty() or database.is_empty():
 		fail_and_quit("smoke_test: set MYSQL_TEST_USER, MYSQL_TEST_PASSWORD and MYSQL_TEST_DATABASE in the environment.")
