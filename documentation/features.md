@@ -97,7 +97,7 @@ flowchart LR
 shipped to players.** It opens a real network connection to a MySQL/MariaDB server using
 credentials that live in `MySQLConfig`; anyone who can reach an exported game can also
 reach whatever that connection can reach. If the module ends up in a client build at all,
-the database user it connects with must have the minimum privileges the game actually
+the database user it connects with must have the minimum privileges the game
 needs (for example, only `SELECT`/`INSERT` on specific tables, never a database
 administrator account), and `transport_mode` should stay at `TCP_TLS_REQUIRED` (the
 default) unless there is a specific, trusted reason not to.
@@ -140,22 +140,37 @@ universal.
   (capability negotiated with the server).
 * **Streaming:** incremental reading of large results (`MySQLStreamingCursor`), without
   loading everything in memory at once.
-* Real asynchronous methods: they do not block the calling thread (unlike earlier
-  versions of the module). Each `async_*` call returns a `MySQLAsyncOperation` that can
-  be awaited (`var result = await op.completed`). **Use `await`, not a busy-wait loop**
-  (`while not op.is_finished(): ...`): such a loop never gives control back to the
-  `SceneTree` to run frames, and running frames is what delivers the result — the
-  operation does finish, it is just never observed. **Keep the `MySQLSession` (or the
-  `MySQLPool` it came from) referenced until the operation finishes**: if the only
-  reference goes out of scope first, the session is destroyed and its I/O thread stops
-  in the middle of the operation.
-* A session runs one operation at a time. Starting an `async_*` call while another one is
-  still in flight on the same session does not queue it: the second operation finishes
-  with an explicit error (category `mysql.client`), and the first one is not affected.
-  Use one session per parallel operation, for example leased from a `MySQLPool`.
+* **Asynchronous methods** that run without blocking the calling thread. See
+  "Asynchronous methods" below.
 * Transactions (`MySQLTransaction`, obtained via `MySQLSession.begin_transaction()`) and
   a connection pool (`MySQLPool`), with multithreading support — each thread uses its
   own `MySQLSession`, never a connection shared between threads at the same time.
+
+### Asynchronous methods
+
+Each `async_*` call runs on a dedicated I/O thread and returns immediately, without
+blocking the calling thread (earlier versions of the module blocked the caller instead).
+`async_execute_text()` and `async_execute_prepared()` each return a
+`MySQLAsyncOperation`; `await` its `completed` signal to get the `MySQLResult`:
+
+```gdscript
+var result = await session.async_execute_text("SELECT SLEEP(1)").completed
+```
+
+**Always `await` the operation; never poll it in a busy-wait loop**
+(`while not op.is_finished(): pass`). A busy-wait loop blocks the `SceneTree` from
+processing frames, and processing frames is what delivers the result back to the caller.
+The operation still finishes — the loop never notices.
+
+**Keep the `MySQLSession` (or the `MySQLPool` it came from) alive until the operation
+finishes.** If every reference to the session goes out of scope first, Godot frees the
+session and stops its I/O thread mid-operation.
+
+A session processes one asynchronous operation at a time. Starting a second `async_*`
+call while the first one is still running does not queue the second call — it fails
+immediately with an explicit error (category `mysql.client`), while the first operation
+keeps running unaffected. Run parallel operations from separate sessions, for example one
+session per operation leased from a `MySQLPool`.
 
 ### Automatic rollback
 
@@ -180,9 +195,9 @@ for longer than needed, until Godot's reference counting destroys the object.
 * `max_result_bytes` (default `0`, no limit): limits the total estimated size (every
   resultset, every row added up) of a single `execute_*`/`async_execute_*` call. Enforced
   by reading the result incrementally and aborting as soon as the running total goes over
-  the limit — the call fails explicitly with a client-side error instead of the result
-  being silently truncated, and peak memory is actually bounded instead of only being
-  checked after the fact. The size counted per cell is an estimate (the exact byte length
+  the limit — the call fails explicitly with a client-side error instead of silently
+  truncating the result, and this bounds peak memory instead of only checking it after
+  the fact. The size counted per cell is an estimate (the exact byte length
   for strings/blobs, a small fixed cost for every other type), not the protocol wire size.
   Does not apply to `MySQLStreamingCursor`, which already reads incrementally and hands
   control back to the caller between batches.
@@ -249,8 +264,8 @@ Used by `execute_formatted()`, `execute_prepared()` and `async_execute_prepared(
 
 > ⚠️ **On MariaDB, `PARSED_VARIANT` behaves like `RAW_STRING`.** Automatic detection of
 > which column is JSON depends on the server reporting a distinct `JSON` type in the
-> metadata — MySQL does that, but **MariaDB does not**: there, `JSON` is just an alias
-> of `LONGTEXT` with a `CHECK` constraint behind it, and the column arrives as plain
+> metadata — MySQL does that, but **MariaDB does not**: there, `JSON` is an alias of
+> `LONGTEXT` with a `CHECK` constraint behind it, and the column arrives as plain
 > text. To convert JSON explicitly regardless of the database, use
 > `get_parsed_json(resultset, row, column)` — it does not depend on the column type and
 > parses whatever text you point at.
@@ -264,8 +279,8 @@ Confirmed targets for this rewrite: Linux, Windows, macOS, Android.
   Wine against a real server, including the asynchronous methods (native IOCP on
   Windows).
 * **Android (arm64-v8a, armeabi-v7a, x86_64, x86_32)**: cross-compiled with the NDK; the
-  full integration test suite (97 checks) verified on two real devices (arm64-v8a), not
-  just an emulator.
+  full integration test suite (97 checks) verified on two real physical devices
+  (arm64-v8a), not an emulator.
 * **macOS**: not done yet on this rewrite — waiting on Apple hardware to build the SDK.
 
 See [instructions.md](instructions.md) for the exact build steps per platform.

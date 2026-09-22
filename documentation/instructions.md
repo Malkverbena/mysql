@@ -14,7 +14,7 @@ and the extra `scons` options it reads.
 **Versions tested in this rewrite:** Boost `boost-1.92.0`, OpenSSL `openssl-4.0.2`
 (stable tags, no development submodules). The `SCsub` checks the minimum versions
 (Boost >= 1.85, OpenSSL >= 3.0) and the headers before building. Newer versions probably
-work, but only the ones above were actually tested.
+work, but this rewrite tested only the versions above.
 
 This module **does not download or build** Boost and OpenSSL. You must build them
 manually before building Godot with the module. This guide gives the steps and the flags
@@ -150,8 +150,8 @@ make -j"$(nproc)"
 make install
 ```
 
-For a non-x86_64 Linux target (e.g. `linux-aarch64`), just change the `Configure`
-target; the Boost flags stay the same except `architecture`/`address-model`.
+For a non-x86_64 Linux target (e.g. `linux-aarch64`), change the `Configure` target; the
+Boost flags stay the same except `architecture`/`address-model`.
 
 ### Windows
 
@@ -229,10 +229,10 @@ Without it `Configure` uses the native `gcc` and the result is not a Windows bin
 ### macOS
 
 Not attempted yet in this rewrite — waiting on access to Apple hardware to generate the
-cross-compilation SDK (`osxcross`). Basic support existed before this rewrite (see the
-module's commit history); it will be reassessed against the current architecture once
-that hardware is available. Native OpenSSL `Configure` targets are `darwin64-x86_64`
-and `darwin64-arm64`.
+cross-compilation SDK (`osxcross`). The module supported macOS before this rewrite (see
+its commit history); this rewrite will reassess that support against the current
+architecture once Apple hardware is available. Native OpenSSL `Configure` targets are
+`darwin64-x86_64` and `darwin64-arm64`.
 
 ### Android
 
@@ -294,8 +294,9 @@ against symbol 'poly1305_blocks_sve2'; recompile with -fPIC`. `-fPIC` alone does
 it, because it is hand-written assembly, not C compiled without `-fPIC`. This never
 shows up on Linux/Windows, where the module links into an **executable**, not a shared
 library, so the symbol-preemption rule the linker is enforcing does not apply there.
-`no-asm` was chosen over patching just that one routine, to avoid the same class of bug
-surfacing later in an untested routine (AES, SHA, ChaCha) — it trades some crypto
+This module uses a blanket `no-asm` instead of patching only that one routine, to avoid
+the same class of bug surfacing later in an untested routine (AES, SHA, ChaCha) — it
+trades some crypto
 performance for a build that will not silently regress on the next OpenSSL update.
 
 ```bash

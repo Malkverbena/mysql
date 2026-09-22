@@ -64,7 +64,7 @@
 			<return type="Array" />
 			<param index="0" name="content" type="String" />
 			<description>
-				Splits [code]content[/code] into individual statements (correctly, even with semicolons inside quoted string literals) and runs them one by one with [method execute_text], stopping at the first one that fails. Returns an [Array] of [MySQLResult], one per statement that was actually run. Refused (returns a single error result) unless [member MySQLConfig.allow_sql_script_execution] is [code]true[/code] on this session's config. Takes the script's content directly, not a file path.
+				Splits [code]content[/code] into individual statements (correctly, even with semicolons inside quoted string literals) and runs them one by one with [method execute_text], stopping at the first one that fails. Returns an [Array] of [MySQLResult], one per statement that ran. Refused (returns a single error result) unless [member MySQLConfig.allow_sql_script_execution] is [code]true[/code] on this session's config. Takes the script's content directly, not a file path.
 			</description>
 		</method>
 		<method name="execute_streaming">
