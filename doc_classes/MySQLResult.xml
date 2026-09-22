@@ -4,8 +4,8 @@
 		The outcome of an [code]execute_*[/code] call: rows, metadata and error, never an exception.
 	</brief_description>
 	<description>
-		Returned by every synchronous [code]execute_*[/code] method of [MySQLSession] (and, inside a [MySQLAsyncOperation], by the asynchronous ones). Always check [method is_ok] before reading rows: on failure, [method get_rows] and the other accessors return empty values instead of anything meaningful, and the actual reason is in [method get_error].
-		Holds every resultset of the call, in order (usually just one; more than one when [member MySQLConfig.allow_multi_queries] is on, or when running a stored procedure that returns several). Most accessors take a [code]resultset[/code] index, defaulting to [code]0[/code].
+		Returned by every synchronous [code]execute_*[/code] method of [MySQLSession] (and, inside a [MySQLAsyncOperation], by the asynchronous ones). Always check [method is_ok] before reading rows: on failure, [method get_rows] and the other accessors return empty values instead of anything meaningful, and the reason is in [method get_error].
+		Holds every resultset of the call, in order (usually one; more than one when [member MySQLConfig.allow_multi_queries] is on, or when running a stored procedure that returns several). Most accessors take a [code]resultset[/code] index, defaulting to [code]0[/code].
 		Rows are returned as an [Array] of [Array]s, one inner [Array] per row with the values in column order, never as a [Dictionary] keyed by column name: a [code]JOIN[/code] can produce duplicate column names, which a [Dictionary] could not keep separate.
 	</description>
 	<tutorials>
@@ -51,7 +51,7 @@
 			<param index="1" name="row" type="int" />
 			<param index="2" name="column" type="int" />
 			<description>
-				Parses one cell as JSON and returns the result (cached, so calling this again for the same cell is free). Only makes sense when [member MySQLConfig.json_result_mode] is [constant MySQLConfig.LAZY_PARSED_VARIANT] (the default), where [method get_rows] keeps the raw text instead of parsing eagerly; in the other modes the cell already comes ready from [method get_rows]. Does not check that the column is actually a [code]JSON[/code] one: naming a cell here is already saying "this is JSON". If the text is not valid JSON, returns [code]null[/code] (same as [method JSON.parse_string]).
+				Parses one cell as JSON and returns the result (cached, so calling this again for the same cell is free). Only makes sense when [member MySQLConfig.json_result_mode] is [constant MySQLConfig.LAZY_PARSED_VARIANT] (the default), where [method get_rows] keeps the raw text instead of parsing eagerly; in the other modes the cell already comes ready from [method get_rows]. Does not check that the column is a [code]JSON[/code] one: naming a cell here is already saying "this is JSON". If the text is not valid JSON, returns [code]null[/code] (same as [method JSON.parse_string]).
 			</description>
 		</method>
 		<method name="get_resultset_count" qualifiers="const">

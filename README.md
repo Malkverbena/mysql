@@ -22,8 +22,8 @@ Written in C++17 and, like Godot's own default, built without C++ exceptions
 
 Minimum supported Godot version: **4.6**. Supported platforms: Linux, Windows, macOS,
 Android (see [documentation/features.md](documentation/features.md) for the status of
-each). iOS is not on the list for now — not a technical decision, just deferred until
-Apple hardware is available to build and test it.
+each). iOS is not on the list for now — not a technical decision, deferred until Apple
+hardware is available to build and test it.
 
 ## Where to go next
 
