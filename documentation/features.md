@@ -1,9 +1,5 @@
 # Features
 
-> **Target design of the ongoing rewrite.** This document describes what the module does
-> once the rewrite is finished. At this point in development, not everything described
-> here is implemented yet — check the module's commit history for the exact state.
-
 ## Module structure
 
 Seven classes are exposed to GDScript. `MySQLSession` is the entry point for a single
@@ -272,8 +268,6 @@ Used by `execute_formatted()`, `execute_prepared()` and `async_execute_prepared(
 
 ## Platforms
 
-Confirmed targets for this rewrite: Linux, Windows, macOS, Android.
-
 * **Linux x86_64**: primary development and testing platform.
 * **Windows x86_64**: cross-compiled from Linux with MinGW-w64 and verified running under
   Wine against a real server, including the asynchronous methods (native IOCP on
@@ -281,19 +275,14 @@ Confirmed targets for this rewrite: Linux, Windows, macOS, Android.
 * **Android (arm64-v8a, armeabi-v7a, x86_64, x86_32)**: cross-compiled with the NDK; the
   full integration test suite (97 checks) verified on two real physical devices
   (arm64-v8a), not an emulator.
-* **macOS**: not done yet on this rewrite — waiting on Apple hardware to build the SDK.
+* **macOS**: not done yet — Need Help.
+* **iOS**: not done yet — Need Help.
 
 See [instructions.md](instructions.md) for the exact build steps per platform.
 
-**iOS is not on the list for now** — building and testing for iOS requires a Mac with
-Xcode, which does not exist in the current development environment. This is neither a
-technical decision nor a discard: it comes in when that hardware is available (for
-example, through an external contribution).
-
 ## Distribution
 
-Custom C++ module, compiled together with the engine (`custom_modules=`). GDExtension
-support is a future direction — it is not part of this rewrite.
+GDExtension support is a future direction.
 
 ## Godot
 
