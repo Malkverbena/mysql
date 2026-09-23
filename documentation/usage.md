@@ -16,7 +16,7 @@ generated from [`../doc_classes/`](../doc_classes/).
 | `MySQLResult` | The outcome of a non-streaming query: `is_ok()`, `get_error()`, `get_rows()`, `get_column_names()`, `get_affected_rows()`, `get_last_insert_id()`; multi-resultset aware (`get_resultset_count()`, and a `resultset` index on the other getters). |
 | `MySQLStreamingCursor` | Incremental reading of a large result: `next_batch()`/`has_more()`, without loading everything into memory. |
 | `MySQLAsyncOperation` | What an `async_*` call returns: `await`able via its `completed` signal, or poll with `is_finished()`/`get_result()`. |
-| `MySQLTransaction` | `commit()`/`rollback()`, obtained from `MySQLSession.begin_transaction()`. |
+| `MySQLTransaction` | `commit()`/`rollback()`, obtained from `MySQLSession.begin_transaction()`; `is_ok()`/`get_error()` say whether it started. |
 
 ## Connecting
 
@@ -149,6 +149,9 @@ See "Asynchronous methods" in [features.md](features.md) for the full explanatio
 
 ```gdscript
 var tx = session.begin_transaction()
+if not tx.is_ok():
+    push_error(tx.get_error())  # START TRANSACTION itself failed.
+    return
 var r1 = session.execute_prepared("UPDATE accounts SET balance = balance - ? WHERE id = ?", [amount, from_id])
 var r2 = session.execute_prepared("UPDATE accounts SET balance = balance + ? WHERE id = ?", [amount, to_id])
 if r1.is_ok() and r2.is_ok():
@@ -159,7 +162,9 @@ else:
 
 If `tx` goes out of scope without either call, the module rolls back automatically and
 logs a warning — a safety net, not a substitute for calling `commit()`/`rollback()`
-yourself on every path.
+yourself on every path. `begin_transaction()` never returns `null`: if `START TRANSACTION`
+fails, the returned transaction has `is_ok() == false`, and `commit()`/`rollback()` on it
+return that same error.
 
 ## Streaming a large result
 

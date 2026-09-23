@@ -58,6 +58,8 @@ classDiagram
       +completed signal
     }
     class MySQLTransaction {
+      +is_ok() bool
+      +get_error() Dictionary
       +commit() Dictionary
       +rollback() Dictionary
     }
