@@ -232,9 +232,6 @@ MySQLSession::~MySQLSession() {
 		io_thread.wait_to_finish();
 	}
 
-	memdelete(statement_cache);
-	statement_cache = nullptr;
-
 	bool connection_healthy = !(pending_async_operation.is_valid() && !pending_async_operation->is_finished());
 	if (owner_pool.is_valid() && connection) {
 		owner_pool->release(connection, connection_healthy);
@@ -264,7 +261,6 @@ Ref<MySQLSession> MySQLSession::create_pooled(const Ref<MySQLConfig> &p_config, 
 	session.instantiate();
 	session->config = p_config;
 	session->connection = p_connection;
-	session->statement_cache = memnew(PreparedStatementCache(p_config->get_statement_cache_size()));
 	session->owner_pool = p_owner_pool;
 	return session;
 }
@@ -274,7 +270,6 @@ void MySQLSession::set_config(const Ref<MySQLConfig> &p_config) {
 	ERR_FAIL_COND_MSG(p_config.is_null(), "MySQLSession: The config cannot be null.");
 	config = p_config;
 	connection = memnew(MySQLConnection(config));
-	statement_cache = memnew(PreparedStatementCache(p_config->get_statement_cache_size()));
 }
 
 Dictionary MySQLSession::connect_db() {
@@ -282,7 +277,6 @@ Dictionary MySQLSession::connect_db() {
 		return mysql_module::make_client_error_dict("MySQLSession: Call set_config() before connect_db().");
 	}
 	if (connection->connect()) {
-		statement_cache->clear(); // Handles from a previous connection are no longer valid.
 		return Dictionary();
 	}
 	return mysql_module::make_error_dict(connection->get_last_error(), connection->get_last_diagnostics());
@@ -292,8 +286,9 @@ Dictionary MySQLSession::close_db() {
 	if (!connection) {
 		return Dictionary();
 	}
+	// MySQLConnection::close() clears the prepared statement cache itself (the handles it
+	// holds stop being valid the moment the connection closes).
 	connection->close();
-	statement_cache->clear();
 	if (connection->get_last_error()) {
 		return mysql_module::make_error_dict(connection->get_last_error(), connection->get_last_diagnostics());
 	}
@@ -384,7 +379,7 @@ Ref<MySQLResult> MySQLSession::execute_prepared(const String &p_sql, const Array
 	boost::mysql::error_code error;
 	boost::mysql::diagnostics diagnostics;
 	boost::mysql::statement statement;
-	if (!statement_cache->get_or_prepare(*connection, p_sql, statement, error, diagnostics)) {
+	if (!connection->get_statement_cache()->get_or_prepare(*connection, p_sql, statement, error, diagnostics)) {
 		return MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics));
 	}
 
@@ -465,7 +460,7 @@ Ref<MySQLAsyncOperation> MySQLSession::async_execute_prepared(const String &p_sq
 	boost::mysql::error_code error;
 	boost::mysql::diagnostics diagnostics;
 	boost::mysql::statement statement;
-	if (!statement_cache->get_or_prepare(*connection, p_sql, statement, error, diagnostics)) {
+	if (!connection->get_statement_cache()->get_or_prepare(*connection, p_sql, statement, error, diagnostics)) {
 		operation->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics)));
 		return operation;
 	}

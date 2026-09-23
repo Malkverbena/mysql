@@ -3,6 +3,7 @@
 #include "mysql_connection.h"
 
 #include "godot_convert.h"
+#include "prepared_statement_cache.h"
 
 #include <boost/asio/ssl/host_name_verification.hpp>
 #include <boost/mysql/any_address.hpp>
@@ -44,7 +45,12 @@ MySQLConnection::MySQLConnection(Ref<MySQLConfig> p_config) :
 		config(p_config),
 		ssl_context(_make_ssl_context(p_config)),
 		connection(io_context.get_executor(), _make_any_connection_params(p_config, ssl_context)) {
+	statement_cache = memnew(PreparedStatementCache(p_config->get_statement_cache_size()));
 	state = CONFIGURED;
+}
+
+MySQLConnection::~MySQLConnection() {
+	memdelete(statement_cache);
 }
 
 boost::mysql::connect_params MySQLConnection::_make_connect_params() const {
@@ -113,6 +119,11 @@ void MySQLConnection::close() {
 	last_diagnostics.clear();
 
 	connection.close(last_error, last_diagnostics);
+
+	// The handles a prepared statement cache holds are only valid on the connection that
+	// prepared them: closing it invalidates every entry, whether or not the connection
+	// (and this cache) go on to be reused for a later connect().
+	statement_cache->clear();
 
 	// An error while closing is not fatal for the caller: the connection is unusable anyway.
 	// It is kept in `last_error` for whoever wants to inspect it.

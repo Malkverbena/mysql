@@ -16,7 +16,6 @@
 
 class MySQLConnection;
 class MySQLPool;
-class PreparedStatementCache;
 class MySQLTransaction;
 class MySQLAsyncOperation;
 class MySQLStreamingCursor;
@@ -24,7 +23,9 @@ class MySQLStreamingCursor;
 // Main class exposed to GDScript: `execute_text()`, `execute_formatted()`,
 // `execute_prepared()`, `execute_script()`, `begin_transaction()` and the asynchronous and
 // streaming variants. It owns a `MySQLConnection` (its own, or one leased from a
-// `MySQLPool`) and the `PreparedStatementCache` of that connection.
+// `MySQLPool`) — the prepared statement cache belongs to the `MySQLConnection` itself, not
+// to the session, so it survives across pool leases (see the comment on
+// `MySQLConnection::statement_cache`).
 //
 // A session is not thread safe: use one session per thread.
 //
@@ -40,7 +41,6 @@ class MySQLSession : public RefCounted {
 
 	Ref<MySQLConfig> config;
 	MySQLConnection *connection = nullptr;
-	PreparedStatementCache *statement_cache = nullptr;
 
 	// Only set when the session was leased from a pool: the connection goes back to the
 	// pool on destruction instead of being destroyed. Holding a reference also keeps the
