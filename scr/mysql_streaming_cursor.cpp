@@ -53,7 +53,9 @@ PackedStringArray MySQLStreamingCursor::get_column_names() const {
 
 Array MySQLStreamingCursor::next_batch() {
 	Array out;
-	if (!ok || closed || state.complete()) {
+	// Same condition as `has_more()`: `state.complete()` alone is not enough, because
+	// between two resultsets the execution is neither complete nor in a row-reading state.
+	if (!ok || closed || !state.should_read_rows()) {
 		return out;
 	}
 
@@ -88,11 +90,20 @@ void MySQLStreamingCursor::close() {
 	if (!ok || !connection) {
 		return;
 	}
-	// Drain the rest of the resultset silently. See the comment in the header.
+	// Drain the rest of the execution silently. See the comment in the header.
+	//
+	// The branch on `should_read_rows()` is required, not cosmetic: with
+	// `allow_multi_queries` the execution moves to `should_read_head()` between resultsets,
+	// and `read_some_rows()` in that state returns an empty batch without an error and
+	// without advancing `state`, so a loop that only ever calls it never terminates.
 	boost::mysql::error_code err;
 	boost::mysql::diagnostics diag;
 	while (!state.complete()) {
-		connection->native().read_some_rows(state, err, diag);
+		if (state.should_read_rows()) {
+			connection->native().read_some_rows(state, err, diag);
+		} else { // should_read_head()
+			connection->native().read_resultset_head(state, err, diag);
+		}
 		if (err) {
 			break;
 		}
