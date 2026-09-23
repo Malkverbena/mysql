@@ -331,12 +331,22 @@ Ref<MySQLResult> MySQLSession::_execute_formatted_std(const std::string &p_sql, 
 	// compile time): the SQL is split at every `?`, literal segments are appended as
 	// `boost::mysql::runtime` (the template comes from the script, not from untrusted
 	// data), and the values are escaped by Boost.MySQL itself. There is never any
-	// home-made escaping.
+	// home-made escaping. A `?` inside a quoted literal or a comment is text, not a
+	// placeholder (see `skip_non_code()`, shared with `execute_script()`).
 	boost::mysql::format_context context(*options);
+	const int64_t sql_length = (int64_t)p_sql.size();
 	size_t position = 0;
 	size_t param_index = 0;
 	while (true) {
-		size_t placeholder = p_sql.find('?', position);
+		size_t placeholder = position;
+		while (placeholder < p_sql.size() && p_sql[placeholder] != '?') {
+			bool is_code = false;
+			size_t skipped = (size_t)mysql_module::skip_non_code(p_sql, (int64_t)placeholder, sql_length, options->backslash_escapes, is_code);
+			placeholder = (skipped != placeholder) ? skipped : placeholder + 1;
+		}
+		if (placeholder >= p_sql.size()) {
+			placeholder = std::string::npos;
+		}
 		size_t segment_end = (placeholder == std::string::npos) ? p_sql.size() : placeholder;
 		context.append_raw(boost::mysql::runtime(boost::mysql::string_view(p_sql.data() + position, segment_end - position)));
 		if (placeholder == std::string::npos) {
@@ -391,6 +401,12 @@ Ref<MySQLResult> MySQLSession::execute_prepared(const String &p_sql, const Array
 	return execute_with_limit(*connection, statement.bind(fields.views.ptr(), fields.views.ptr() + fields.views.size()), config);
 }
 
+bool MySQLSession::_backslash_escapes() const {
+	// Kept up to date by Boost.MySQL from every OK packet the server sends. Without a
+	// connection the statement will fail anyway; the server's default is as good as any.
+	return (connection && connection->is_connected()) ? connection->native().backslash_escapes() : true;
+}
+
 Array MySQLSession::execute_script(const String &p_content) {
 	Array out;
 
@@ -399,8 +415,11 @@ Array MySQLSession::execute_script(const String &p_content) {
 		return out;
 	}
 
-	Vector<String> statements = mysql_module::split_sql_statements(p_content);
-	for (const String &statement_sql : statements) {
+	// One statement at a time, re-reading the connection's backslash escaping before each:
+	// a statement of the script may itself change the SQL mode (`NO_BACKSLASH_ESCAPES`).
+	int position = 0;
+	String statement_sql;
+	while (mysql_module::next_sql_statement(p_content, position, _backslash_escapes(), statement_sql)) {
 		Ref<MySQLResult> result = _execute_text_std(mysql_module::to_std_string(statement_sql));
 		out.push_back(result);
 		if (!result->is_ok()) {

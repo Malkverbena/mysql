@@ -4,48 +4,42 @@
 
 namespace mysql_module {
 
-namespace {
+bool next_sql_statement(const String &p_content, int &r_position, bool p_backslash_escapes, String &r_statement) {
+	const int length = p_content.length();
+	int start = r_position;
+	// Whether the current fragment holds anything besides comments and whitespace.
+	bool has_code = false;
 
-void push_trimmed_statement(Vector<String> &r_statements, const String &p_text) {
-	String trimmed = p_text.strip_edges();
-	if (!trimmed.is_empty()) {
-		r_statements.push_back(trimmed);
-	}
-}
-
-} //namespace
-
-Vector<String> split_sql_statements(const String &p_content) {
-	Vector<String> statements;
-	int length = p_content.length();
-	int start = 0;
-	char32_t quote = 0;
-
-	for (int i = 0; i < length; i++) {
-		char32_t c = p_content[i];
-
-		if (quote != 0) {
-			if (c == quote) {
-				if (i + 1 < length && p_content[i + 1] == quote) {
-					i++; // Doubled quote, still inside the literal.
-				} else {
-					quote = 0;
-				}
-			} else if (c == '\\' && quote != '`' && i + 1 < length) {
-				i++; // Skip the escaped character.
-			}
+	int i = r_position;
+	while (i < length) {
+		bool is_code = false;
+		int skipped = (int)skip_non_code(p_content, i, length, p_backslash_escapes, is_code);
+		if (skipped != i) {
+			has_code = has_code || is_code;
+			i = skipped;
 			continue;
 		}
 
-		if (c == '\'' || c == '"' || c == '`') {
-			quote = c;
-		} else if (c == ';') {
-			push_trimmed_statement(statements, p_content.substr(start, i - start));
-			start = i + 1;
+		char32_t c = p_content[i];
+		if (c == ';') {
+			if (has_code) {
+				r_statement = p_content.substr(start, i - start).strip_edges();
+				r_position = i + 1;
+				return true;
+			}
+			start = i + 1; // Empty or comment-only fragment.
+		} else if (c > ' ') {
+			has_code = true;
 		}
+		i++;
 	}
-	push_trimmed_statement(statements, p_content.substr(start));
-	return statements;
+
+	r_position = length;
+	if (has_code) {
+		r_statement = p_content.substr(start).strip_edges();
+		return true;
+	}
+	return false;
 }
 
 } //namespace mysql_module

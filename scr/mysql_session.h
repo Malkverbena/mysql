@@ -72,6 +72,8 @@ class MySQLSession : public RefCounted {
 
 	Ref<MySQLResult> _execute_text_std(const std::string &p_sql);
 	Ref<MySQLResult> _execute_formatted_std(const std::string &p_sql, const Array &p_params);
+	// Whether the server currently treats `\` as an escape inside string literals.
+	bool _backslash_escapes() const;
 
 protected:
 	static void _bind_methods();
@@ -97,7 +99,7 @@ public:
 	Ref<MySQLResult> execute_formatted(const String &p_sql, const Array &p_params);
 	Ref<MySQLResult> execute_prepared(const String &p_sql, const Array &p_params);
 	// Takes the script content, not a file path. It splits the content into statements
-	// (see `split_sql_statements()`) and runs them one by one, stopping at the first one
+	// (see `next_sql_statement()`) and runs them one by one, stopping at the first one
 	// that fails. Only works with `allow_sql_script_execution` enabled in the config.
 	Array execute_script(const String &p_content);
 

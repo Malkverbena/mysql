@@ -296,6 +296,21 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	check(still_exists.is_ok() and int(still_exists.get_rows()[0][0]) >= 2, "the table survives the injection attempt (COUNT = %s)" % [still_exists.get_rows()[0][0] if still_exists.is_ok() else "?"])
 	var escaped_back: MySQLResult = session.execute_text("SELECT txt FROM t_mysql_module_smoke_test WHERE id = 2")
 	check(escaped_back.is_ok() and escaped_back.get_rows()[0][0] == injection_attempt, "the 'dangerous' value was stored literally, as a string (%s)" % [escaped_back.get_rows()[0][0] if escaped_back.is_ok() else "?"])
+	var literal_question: MySQLResult = session.execute_formatted("SELECT '?' AS a, \"it's ?\" AS b, ? AS c", [7])
+	check(literal_question.is_ok() and literal_question.get_rows()[0] == ["?", "it's ?", 7], "a '?' inside a quoted literal is text, not a placeholder (%s)" % [literal_question.get_rows() if literal_question.is_ok() else literal_question.get_error()])
+	var no_placeholders: MySQLResult = session.execute_formatted("SELECT 'a?b' AS a", [])
+	check(no_placeholders.is_ok() and no_placeholders.get_rows()[0][0] == "a?b", "a quoted '?' alone does not demand a parameter (%s)" % [no_placeholders.get_error()])
+	var commented_question: MySQLResult = session.execute_formatted("SELECT ? AS a /* why? don't */, ? AS b -- really?\n", [1, 2])
+	check(commented_question.is_ok() and commented_question.get_rows()[0] == [1, 2], "a '?' or an apostrophe inside a comment is not read as SQL (%s)" % [commented_question.get_rows() if commented_question.is_ok() else commented_question.get_error()])
+	# Under NO_BACKSLASH_ESCAPES a backslash is plain text inside a literal, so 'C:\' is a
+	# complete literal and the '?' after it is a real placeholder.
+	session.execute_text("SET @smoke_saved_sql_mode = @@SESSION.sql_mode")
+	session.execute_text("SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_BACKSLASH_ESCAPES')")
+	var no_backslash: MySQLResult = session.execute_formatted("SELECT 'C:\\' AS p, ? AS n, ? AS s", [1, "a\\b'c"])
+	check(no_backslash.is_ok() and no_backslash.get_rows()[0] == ["C:\\", 1, "a\\b'c"], "execute_formatted follows NO_BACKSLASH_ESCAPES (%s)" % [no_backslash.get_rows() if no_backslash.is_ok() else no_backslash.get_error()])
+	session.execute_text("SET SESSION sql_mode = @smoke_saved_sql_mode")
+	var backslash_again: MySQLResult = session.execute_formatted("SELECT 'it\\'s' AS q, ? AS n", [1])
+	check(backslash_again.is_ok() and backslash_again.get_rows()[0] == ["it's", 1], "execute_formatted follows the SQL mode being restored (%s)" % [backslash_again.get_rows() if backslash_again.is_ok() else backslash_again.get_error()])
 
 	print("=== 5. Parameter round trip (execute_prepared) ===")
 	var blob := PackedByteArray([0, 255, 16, 0, 127])
@@ -587,6 +602,38 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 		check(literal.is_ok() and literal.get_rows().size() == 1 and literal.get_rows()[0][0] == "script_2;with_semicolon", "a semicolon inside a quoted literal did not split the statement")
 	var failing_script: Array = session.execute_script("SELECT 1; SELEC nothing; SELECT 3")
 	check(failing_script.size() == 2 and (failing_script[0] as MySQLResult).is_ok() and not (failing_script[1] as MySQLResult).is_ok(), "the script stops at the first failing statement (%d results)" % [failing_script.size()])
+	var commented_script: Array = session.execute_script(
+		"""
+		-- header; not a statement
+		/* block; comment */ SELECT 1;
+		# hash; comment
+		SELECT 2; -- trailer; still a comment
+		"""
+	)
+	var commented_ok := commented_script.size() == 2
+	for r in commented_script:
+		if not (r as MySQLResult).is_ok():
+			commented_ok = false
+	check(commented_ok, "semicolons inside comments do not split the script, comment-only fragments are dropped (%d results)" % [commented_script.size()])
+	# The script itself turns NO_BACKSLASH_ESCAPES on and off: each statement must be split
+	# with the SQL mode in force when it runs, not the one from before the script started.
+	var mode_script: Array = session.execute_script(
+		"""
+		SET @smoke_script_sql_mode = @@SESSION.sql_mode;
+		SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_BACKSLASH_ESCAPES');
+		SELECT 'C:\\' AS p;
+		SET SESSION sql_mode = @smoke_script_sql_mode;
+		SELECT 'it\\'s; fine' AS q;
+		"""
+	)
+	var mode_script_ok := mode_script.size() == 5
+	for r in mode_script:
+		if not (r as MySQLResult).is_ok():
+			mode_script_ok = false
+	check(mode_script_ok, "execute_script re-reads the SQL mode between statements (%d results)" % [mode_script.size()])
+	if mode_script_ok:
+		check((mode_script[2] as MySQLResult).get_rows()[0][0] == "C:\\", "a backslash is plain text after the script turns on NO_BACKSLASH_ESCAPES")
+		check((mode_script[4] as MySQLResult).get_rows()[0][0] == "it's; fine", "a backslash escapes again after the script restores the SQL mode")
 
 	print("=== 12. Multiple resultsets ===")
 	var multi_config := make_config(host, port, user, password, database)

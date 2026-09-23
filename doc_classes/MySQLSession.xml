@@ -49,7 +49,7 @@
 			<param index="0" name="sql" type="String" />
 			<param index="1" name="params" type="Array" />
 			<description>
-				Runs [code]sql[/code] with [code]?[/code] placeholders filled in from [code]params[/code], escaped by Boost.MySQL itself (never by the module's own code) and sent as a single formatted text query, not a prepared statement. Blocks until the server answers. Fails explicitly, without running anything, if the number of placeholders and parameters do not match, or if a parameter is of an unsupported [Variant] type. A [Dictionary] parameter is read as [code]DATE[/code]/[code]DATETIME[/code]/[code]TIME[/code], using the same shape [method MySQLResult.get_rows] returns for that type.
+				Runs [code]sql[/code] with [code]?[/code] placeholders filled in from [code]params[/code], escaped by Boost.MySQL itself (never by the module's own code) and sent as a single formatted text query, not a prepared statement. Blocks until the server answers. A [code]?[/code] inside a quoted literal ([code]'...'[/code], [code]"..."[/code] or a backtick-quoted identifier) or inside a comment ([code]-- [/code], [code]#[/code], [code]/* */[/code]) is text, not a placeholder; inside a versioned [code]/*! ... */[/code] comment, which the server runs as code, it is a placeholder. Backslash escapes inside literals follow the connection's current SQL mode ([code]NO_BACKSLASH_ESCAPES[/code]). Fails explicitly, without running anything, if the number of placeholders and parameters do not match, or if a parameter is of an unsupported [Variant] type. A [Dictionary] parameter is read as [code]DATE[/code]/[code]DATETIME[/code]/[code]TIME[/code], using the same shape [method MySQLResult.get_rows] returns for that type.
 			</description>
 		</method>
 		<method name="execute_prepared">
@@ -64,7 +64,7 @@
 			<return type="Array" />
 			<param index="0" name="content" type="String" />
 			<description>
-				Splits [code]content[/code] into individual statements (correctly, even with semicolons inside quoted string literals) and runs them one by one with [method execute_text], stopping at the first one that fails. Returns an [Array] of [MySQLResult], one per statement that ran. Refused (returns a single error result) unless [member MySQLConfig.allow_sql_script_execution] is [code]true[/code] on this session's config. Takes the script's content directly, not a file path.
+				Splits [code]content[/code] into individual statements (correctly, even with semicolons inside quoted string literals or inside [code]-- [/code], [code]#[/code] and [code]/* */[/code] comments) and runs them one by one with [method execute_text], stopping at the first one that fails. Returns an [Array] of [MySQLResult], one per statement that ran. Refused (returns a single error result) unless [member MySQLConfig.allow_sql_script_execution] is [code]true[/code] on this session's config. Comments are sent to the server as part of the statement they sit in; a fragment made only of comments is skipped, except a versioned [code]/*! ... */[/code] comment, whose content the server runs as code. Statements are found one at a time, each with the backslash escaping of the SQL mode in force at that point, so a script that itself sets [code]NO_BACKSLASH_ESCAPES[/code] is still split correctly. [code]DELIMITER[/code] is a client command of the [code]mysql[/code] tool, not SQL, and is not understood. Takes the script's content directly, not a file path.
 			</description>
 		</method>
 		<method name="execute_streaming">
