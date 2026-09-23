@@ -11,7 +11,6 @@ void MySQLAsyncOperation::_complete(Ref<MySQLResult> p_result) {
 }
 
 void MySQLAsyncOperation::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("_complete", "result"), &MySQLAsyncOperation::_complete);
 	ClassDB::bind_method(D_METHOD("is_finished"), &MySQLAsyncOperation::is_finished);
 	ClassDB::bind_method(D_METHOD("get_result"), &MySQLAsyncOperation::get_result);
 

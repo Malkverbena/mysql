@@ -504,6 +504,22 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	var after_busy: MySQLResult = session.execute_text("SELECT 'still_usable'")
 	check(after_busy.is_ok(), "the session is still usable after a rejected concurrent operation (%s)" % [after_busy.get_error()])
 
+	# While an asynchronous operation runs, the I/O thread owns the connection: every other
+	# call on the session fails explicitly without touching it, and close_db() does not
+	# close it from under the running operation.
+	var owner_op: MySQLAsyncOperation = session.async_execute_text("SELECT SLEEP(0.3)")
+	var busy_sync: MySQLResult = session.execute_text("SELECT 1")
+	check(not busy_sync.is_ok() and busy_sync.get_error().get("category", "") == "mysql.client", "a synchronous call during an asynchronous operation fails explicitly (%s)" % [busy_sync.get_error().get("message", "")])
+	check(not session.execute_formatted("SELECT ?", [1]).is_ok(), "execute_formatted during an asynchronous operation fails explicitly")
+	check(not session.execute_prepared("SELECT ?", [1]).is_ok(), "execute_prepared during an asynchronous operation fails explicitly")
+	check(not session.execute_streaming("SELECT 1").is_ok(), "execute_streaming during an asynchronous operation fails explicitly")
+	check(not session.close_db().is_empty(), "close_db() during an asynchronous operation fails explicitly")
+	check(session.is_db_connected(), "the session is still connected after a rejected close_db()")
+	var owner_result: MySQLResult = await await_operation(owner_op)
+	check(owner_result.is_ok(), "the asynchronous operation finishes normally after the rejected calls (%s)" % [owner_result.get_error()])
+	check(session.execute_text("SELECT 1").is_ok(), "synchronous calls work again once the asynchronous operation finished")
+	check(not owner_op.has_method("_complete"), "MySQLAsyncOperation does not expose _complete to scripts")
+
 	var async_not_connected: MySQLAsyncOperation = not_connected.async_execute_text("SELECT 1")
 	var async_not_connected_result: MySQLResult = await await_operation(async_not_connected)
 	check(not async_not_connected_result.is_ok(), "an asynchronous call on a session without config fails explicitly")
@@ -571,6 +587,24 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	var after_abandon_result: MySQLResult = after_abandon.execute_text("SELECT 'healthy'")
 	check(after_abandon_result.is_ok(), "a lease after an abandoned asynchronous operation gets a usable connection (%s)" % [after_abandon_result.get_error()])
 	after_abandon = null
+
+	# Same, with a second call rejected while the first still runs, and awaited before the
+	# session is dropped: the rejected call must not replace the running operation as the
+	# one the session tracks, or the busy connection would go back to the pool.
+	var twice_session: MySQLSession = busy_pool.acquire()
+	if not twice_session.is_db_connected():
+		twice_session.connect_db()
+	twice_session.async_execute_text("SELECT SLEEP(1)")
+	var twice_rejected: MySQLAsyncOperation = twice_session.async_execute_text("SELECT 1")
+	var twice_rejected_result: MySQLResult = await await_operation(twice_rejected)
+	check(not twice_rejected_result.is_ok(), "the second back-to-back asynchronous call is rejected")
+	twice_session = null # Dropped with the first operation still in flight.
+	var after_twice: MySQLSession = busy_pool.acquire()
+	if not after_twice.is_db_connected():
+		after_twice.connect_db()
+	var after_twice_result: MySQLResult = after_twice.execute_text("SELECT 'healthy'")
+	check(after_twice_result.is_ok(), "a lease after two back-to-back asynchronous calls gets a usable connection (%s)" % [after_twice_result.get_error()])
+	after_twice = null
 
 	# Regression test: prepared statements must not leak on the server across leases of
 	# the same pooled connection (the statement cache belongs to the connection, not to

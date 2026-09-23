@@ -184,8 +184,12 @@ busy); the pool closes that connection and opens a new one when needed.
 A session processes one asynchronous operation at a time. Starting a second `async_*`
 call while the first one is still running does not queue the second call — it fails
 immediately with an explicit error (category `mysql.client`), while the first operation
-keeps running unaffected. Run parallel operations from separate sessions, for example one
-session per operation leased from a `MySQLPool`.
+keeps running unaffected. The same applies to every other call on that session while the
+operation runs — `execute_*`, `execute_streaming`, `begin_transaction`, `connect_db`,
+`close_db`: each fails with that same error without touching the connection (in
+particular, `close_db()` does not close it from under the running operation). Run
+parallel operations from separate sessions, for example one session per operation leased
+from a `MySQLPool`.
 
 ### Automatic rollback
 

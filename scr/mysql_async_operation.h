@@ -6,6 +6,7 @@
 #include "mysql_result.h"
 
 #include "core/object/ref_counted.h"
+#include "core/templates/safe_refcount.h"
 
 #include <boost/mysql/diagnostics.hpp>
 #include <boost/mysql/error_code.hpp>
@@ -28,6 +29,13 @@ class MySQLAsyncOperation : public RefCounted {
 
 	Ref<MySQLResult> result;
 	bool finished_flag = false;
+	// Set on the main thread right before the operation is handed to Boost.MySQL, cleared
+	// on the I/O thread once Boost.MySQL is done with the connection (just before the
+	// result is sent to the main thread). Unlike `finished_flag`, which only changes when
+	// the main thread processes the deferred `_complete`, it says exactly when the
+	// connection is free again, and it is safe to read from the main thread while the I/O
+	// thread writes it.
+	SafeFlag running;
 
 protected:
 	static void _bind_methods();
@@ -46,10 +54,13 @@ public:
 	MySQLResult::Builder result_builder;
 	boost::mysql::diagnostics diagnostics;
 
-	// Must be bound (not only internal) because `call_deferred()` dispatches by method
-	// name. Do not call it directly from outside the main thread.
+	// Internal use by `MySQLSession`, not bound: runs on the main thread through a deferred
+	// `callable_mp` (see `complete_deferred()` in `mysql_session.cpp`).
 	void _complete(Ref<MySQLResult> p_result);
 
 	bool is_finished() const { return finished_flag; }
+	bool is_running() const { return running.is_set(); }
+	void set_running() { running.set(); }
+	void clear_running() { running.clear(); }
 	Ref<MySQLResult> get_result() const { return result; }
 };

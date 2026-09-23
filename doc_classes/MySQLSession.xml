@@ -6,7 +6,7 @@
 	<description>
 		Runs SQL three ways ([method execute_text], [method execute_formatted], [method execute_prepared]), each with an asynchronous or streaming variant where it makes sense, plus transactions ([method begin_transaction]) and manual scripts ([method execute_script]).
 		A session needs a [MySQLConfig] before it can be used: call [method set_config] (which also creates the underlying connection), or get one already configured from [method MySQLPool.acquire]. Every method that needs the connection returns an explicit error (category [code]mysql_module.client[/code] in the returned [Dictionary]/[MySQLResult]) when called before [method set_config] or before [method connect_db], instead of crashing.
-		A session is [b]not[/b] thread safe and runs at most one operation (synchronous or asynchronous) at a time on its connection: starting a second asynchronous operation while one is already in flight fails the second one explicitly. Use one session per thread, or lease one per thread from a [MySQLPool].
+		A session is [b]not[/b] thread safe and runs at most one operation (synchronous or asynchronous) at a time on its connection: while an asynchronous operation is in flight, any other call on the session (a second asynchronous call, any [code]execute_*[/code] method, [method begin_transaction], [method connect_db], [method close_db]) fails explicitly with an [code]operation_in_progress[/code] error, without touching the connection. Use one session per thread, or lease one per thread from a [MySQLPool].
 	</description>
 	<tutorials>
 	</tutorials>
