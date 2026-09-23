@@ -13,6 +13,7 @@
 #include "prepared_statement_cache.h"
 #include "sql_script.h"
 
+#include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 
 #include <boost/asio/cancel_after.hpp>
@@ -26,8 +27,23 @@
 
 namespace {
 
+// Hands the result to the main thread, where `completed` is emitted. Through
+// `callable_mp` rather than `call_deferred()` by method name, so `_complete` does not
+// need to be bound, and a script cannot call it to fire `completed` spuriously. Like a
+// deferred call by name, it is dropped if the operation was freed in the meantime.
+void complete_deferred(const Ref<MySQLAsyncOperation> &p_operation, const Ref<MySQLResult> &p_result) {
+	// From here on the connection is free: nothing below touches it again.
+	p_operation->clear_running();
+	callable_mp(p_operation.ptr(), &MySQLAsyncOperation::_complete).call_deferred(p_result);
+}
+
 Dictionary make_not_connected_error() {
 	return mysql_module::make_error_dict(boost::mysql::make_error_code(boost::mysql::client_errc::not_connected), boost::mysql::diagnostics());
+}
+
+// The same error Boost.MySQL itself reports for a second operation on a busy connection.
+Dictionary make_busy_error() {
+	return mysql_module::make_error_dict(boost::mysql::make_error_code(boost::mysql::client_errc::operation_in_progress), boost::mysql::diagnostics());
 }
 
 // Keeps the connection protocol in sync after a `max_result_bytes` overflow: the resultset
@@ -123,7 +139,7 @@ struct AsyncDrainHeadHandler {
 
 void async_drain_step(const Ref<MySQLAsyncOperation> &p_operation, const Dictionary &p_error, boost::mysql::error_code p_drain_error) {
 	if (p_drain_error || p_operation->exec_state.complete()) {
-		p_operation->call_deferred("_complete", MySQLResult::from_error(p_error));
+		complete_deferred(p_operation, MySQLResult::from_error(p_error));
 		return;
 	}
 	if (p_operation->exec_state.should_read_rows()) {
@@ -143,7 +159,7 @@ struct AsyncRowsHandler {
 	Ref<MySQLAsyncOperation> operation;
 	void operator()(boost::mysql::error_code p_error, boost::mysql::rows_view p_rows) {
 		if (p_error) {
-			operation->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_error_dict(p_error, operation->diagnostics)));
+			complete_deferred(operation, MySQLResult::from_error(mysql_module::make_error_dict(p_error, operation->diagnostics)));
 			return;
 		}
 		operation->result_builder.add_rows(p_rows, operation->exec_state.meta(), operation->config);
@@ -164,7 +180,7 @@ struct AsyncHeadHandler {
 	Ref<MySQLAsyncOperation> operation;
 	void operator()(boost::mysql::error_code p_error) {
 		if (p_error) {
-			operation->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_error_dict(p_error, operation->diagnostics)));
+			complete_deferred(operation, MySQLResult::from_error(mysql_module::make_error_dict(p_error, operation->diagnostics)));
 			return;
 		}
 		operation->result_builder.begin_resultset(operation->exec_state.meta());
@@ -193,7 +209,7 @@ void issue_read_head(const Ref<MySQLAsyncOperation> &p_operation) {
 void async_advance(const Ref<MySQLAsyncOperation> &p_operation) {
 	if (p_operation->exec_state.complete()) {
 		p_operation->result_builder.end_resultset(p_operation->exec_state.affected_rows(), p_operation->exec_state.last_insert_id(), p_operation->exec_state.info());
-		p_operation->call_deferred("_complete", p_operation->result_builder.finish());
+		complete_deferred(p_operation, p_operation->result_builder.finish());
 		return;
 	}
 	if (p_operation->exec_state.should_read_rows()) {
@@ -208,6 +224,7 @@ void async_advance(const Ref<MySQLAsyncOperation> &p_operation) {
 // the operation or a bound statement whose parameters are owned by the operation.
 template <typename Request>
 void start_async_execute(MySQLConnection &p_connection, Request &&p_request, const Ref<MySQLAsyncOperation> &p_operation, int p_timeout_ms) {
+	p_operation->set_running();
 	p_operation->connection = &p_connection;
 	p_operation->timeout_ms = p_timeout_ms;
 	AsyncHeadHandler handler{ p_operation };
@@ -232,7 +249,9 @@ MySQLSession::~MySQLSession() {
 		io_thread.wait_to_finish();
 	}
 
-	bool connection_healthy = !(pending_async_operation.is_valid() && !pending_async_operation->is_finished());
+	// The I/O thread is stopped at this point: if the operation was still running, it
+	// never will finish, and the connection is left mid-operation.
+	bool connection_healthy = !_is_async_busy();
 	if (owner_pool.is_valid() && connection) {
 		owner_pool->release(connection, connection_healthy);
 	} else {
@@ -272,9 +291,16 @@ void MySQLSession::set_config(const Ref<MySQLConfig> &p_config) {
 	connection = memnew(MySQLConnection(config));
 }
 
+bool MySQLSession::_is_async_busy() const {
+	return pending_async_operation.is_valid() && pending_async_operation->is_running();
+}
+
 Dictionary MySQLSession::connect_db() {
 	if (!connection) {
 		return mysql_module::make_client_error_dict("MySQLSession: Call set_config() before connect_db().");
+	}
+	if (_is_async_busy()) {
+		return make_busy_error();
 	}
 	if (connection->connect()) {
 		return Dictionary();
@@ -285,6 +311,10 @@ Dictionary MySQLSession::connect_db() {
 Dictionary MySQLSession::close_db() {
 	if (!connection) {
 		return Dictionary();
+	}
+	if (_is_async_busy()) {
+		// Left connected, untouched: the operation still owns it.
+		return make_busy_error();
 	}
 	// MySQLConnection::close() clears the prepared statement cache itself (the handles it
 	// holds stop being valid the moment the connection closes).
@@ -303,6 +333,9 @@ Ref<MySQLResult> MySQLSession::_execute_text_std(const std::string &p_sql) {
 	if (!connection || !connection->is_connected()) {
 		return MySQLResult::from_error(make_not_connected_error());
 	}
+	if (_is_async_busy()) {
+		return MySQLResult::from_error(make_busy_error());
+	}
 
 	return execute_with_limit(*connection, p_sql, config);
 }
@@ -314,6 +347,9 @@ Ref<MySQLResult> MySQLSession::execute_text(const String &p_sql) {
 Ref<MySQLResult> MySQLSession::_execute_formatted_std(const std::string &p_sql, const Array &p_params) {
 	if (!connection || !connection->is_connected()) {
 		return MySQLResult::from_error(make_not_connected_error());
+	}
+	if (_is_async_busy()) {
+		return MySQLResult::from_error(make_busy_error());
 	}
 
 	mysql_module::FieldParams fields;
@@ -378,6 +414,9 @@ Ref<MySQLResult> MySQLSession::execute_formatted(const String &p_sql, const Arra
 Ref<MySQLResult> MySQLSession::execute_prepared(const String &p_sql, const Array &p_params) {
 	if (!connection || !connection->is_connected()) {
 		return MySQLResult::from_error(make_not_connected_error());
+	}
+	if (_is_async_busy()) {
+		return MySQLResult::from_error(make_busy_error());
 	}
 
 	mysql_module::FieldParams fields;
@@ -445,12 +484,18 @@ Ref<MySQLTransaction> MySQLSession::begin_transaction() {
 Ref<MySQLAsyncOperation> MySQLSession::async_execute_text(const String &p_sql) {
 	Ref<MySQLAsyncOperation> operation;
 	operation.instantiate();
-	pending_async_operation = operation;
 
 	if (!connection || !connection->is_connected()) {
-		operation->call_deferred("_complete", MySQLResult::from_error(make_not_connected_error()));
+		complete_deferred(operation, MySQLResult::from_error(make_not_connected_error()));
 		return operation;
 	}
+	if (_is_async_busy()) {
+		// Not tracked: the operation already running is still the one that owns the
+		// connection.
+		complete_deferred(operation, MySQLResult::from_error(make_busy_error()));
+		return operation;
+	}
+	pending_async_operation = operation;
 
 	_ensure_io_thread_started();
 
@@ -463,16 +508,22 @@ Ref<MySQLAsyncOperation> MySQLSession::async_execute_text(const String &p_sql) {
 Ref<MySQLAsyncOperation> MySQLSession::async_execute_prepared(const String &p_sql, const Array &p_params) {
 	Ref<MySQLAsyncOperation> operation;
 	operation.instantiate();
-	pending_async_operation = operation;
 
 	if (!connection || !connection->is_connected()) {
-		operation->call_deferred("_complete", MySQLResult::from_error(make_not_connected_error()));
+		complete_deferred(operation, MySQLResult::from_error(make_not_connected_error()));
 		return operation;
 	}
+	if (_is_async_busy()) {
+		// Not tracked: the operation already running is still the one that owns the
+		// connection.
+		complete_deferred(operation, MySQLResult::from_error(make_busy_error()));
+		return operation;
+	}
+	pending_async_operation = operation;
 
 	String error_message;
 	if (!mysql_module::array_to_field_params(p_params, operation->params, error_message)) {
-		operation->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_client_error_dict(error_message)));
+		complete_deferred(operation, MySQLResult::from_error(mysql_module::make_client_error_dict(error_message)));
 		return operation;
 	}
 
@@ -480,11 +531,11 @@ Ref<MySQLAsyncOperation> MySQLSession::async_execute_prepared(const String &p_sq
 	boost::mysql::diagnostics diagnostics;
 	boost::mysql::statement statement;
 	if (!connection->get_statement_cache()->get_or_prepare(*connection, p_sql, statement, error, diagnostics)) {
-		operation->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics)));
+		complete_deferred(operation, MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics)));
 		return operation;
 	}
 	if ((int)statement.num_params() != (int)operation->params.views.size()) {
-		operation->call_deferred("_complete", MySQLResult::from_error(mysql_module::make_client_error_dict(vformat("async_execute_prepared: The prepared statement expects %d parameter(s), got %d.", (int)statement.num_params(), (int)operation->params.views.size()))));
+		complete_deferred(operation, MySQLResult::from_error(mysql_module::make_client_error_dict(vformat("async_execute_prepared: The prepared statement expects %d parameter(s), got %d.", (int)statement.num_params(), (int)operation->params.views.size()))));
 		return operation;
 	}
 
@@ -498,6 +549,9 @@ Ref<MySQLAsyncOperation> MySQLSession::async_execute_prepared(const String &p_sq
 Ref<MySQLStreamingCursor> MySQLSession::execute_streaming(const String &p_sql) {
 	if (!connection || !connection->is_connected()) {
 		return MySQLStreamingCursor::from_error(make_not_connected_error());
+	}
+	if (_is_async_busy()) {
+		return MySQLStreamingCursor::from_error(make_busy_error());
 	}
 	return MySQLStreamingCursor::start(Ref<MySQLSession>(this), *connection, config, mysql_module::to_std_string(p_sql));
 }

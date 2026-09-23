@@ -47,18 +47,16 @@ class MySQLSession : public RefCounted {
 	// pool alive for as long as the session exists.
 	Ref<MySQLPool> owner_pool;
 
-	// Set by async_execute_text()/async_execute_prepared(), overwritten on every call:
-	// tracks only the most recently started operation, which is correct for the common
-	// case (a session runs one operation at a time; starting a second one while the first
-	// is still in flight fails immediately, see MySQLSession::async_execute_text()).
-	// Checked in the destructor: if the session is destroyed before this operation has
-	// finished, the connection cannot be reused — Boost.MySQL allows only one outstanding
-	// operation on a given `any_connection`, and the module cannot cancel one already in
-	// flight (see "MySQLStreamingCursor assíncrono"/cancellation in the roadmap). A pooled
-	// connection in that state is discarded instead of recycled (see
-	// MySQLPool::release()); this does not cover the narrower case of two operations
-	// started back to back without awaiting either before the session is dropped, since
-	// only the later one (already rejected, and so already finished) would be tracked.
+	// The asynchronous operation last started on this connection (a call rejected because
+	// one was already running does not replace it). While it runs, the I/O thread owns the
+	// connection: every other method checks `_is_async_busy()` first and fails with
+	// `operation_in_progress` instead of touching the connection from the main thread
+	// (which would be a data race with the I/O thread, even just to let Boost.MySQL
+	// reject the call). Also checked in the destructor: if the session is destroyed while
+	// the operation is still running, the connection cannot be reused (Boost.MySQL allows
+	// one outstanding operation per `any_connection`, and the module cannot cancel one in
+	// flight), so a pooled connection is discarded instead of recycled (see
+	// `MySQLPool::release()`).
 	Ref<MySQLAsyncOperation> pending_async_operation;
 
 	// Dedicated I/O thread, started on demand by the first `async_*` call. The work guard
@@ -72,6 +70,7 @@ class MySQLSession : public RefCounted {
 
 	Ref<MySQLResult> _execute_text_std(const std::string &p_sql);
 	Ref<MySQLResult> _execute_formatted_std(const std::string &p_sql, const Array &p_params);
+	bool _is_async_busy() const;
 	// Whether the server currently treats `\` as an escape inside string literals.
 	bool _backslash_escapes() const;
 

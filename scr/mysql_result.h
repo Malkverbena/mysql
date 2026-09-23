@@ -4,6 +4,7 @@
 #include "mysql_config.h"
 
 #include "core/object/ref_counted.h"
+#include "core/math/vector3i.h"
 #include "core/templates/hash_map.h"
 #include "core/variant/array.h"
 #include "core/variant/dictionary.h"
@@ -38,10 +39,10 @@ class MySQLResult : public RefCounted {
 	bool ok = true;
 	Dictionary error;
 	Vector<ResultsetData> resultsets;
-	HashMap<uint64_t, Variant> json_cache;
+	// Keyed by (resultset, row, column).
+	HashMap<Vector3i, Variant> json_cache;
 
 	const ResultsetData *_get_resultset(int p_index) const;
-	static uint64_t _json_cache_key(int p_resultset, int p_row, int p_column);
 
 protected:
 	static void _bind_methods();

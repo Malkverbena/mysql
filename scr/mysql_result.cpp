@@ -64,10 +64,6 @@ const MySQLResult::ResultsetData *MySQLResult::_get_resultset(int p_index) const
 	return &resultsets[p_index];
 }
 
-uint64_t MySQLResult::_json_cache_key(int p_resultset, int p_row, int p_column) {
-	return ((uint64_t)(uint32_t)p_resultset << 48) | ((uint64_t)(uint32_t)p_column << 32) | (uint64_t)(uint32_t)p_row;
-}
-
 Ref<MySQLResult> MySQLResult::from_error(const Dictionary &p_error) {
 	Ref<MySQLResult> result;
 	result.instantiate();
@@ -122,14 +118,14 @@ Variant MySQLResult::get_parsed_json(int p_resultset, int p_row, int p_column) {
 	// already saying "this is JSON" by naming the cell. If the text is not valid JSON,
 	// `JSON::parse_string()` just returns null.
 
-	uint64_t key = _json_cache_key(p_resultset, p_row, p_column);
-	if (Variant *cached = json_cache.getptr(key)) {
-		return *cached;
-	}
-
 	ERR_FAIL_INDEX_V(p_row, data->rows.size(), Variant());
 	Array row = data->rows[p_row];
 	ERR_FAIL_INDEX_V(p_column, row.size(), Variant());
+
+	const Vector3i key(p_resultset, p_row, p_column);
+	if (Variant *cached = json_cache.getptr(key)) {
+		return *cached;
+	}
 
 	Variant parsed = JSON::parse_string(row[p_column]);
 	json_cache.insert(key, parsed);

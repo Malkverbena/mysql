@@ -140,7 +140,8 @@ Four rules apply to every asynchronous call:
   operation finishes.** Freeing it earlier stops its I/O thread mid-operation.
 * **A session runs one asynchronous operation at a time.** A second call on the same
   session, started while the first one is still running, fails immediately instead of
-  queuing. Use a separate session per parallel operation — for example, one leased from a
+  queuing — and so does any other call on that session (`execute_*`, `close_db()`...)
+  until the operation finishes. Use a separate session per parallel operation — for example, one leased from a
   `MySQLPool`.
 
 See "Asynchronous methods" in [features.md](features.md) for the full explanation.
