@@ -64,7 +64,7 @@
 			<return type="Array" />
 			<param index="0" name="resultset" type="int" default="0" />
 			<description>
-				Rows of the given resultset. See the class description for the shape (an [Array] of [Array]s).
+				Rows of the given resultset. See the class description for the shape (an [Array] of [Array]s). Returns a new outer [Array] on every call, so resizing or sorting it does not change this result; the row [Array]s inside it are still shared with this result.
 			</description>
 		</method>
 		<method name="is_ok" qualifiers="const">

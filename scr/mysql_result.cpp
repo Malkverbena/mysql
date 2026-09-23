@@ -91,7 +91,8 @@ PackedStringArray MySQLResult::get_column_names(int p_resultset) const {
 
 Array MySQLResult::get_rows(int p_resultset) const {
 	const ResultsetData *data = _get_resultset(p_resultset);
-	return data ? data->rows : Array();
+	// A copy, so resizing or reordering the returned `Array` cannot change this result.
+	return data ? data->rows.duplicate() : Array();
 }
 
 Variant MySQLResult::get_affected_rows(int p_resultset) const {
