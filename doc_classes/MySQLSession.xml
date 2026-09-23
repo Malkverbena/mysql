@@ -29,7 +29,7 @@
 		<method name="begin_transaction">
 			<return type="MySQLTransaction" />
 			<description>
-				Runs [code]START TRANSACTION[/code] and returns a [MySQLTransaction] to [method MySQLTransaction.commit] or [method MySQLTransaction.rollback] it. If the returned [MySQLTransaction] is destroyed without either having been called, it rolls back automatically as a safety net.
+				Runs [code]START TRANSACTION[/code] and returns a [MySQLTransaction] to [method MySQLTransaction.commit] or [method MySQLTransaction.rollback] it. If the returned [MySQLTransaction] is destroyed without either having been called, it rolls back automatically as a safety net. Never returns [code]null[/code]: if [code]START TRANSACTION[/code] fails, the returned transaction reports it through [method MySQLTransaction.is_ok] and [method MySQLTransaction.get_error].
 			</description>
 		</method>
 		<method name="close_db">

@@ -11,11 +11,18 @@ class MySQLSession;
 //
 // It holds a `Ref<MySQLSession>` instead of a raw pointer, so the session (and the
 // connection behind it) cannot be destroyed while a transaction still exists.
+//
+// `MySQLSession::begin_transaction()` always returns one, even when `START TRANSACTION`
+// fails: the transaction is then already finished, `is_ok()` is false and `get_error()`
+// holds the reason, the same pattern as `MySQLResult` (never a null reference that a
+// chained `begin_transaction().commit()` would crash on).
 class MySQLTransaction : public RefCounted {
 	GDCLASS(MySQLTransaction, RefCounted);
 
 	Ref<MySQLSession> session;
 	bool finished = false;
+	// Error from `START TRANSACTION`; empty when the transaction started.
+	Dictionary start_error;
 
 protected:
 	static void _bind_methods();
@@ -23,6 +30,10 @@ protected:
 public:
 	// Internal use by `MySQLSession::begin_transaction()`, not bound.
 	static Ref<MySQLTransaction> create(Ref<MySQLSession> p_session);
+	static Ref<MySQLTransaction> create_failed(const Dictionary &p_error);
+
+	bool is_ok() const { return start_error.is_empty(); }
+	Dictionary get_error() const { return start_error; }
 
 	Dictionary commit();
 	Dictionary rollback();

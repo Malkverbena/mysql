@@ -35,6 +35,9 @@ func run_example() -> void:
 
 	log_line("\nTransferring 100 from Alice to Bob inside a transaction ...")
 	var tx := session.begin_transaction()
+	if not tx.is_ok():
+		log_line("[color=red]START TRANSACTION failed: %s[/color]" % [tx.get_error()])
+		return
 	var r1 := session.execute_prepared("UPDATE %s SET balance = balance - ? WHERE name = ?" % TABLE, [100, "Alice"])
 	var r2 := session.execute_prepared("UPDATE %s SET balance = balance + ? WHERE name = ?" % TABLE, [100, "Bob"])
 	if r1.is_ok() and r2.is_ok():

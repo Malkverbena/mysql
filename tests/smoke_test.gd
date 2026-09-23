@@ -431,6 +431,15 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	var tx_twice := session.begin_transaction()
 	tx_twice.commit()
 	check(not tx_twice.commit().is_empty(), "commit() on an already finished transaction is an error")
+	check(tx_twice.is_ok() and tx_twice.get_error().is_empty(), "a transaction that started reports is_ok()")
+
+	# A failed START TRANSACTION still returns a transaction (never null), so chaining a
+	# call on it reports the error instead of crashing the script.
+	var tx_failed: MySQLTransaction = not_connected.begin_transaction()
+	check(tx_failed != null and not tx_failed.is_ok() and not tx_failed.get_error().is_empty(), "begin_transaction() on a session that is not connected returns a failed transaction (%s)" % [tx_failed.get_error() if tx_failed != null else "null"])
+	if tx_failed != null:
+		check(tx_failed.commit() == tx_failed.get_error(), "commit() on a transaction that never started returns the START TRANSACTION error")
+		check(tx_failed.rollback() == tx_failed.get_error(), "rollback() on a transaction that never started returns the START TRANSACTION error")
 
 	print("=== 7b. Automatic rollback (destructor) ===")
 	var tx_auto := session.begin_transaction()

@@ -437,7 +437,7 @@ Dictionary MySQLSession::run_control_statement(const String &p_sql) {
 Ref<MySQLTransaction> MySQLSession::begin_transaction() {
 	Dictionary error = run_control_statement("START TRANSACTION");
 	if (!error.is_empty()) {
-		ERR_FAIL_V_MSG(Ref<MySQLTransaction>(), vformat("MySQLSession: begin_transaction() failed: %s", String(error.get("message", "unknown error"))));
+		return MySQLTransaction::create_failed(error);
 	}
 	return MySQLTransaction::create(Ref<MySQLSession>(this));
 }
