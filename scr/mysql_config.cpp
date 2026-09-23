@@ -6,6 +6,7 @@
 
 #include "core/object/class_db.h"
 
+#include <boost/mysql/defaults.hpp>
 #include <openssl/crypto.h>
 
 void MySQLConfig::_wipe_password() {
@@ -30,6 +31,7 @@ String MySQLConfig::get_host() const {
 }
 
 void MySQLConfig::set_port(int p_port) {
+	ERR_FAIL_COND_MSG(p_port < 1 || p_port > 65535, vformat("MySQLConfig: port must be between 1 and 65535, got %d.", p_port));
 	port = p_port;
 }
 
@@ -121,14 +123,19 @@ bool MySQLConfig::get_allow_multi_queries() const {
 }
 
 void MySQLConfig::set_async_timeout_ms(int p_timeout_ms) {
+	ERR_FAIL_COND_MSG(p_timeout_ms < 0, "MySQLConfig: async_timeout_ms cannot be negative (0 means no timeout).");
 	async_timeout_ms = p_timeout_ms;
 }
 
 void MySQLConfig::set_max_buffer_size(int p_size) {
+	// Boost.MySQL starts every connection with a buffer of `default_initial_read_buffer_size`
+	// bytes and asserts that it fits within the maximum.
+	ERR_FAIL_COND_MSG(p_size < (int)boost::mysql::default_initial_read_buffer_size, vformat("MySQLConfig: max_buffer_size must be at least %d bytes, got %d.", (int)boost::mysql::default_initial_read_buffer_size, p_size));
 	max_buffer_size = p_size;
 }
 
 void MySQLConfig::set_max_result_bytes(int64_t p_size) {
+	ERR_FAIL_COND_MSG(p_size < 0, "MySQLConfig: max_result_bytes cannot be negative (0 means no limit).");
 	max_result_bytes = p_size;
 }
 
