@@ -90,17 +90,24 @@ bool dict_to_time_field(const Dictionary &p_dict, boost::mysql::field_view &r_vi
 	int64_t minutes = p_dict["minutes"];
 	int64_t seconds = p_dict["seconds"];
 	int64_t microsecond = p_dict["microsecond"];
-	if (hours < 0 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59 || microsecond < 0 || microsecond > 999999) {
-		r_error_message = "TIME Dictionary parameter has an out-of-range component (minutes/seconds must be 0-59, microsecond must be 0-999999; hours/minutes/seconds/microsecond are always non-negative magnitudes — use \"negative\" for the sign).";
+	// `hours` is bounded here, before the `std::chrono` arithmetic, and not only afterwards
+	// through `min_time`/`max_time`: converting `std::chrono::hours(h)` to the microsecond
+	// representation of `boost::mysql::time` multiplies by 3.6e9, which overflows `int64_t`
+	// (undefined behaviour) for a large `h` and wraps around to a small, plausible-looking
+	// value that the range check below then accepts. `hours = 2^54`, for example, wraps to
+	// exactly 0 and used to be sent to the server as 00:00:00 instead of being rejected.
+	//
+	// The bound is MySQL's own TIME maximum (838 hours), not Boost's `max_time` (exactly 839
+	// hours, one second wider than MySQL accepts): 839:00:00 passed the check below and was
+	// then silently truncated to 838:59:59 by the server.
+	const int64_t MAX_TIME_HOURS = 838;
+	if (hours < 0 || hours > MAX_TIME_HOURS || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59 || microsecond < 0 || microsecond > 999999) {
+		r_error_message = "TIME Dictionary parameter has an out-of-range component (hours must be 0-838, minutes/seconds 0-59, microsecond 0-999999; hours/minutes/seconds/microsecond are always non-negative magnitudes — use \"negative\" for the sign).";
 		return false;
 	}
 	boost::mysql::time value = std::chrono::hours(hours) + std::chrono::minutes(minutes) + std::chrono::seconds(seconds) + std::chrono::microseconds(microsecond);
 	if (negative) {
 		value = -value;
-	}
-	if (value < boost::mysql::min_time || value > boost::mysql::max_time) {
-		r_error_message = "TIME Dictionary parameter is outside the MySQL range (-838:59:59.999999 to 838:59:59.999999).";
-		return false;
 	}
 	r_view = boost::mysql::field_view(value);
 	return true;
