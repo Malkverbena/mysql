@@ -147,11 +147,25 @@ universal.
 Each `async_*` call runs on a dedicated I/O thread and returns immediately, without
 blocking the calling thread (earlier versions of the module blocked the caller instead).
 `async_execute_text()` and `async_execute_prepared()` each return a
-`MySQLAsyncOperation`; `await` its `completed` signal to get the `MySQLResult`:
+`MySQLAsyncOperation`. Wait for its `MySQLResult` through a small helper that checks
+`is_finished()` before awaiting `completed`:
 
 ```gdscript
-var result = await session.async_execute_text("SELECT SLEEP(1)").completed
+func await_result(op: MySQLAsyncOperation) -> MySQLResult:
+    if op.is_finished():
+        return op.get_result()
+    return await op.completed
+
+var op := session.async_execute_text("SELECT SLEEP(1)")
+# ... other work, including other awaits ...
+var result := await await_result(op)
 ```
+
+`completed` fires exactly once and is never sent again. If anything else is awaited
+between starting the operation and awaiting it (a timer, another operation), the operation
+may already have finished, and a bare `await op.completed` then waits forever for a signal
+that has already fired. `await session.async_execute_text(...).completed` in a single
+statement is safe, since nothing can run in between, but the helper is safe everywhere.
 
 **Always `await` the operation; never poll it in a busy-wait loop**
 (`while not op.is_finished(): pass`). A busy-wait loop blocks the `SceneTree` from

@@ -4,7 +4,7 @@
 		A pending [method MySQLSession.async_execute_text]/[method MySQLSession.async_execute_prepared] call.
 	</brief_description>
 	<description>
-		Returned immediately by [method MySQLSession.async_execute_text] and [method MySQLSession.async_execute_prepared], before the server has answered. Wait for it with [code]await async_op.completed[/code] in GDScript, or poll [method is_finished] across frames (driven by [method Object.call_deferred] under the hood, so it only progresses while the [SceneTree] is processing frames, never from a busy [code]while[/code] loop).
+		Returned immediately by [method MySQLSession.async_execute_text] and [method MySQLSession.async_execute_prepared], before the server has answered. Wait for it by awaiting [signal completed] only if [method is_finished] is still [code]false[/code] (otherwise read [method get_result] directly): [signal completed] fires only once, so if the operation already finished while something else was being awaited, a bare [code]await async_op.completed[/code] would never return. Alternatively, poll [method is_finished] across frames (driven by [method Object.call_deferred] under the hood, so it only progresses while the [SceneTree] is processing frames, never from a busy [code]while[/code] loop).
 		Once finished, [method get_result] returns the same [MySQLResult] that [signal completed] carries.
 	</description>
 	<tutorials>
@@ -27,7 +27,7 @@
 		<signal name="completed">
 			<param index="0" name="result" type="MySQLResult" />
 			<description>
-				Emitted once, when the operation finishes (successfully or not). [code]result[/code] is the same [MySQLResult] [method get_result] then returns.
+				Emitted once, when the operation finishes (successfully or not), and never again. [code]result[/code] is the same [MySQLResult] [method get_result] then returns. Check [method is_finished] before awaiting it (see the class description).
 			</description>
 		</signal>
 	</signals>
