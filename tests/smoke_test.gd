@@ -527,6 +527,25 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 		worker_successes += int(worker_thread.wait_to_finish())
 	check(worker_successes == 6, "6 threads sharing a pool of 2 connections all got a correct result (%d of 6)" % [worker_successes])
 
+	print("=== 10c. Pooled connection health ===")
+	# Regression test: a session dropped while an asynchronous operation is still running
+	# must not hand a busy connection back to the pool. With max_size = 1, a poisoned
+	# connection used to make every later lease fail with "operation in progress".
+	var busy_pool := MySQLPool.new()
+	busy_pool.set_config(config)
+	busy_pool.max_size = 1
+	var abandoned_session: MySQLSession = busy_pool.acquire()
+	abandoned_session.connect_db()
+	abandoned_session.async_execute_text("SELECT SLEEP(1)")
+	abandoned_session = null # Dropped with the operation still in flight.
+	var after_abandon: MySQLSession = busy_pool.acquire()
+	if not after_abandon.is_db_connected():
+		after_abandon.connect_db()
+	var after_abandon_result: MySQLResult = after_abandon.execute_text("SELECT 'healthy'")
+	check(after_abandon_result.is_ok(), "a lease after an abandoned asynchronous operation gets a usable connection (%s)" % [after_abandon_result.get_error()])
+	after_abandon = null
+
+
 	print("=== 11. execute_script ===")
 	var script_off: Array = session.execute_script("SELECT 1")
 	check(script_off.size() == 1 and not (script_off[0] as MySQLResult).is_ok(), "execute_script is refused while allow_sql_script_execution is off (the default)")

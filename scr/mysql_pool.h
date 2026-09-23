@@ -46,6 +46,10 @@ public:
 	Ref<MySQLSession> acquire();
 
 	// Internal use by `MySQLSession`, which hands its connection back on destruction.
-	// Takes ownership of `p_connection`. Not bound.
-	void release(MySQLConnection *p_connection);
+	// Takes ownership of `p_connection`. `p_healthy` is false when the session still had
+	// an asynchronous operation in flight when it was destroyed: the connection is
+	// discarded instead of recycled in that case (see the comment on
+	// MySQLSession::pending_async_operation), and the pool creates a fresh replacement on
+	// the next acquire() instead of permanently losing that slot. Not bound.
+	void release(MySQLConnection *p_connection, bool p_healthy);
 };

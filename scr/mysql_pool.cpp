@@ -25,10 +25,21 @@ void MySQLPool::set_max_size(int p_max_size) {
 	max_size = p_max_size;
 }
 
-void MySQLPool::release(MySQLConnection *p_connection) {
+void MySQLPool::release(MySQLConnection *p_connection, bool p_healthy) {
 	{
 		MutexLock lock(mutex);
-		idle.push_back(p_connection);
+		if (p_healthy) {
+			idle.push_back(p_connection);
+		} else {
+			// Boost.MySQL allows only one outstanding operation per connection, and the
+			// module has no way to cancel one already in flight: a connection released
+			// while its last operation was still running can never safely run another
+			// one. Discard it and free its slot instead of recycling it, so a waiting
+			// acquire() can create a replacement rather than blocking forever on a
+			// connection that will never come back.
+			memdelete(p_connection);
+			total_count--;
+		}
 	}
 	condition.notify_one();
 }
@@ -40,15 +51,18 @@ Ref<MySQLSession> MySQLPool::acquire() {
 	bool create_new = false;
 	{
 		MutexLock lock(mutex);
-		if (idle.is_empty() && total_count < max_size) {
-			total_count++;
-			create_new = true;
-		} else {
-			while (idle.is_empty()) {
-				condition.wait(lock);
+		while (true) {
+			if (!idle.is_empty()) {
+				connection = idle[idle.size() - 1];
+				idle.remove_at(idle.size() - 1);
+				break;
 			}
-			connection = idle[idle.size() - 1];
-			idle.remove_at(idle.size() - 1);
+			if (total_count < max_size) {
+				total_count++;
+				create_new = true;
+				break;
+			}
+			condition.wait(lock);
 		}
 	}
 

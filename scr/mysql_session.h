@@ -47,6 +47,20 @@ class MySQLSession : public RefCounted {
 	// pool alive for as long as the session exists.
 	Ref<MySQLPool> owner_pool;
 
+	// Set by async_execute_text()/async_execute_prepared(), overwritten on every call:
+	// tracks only the most recently started operation, which is correct for the common
+	// case (a session runs one operation at a time; starting a second one while the first
+	// is still in flight fails immediately, see MySQLSession::async_execute_text()).
+	// Checked in the destructor: if the session is destroyed before this operation has
+	// finished, the connection cannot be reused — Boost.MySQL allows only one outstanding
+	// operation on a given `any_connection`, and the module cannot cancel one already in
+	// flight (see "MySQLStreamingCursor assíncrono"/cancellation in the roadmap). A pooled
+	// connection in that state is discarded instead of recycled (see
+	// MySQLPool::release()); this does not cover the narrower case of two operations
+	// started back to back without awaiting either before the session is dropped, since
+	// only the later one (already rejected, and so already finished) would be tracked.
+	Ref<MySQLAsyncOperation> pending_async_operation;
+
 	// Dedicated I/O thread, started on demand by the first `async_*` call. The work guard
 	// keeps `io_context::run()` from returning while no operation is pending, so the thread
 	// stays alive between asynchronous calls.
