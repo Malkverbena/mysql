@@ -566,6 +566,18 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 		check(multi_result.get_rows(1)[0] == [2, 3], "the second resultset has its own rows (%s)" % [multi_result.get_rows(1)[0]])
 	var no_multi: MySQLResult = session.execute_text("SELECT 1; SELECT 2")
 	check(not no_multi.is_ok(), "multiple statements are refused by default (allow_multi_queries is off)")
+	# Regression test: streaming a multi-statement query used to loop forever once the first
+	# resultset was exhausted (has_more() stayed true between resultsets, and close() spun
+	# the same way). A hang here means that bug is back.
+	var multi_cursor: MySQLStreamingCursor = multi_session.execute_streaming("SELECT 1; SELECT 2")
+	var multi_batches := 0
+	while multi_cursor.has_more() and multi_batches < 1000:
+		multi_cursor.next_batch()
+		multi_batches += 1
+	check(multi_batches < 1000, "streaming a multi-statement query ends (%d batches)" % [multi_batches])
+	multi_cursor.close()
+	var after_multi_stream: MySQLResult = multi_session.execute_text("SELECT 3")
+	check(after_multi_stream.is_ok(), "the connection is usable after closing a multi-statement stream (%s)" % [after_multi_stream.get_error()])
 	multi_session.close_db()
 
 	print("=== 13. Cleanup ===")

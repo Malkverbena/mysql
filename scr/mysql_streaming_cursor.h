@@ -47,7 +47,13 @@ public:
 
 	bool is_ok() const { return ok; }
 	Dictionary get_error() const { return error; }
-	bool has_more() const { return ok && !closed && !state.complete(); }
+	// `should_read_rows()`, not `!complete()`: a cursor only reads a single resultset (see
+	// `MySQLSession::execute_streaming()`), and with `allow_multi_queries` the execution is
+	// neither complete nor readable as rows between two resultsets. Reporting "more" there
+	// would make the documented `while (has_more()) next_batch()` loop spin forever on empty
+	// batches, because `read_some_rows()` in that state returns nothing and advances nothing.
+	// The resultsets left over are drained by `close()`.
+	bool has_more() const { return ok && !closed && state.should_read_rows(); }
 	PackedStringArray get_column_names() const;
 	Array next_batch();
 	void close();
