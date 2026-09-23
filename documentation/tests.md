@@ -45,9 +45,10 @@ with the server's `Com_stmt_prepare` and `Com_stmt_close` counters), the
 asynchronous path, including that the connection stays usable afterwards), transactions
 (`commit`, `rollback` and automatic rollback), streaming, asynchronous calls
 (`async_execute_text`, `async_execute_prepared` and `await`), the connection pool
-(including asynchronous calls on a recycled connection and a session dropped with an
-asynchronous operation still running), multiple resultsets (including streaming one) and
-`execute_script`.
+(including asynchronous calls on a recycled connection, a session dropped with an
+asynchronous operation still running, and no prepared statement leak across leases,
+measured with the server's `Prepared_stmt_count`), multiple resultsets (including streaming
+one) and `execute_script`.
 
 ### Prerequisites
 

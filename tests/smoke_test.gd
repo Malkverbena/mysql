@@ -545,6 +545,23 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	check(after_abandon_result.is_ok(), "a lease after an abandoned asynchronous operation gets a usable connection (%s)" % [after_abandon_result.get_error()])
 	after_abandon = null
 
+	# Regression test: prepared statements must not leak on the server across leases of
+	# the same pooled connection (the statement cache belongs to the connection, not to
+	# the session). The server-wide count must not grow after the first lease.
+	var stmt_pool := MySQLPool.new()
+	stmt_pool.set_config(config)
+	stmt_pool.max_size = 1
+	var stmt_counts: Array[int] = []
+	for lease in range(3):
+		var leased: MySQLSession = stmt_pool.acquire()
+		if not leased.is_db_connected():
+			leased.connect_db()
+		for k in range(5):
+			leased.execute_prepared("SELECT ? + %d" % [k], [lease])
+		leased = null
+		var count_result: MySQLResult = session.execute_text("SHOW GLOBAL STATUS LIKE 'Prepared_stmt_count'")
+		stmt_counts.append(int(count_result.get_rows()[0][1]) if count_result.is_ok() else -1)
+	check(stmt_counts[0] >= 0 and stmt_counts[1] == stmt_counts[0] and stmt_counts[2] == stmt_counts[0], "prepared statements do not leak across leases of a pooled connection (Prepared_stmt_count %s)" % [stmt_counts])
 
 	print("=== 11. execute_script ===")
 	var script_off: Array = session.execute_script("SELECT 1")
