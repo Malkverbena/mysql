@@ -119,12 +119,20 @@ for r in results:
 ## Asynchronous calls
 
 ```gdscript
-var op = session.async_execute_text("SELECT SLEEP(1)")
-var result = await op.completed
+func await_result(op: MySQLAsyncOperation) -> MySQLResult:
+    if op.is_finished():
+        return op.get_result()
+    return await op.completed
+
+var op := session.async_execute_text("SELECT SLEEP(1)")
+var result := await await_result(op)
 ```
 
-Three rules apply to every asynchronous call:
+Four rules apply to every asynchronous call:
 
+* **Await through an `is_finished()` check, like `await_result()` above.** `completed`
+  fires only once: if the operation finished while something else was being awaited, a
+  bare `await op.completed` never returns.
 * **Always `await` the operation.** Do not poll it in a loop
   (`while not op.is_finished(): pass`) — that loop blocks the `SceneTree` from processing
   frames, and processing frames is what delivers the result.
