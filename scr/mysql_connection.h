@@ -48,10 +48,10 @@ private:
 
 	// Owned here, not by `MySQLSession`: a connection leased from a `MySQLPool` outlives
 	// any single session that borrows it, and the prepared statement handles it holds are
-	// only valid on this specific connection. Keeping the cache with the connection lets
-	// it survive across leases, instead of every new session starting a fresh cache and
-	// leaving the previous lease's handles open on the server forever (they were never
-	// closed, since the old cache was simply discarded with the session that owned it).
+	// only valid on this specific connection. When the cache belonged to the session, it
+	// was discarded with it while its handles stayed open on the server forever, one set
+	// per lease. Now the handles live exactly as long as the server keeps them: until the
+	// connection closes or `reset_session()` resets it, and both clear the cache.
 	PreparedStatementCache *statement_cache = nullptr;
 
 	static boost::asio::ssl::context _make_ssl_context(const Ref<MySQLConfig> &p_config);
@@ -72,6 +72,13 @@ public:
 	// reason.
 	bool connect();
 	void close();
+
+	// Internal use by `MySQLPool::acquire()` before handing a recycled connection to a new
+	// lease: runs `RESET CONNECTION` (rolls back an open transaction, drops temporary
+	// tables, clears user variables, restores session variables and closes every prepared
+	// statement), then restores what `connect()` had set up, in a single round trip. On
+	// failure the connection is closed, and `get_last_error()` has the reason.
+	bool reset_session();
 
 	bool is_connected() const { return state == CONNECTED; }
 	State get_state() const { return state; }

@@ -69,6 +69,15 @@ Ref<MySQLSession> MySQLPool::acquire() {
 	if (create_new) {
 		// Built outside the lock: creating the connection (TLS context included) is slow.
 		connection = memnew(MySQLConnection(config));
+	} else if (connection->is_connected()) {
+		// A recycled connection still carries whatever the previous lease left on the
+		// server (an open transaction, temporary tables, variables, session settings).
+		// Reset here, by the thread that is about to use it and only when it is actually
+		// reused, rather than when it is released (often from the main thread). Also
+		// outside the lock: it is a round trip to the server. If the reset fails, the
+		// connection is left closed, and the new session reports `is_db_connected()`
+		// as false, so the usual `connect_db()` check reconnects it.
+		connection->reset_session();
 	}
 
 	// The session keeps a reference to the pool, so the pool outlives every leased

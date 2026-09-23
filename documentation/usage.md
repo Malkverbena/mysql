@@ -80,8 +80,8 @@ var result = session.execute_prepared(
 print(result.get_last_insert_id())
 ```
 
-The same SQL text reuses one prepared statement across calls (a per-session LRU cache,
-`MySQLConfig.statement_cache_size`) instead of preparing it again every time.
+The same SQL text reuses one prepared statement across calls (a per-connection LRU
+cache, `MySQLConfig.statement_cache_size`) instead of preparing it again every time.
 
 ### Date and time parameters
 
@@ -196,6 +196,12 @@ var result = session.execute_text("SELECT 1")
 Each thread must use its own acquired `MySQLSession` — never share one session between
 threads at the same time. `pool.acquire()` blocks if the pool is already at
 `MySQLPool.max_size`.
+
+A recycled connection is reset before it is handed out, so a lease never sees what the
+previous one left behind (open transaction, temporary tables, variables, `sql_mode`, a
+`USE`). That costs one round trip per reuse, and prepared statements are prepared again on
+each lease. Finish transactions with `begin_transaction()`: one started with plain SQL
+and left open keeps its locks until the connection is next reused.
 
 ## Bounding result size
 

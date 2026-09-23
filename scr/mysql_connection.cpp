@@ -8,7 +8,10 @@
 #include <boost/asio/ssl/host_name_verification.hpp>
 #include <boost/mysql/any_address.hpp>
 #include <boost/mysql/connect_params.hpp>
+#include <boost/mysql/character_set.hpp>
+#include <boost/mysql/format_sql.hpp>
 #include <boost/mysql/metadata_mode.hpp>
+#include <boost/mysql/pipeline.hpp>
 #include <boost/mysql/ssl_mode.hpp>
 
 namespace {
@@ -107,6 +110,53 @@ bool MySQLConnection::connect() {
 	connection.set_meta_mode(boost::mysql::metadata_mode::full);
 
 	state = CONNECTED;
+	return true;
+}
+
+bool MySQLConnection::reset_session() {
+	ERR_FAIL_COND_V(state != CONNECTED, false);
+	last_error.clear();
+	last_diagnostics.clear();
+
+	// Taken before the reset, which leaves the character set unknown to Boost.MySQL.
+	boost::system::result<boost::mysql::format_options> options = connection.format_opts();
+
+	boost::mysql::pipeline_request request;
+	request.add_reset_connection();
+	// The reset restores the server's default character set and collation, not the ones
+	// `connect()` asked for (`utf8mb4_general_ci`, the `connect_params` default).
+	// `add_set_character_set()` is what keeps Boost.MySQL's own tracking of the character
+	// set right (`format_opts()` depends on it); the collation is then set back to the
+	// exact one of a fresh connection, so string comparisons behave the same on every
+	// lease. Changing only the collation keeps the character set `utf8mb4`.
+	request.add_set_character_set(boost::mysql::utf8mb4_charset);
+	request.add_execute("SET collation_connection = 'utf8mb4_general_ci'");
+	// A `USE` run by a previous lease survives the reset; go back to the configured schema.
+	std::string database = mysql_module::to_std_string(config->get_database());
+	std::string use_database;
+	if (!database.empty() && options) {
+		use_database = boost::mysql::format_sql(*options, "USE {:i}", database);
+		request.add_execute(use_database);
+	}
+
+	std::vector<boost::mysql::stage_response> responses;
+	connection.run_pipeline(request, responses, last_error, last_diagnostics);
+
+	// Every prepared statement was closed by the server (or the connection is about to be
+	// closed below): the handles in the cache are no longer valid either way.
+	statement_cache->clear();
+
+	if (last_error || !options) {
+		if (!last_error) {
+			last_error = options.error();
+		}
+		boost::mysql::error_code reset_error = last_error;
+		boost::mysql::diagnostics reset_diagnostics = last_diagnostics;
+		close();
+		last_error = reset_error; // Report why the reset failed, not how the close went.
+		last_diagnostics = reset_diagnostics;
+		return false;
+	}
 	return true;
 }
 

@@ -11,14 +11,15 @@
 
 class MySQLConnection;
 
-// LRU cache from SQL text to prepared statement handle, owned by a single `MySQLSession`
-// (handles are per connection). Without it every execution would prepare, execute and
+// LRU cache from SQL text to prepared statement handle, owned by a single
+// `MySQLConnection` (handles are only valid on the connection that prepared them). Without it every execution would prepare, execute and
 // close the statement, costing three round trips.
 //
 // When the cache is full, the least recently used statement is closed on the server
 // before being dropped, because the handle keeps using server resources until it is
-// closed or the connection ends. `clear()` (called when reconnecting) only empties the
-// cache without closing anything: the old handles are not valid on a new connection.
+// closed or the connection ends. `clear()` (called when the connection closes, or when a
+// pooled connection is reset for a new lease) only empties the cache without closing
+// anything: the server has already closed those statements.
 //
 // Internal class, never exposed to GDScript.
 class PreparedStatementCache {
