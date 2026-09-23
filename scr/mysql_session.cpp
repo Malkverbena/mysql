@@ -235,8 +235,9 @@ MySQLSession::~MySQLSession() {
 	memdelete(statement_cache);
 	statement_cache = nullptr;
 
+	bool connection_healthy = !(pending_async_operation.is_valid() && !pending_async_operation->is_finished());
 	if (owner_pool.is_valid() && connection) {
-		owner_pool->release(connection);
+		owner_pool->release(connection, connection_healthy);
 	} else {
 		memdelete(connection);
 	}
@@ -430,6 +431,7 @@ Ref<MySQLTransaction> MySQLSession::begin_transaction() {
 Ref<MySQLAsyncOperation> MySQLSession::async_execute_text(const String &p_sql) {
 	Ref<MySQLAsyncOperation> operation;
 	operation.instantiate();
+	pending_async_operation = operation;
 
 	if (!connection || !connection->is_connected()) {
 		operation->call_deferred("_complete", MySQLResult::from_error(make_not_connected_error()));
@@ -447,6 +449,7 @@ Ref<MySQLAsyncOperation> MySQLSession::async_execute_text(const String &p_sql) {
 Ref<MySQLAsyncOperation> MySQLSession::async_execute_prepared(const String &p_sql, const Array &p_params) {
 	Ref<MySQLAsyncOperation> operation;
 	operation.instantiate();
+	pending_async_operation = operation;
 
 	if (!connection || !connection->is_connected()) {
 		operation->call_deferred("_complete", MySQLResult::from_error(make_not_connected_error()));

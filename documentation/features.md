@@ -160,7 +160,9 @@ The operation still finishes — the loop never notices.
 
 **Keep the `MySQLSession` (or the `MySQLPool` it came from) alive until the operation
 finishes.** If every reference to the session goes out of scope first, Godot frees the
-session and stops its I/O thread mid-operation.
+session and stops its I/O thread mid-operation: `completed` then never fires. A pooled
+session freed this way does not hand its connection back to the pool (it would still be
+busy); the pool closes that connection and opens a new one when needed.
 
 A session processes one asynchronous operation at a time. Starting a second `async_*`
 call while the first one is still running does not queue the second call — it fails
