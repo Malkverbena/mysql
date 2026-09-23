@@ -6,6 +6,7 @@
 	<description>
 		Owns up to [member max_size] connections and hands them out one at a time via [method acquire], as a [MySQLSession]. It is the only class in this module meant to be called from several threads at once: [method acquire] itself is thread safe, even though each leased [MySQLSession] individually is not (see the [MySQLSession] class description).
 		A session leased from the pool is not connected yet: call [method MySQLSession.connect_db] on it (or check [method MySQLSession.is_db_connected] first, since a recycled connection may already be connected). When the session is destroyed (its last reference is dropped), its connection goes back to the pool idle instead of being closed, ready for the next [method acquire].
+		Before a recycled connection is handed to a new session, [method acquire] resets it, so no state leaks from one lease to the next: an open transaction is rolled back, temporary tables are dropped, user variables are cleared, session variables (such as [code]sql_mode[/code] or [code]autocommit[/code]) go back to their defaults, and the default schema goes back to [member MySQLConfig.database]. This costs one round trip to the server per reuse, and the server closes every prepared statement, so each lease prepares again the statements it uses. If the reset fails, the connection is closed, and the new session reports [method MySQLSession.is_db_connected] as [code]false[/code], so the usual check reconnects it. The reset happens when the connection is reused, not when it is released: a transaction started with plain SQL ([code]START TRANSACTION[/code] through [method MySQLSession.execute_text]) and never finished keeps its locks while the connection sits idle. [method MySQLSession.begin_transaction] does not have this problem, since its [MySQLTransaction] always finishes before the session can be released.
 		If [method acquire] is called while the pool is already at [member max_size] and every connection is leased out, it blocks until one is released.
 	</description>
 	<tutorials>
@@ -14,7 +15,7 @@
 		<method name="acquire">
 			<return type="MySQLSession" />
 			<description>
-				Returns a [MySQLSession] backed by an idle connection from the pool, creating a new one first if the pool has not yet reached [member max_size]. Blocks if the pool is full and no connection is idle. [method set_config] must be called first.
+				Returns a [MySQLSession] backed by an idle connection from the pool (reset first, see the class description), creating a new one first if the pool has not yet reached [member max_size]. Blocks if the pool is full and no connection is idle. [method set_config] must be called first.
 			</description>
 		</method>
 		<method name="get_config" qualifiers="const">

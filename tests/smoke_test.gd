@@ -574,7 +574,8 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 
 	# Regression test: prepared statements must not leak on the server across leases of
 	# the same pooled connection (the statement cache belongs to the connection, not to
-	# the session). The server-wide count must not grow after the first lease.
+	# the session, and the reset between leases closes them on the server). The
+	# server-wide count must not grow after the first lease.
 	var stmt_pool := MySQLPool.new()
 	stmt_pool.set_config(config)
 	stmt_pool.max_size = 1
@@ -589,6 +590,61 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 		var count_result: MySQLResult = session.execute_text("SHOW GLOBAL STATUS LIKE 'Prepared_stmt_count'")
 		stmt_counts.append(int(count_result.get_rows()[0][1]) if count_result.is_ok() else -1)
 	check(stmt_counts[0] >= 0 and stmt_counts[1] == stmt_counts[0] and stmt_counts[2] == stmt_counts[0], "prepared statements do not leak across leases of a pooled connection (Prepared_stmt_count %s)" % [stmt_counts])
+
+	# A recycled connection is reset before a new lease: nothing the previous lease left
+	# on the server (transaction, temporary table, variables, session settings, USE) may
+	# reach the next one.
+	var reset_pool := MySQLPool.new()
+	reset_pool.set_config(config)
+	reset_pool.max_size = 1
+	var dirty: MySQLSession = reset_pool.acquire()
+	dirty.connect_db()
+	var fresh_collation: MySQLResult = dirty.execute_text("SELECT @@SESSION.collation_connection")
+	dirty.execute_text("SET @smoke_leaked_variable = 42")
+	dirty.execute_text("CREATE TEMPORARY TABLE smoke_leaked_temp (x INT)")
+	dirty.execute_text("SET SESSION sql_mode = 'NO_BACKSLASH_ESCAPES'")
+	dirty.execute_text("SET NAMES utf8mb4 COLLATE utf8mb4_bin")
+	dirty.execute_text("START TRANSACTION")
+	dirty.execute_text("INSERT INTO t_mysql_module_smoke_test (txt) VALUES ('leaked_uncommitted')")
+	var dirty_use: MySQLResult = dirty.execute_text("USE information_schema")
+	check(dirty_use.is_ok(), "the dirty lease switched to another schema (%s)" % [dirty_use.get_error()])
+	dirty.execute_prepared("SELECT ? + 100", [1])
+	dirty = null # Released with all of the above still in place.
+	var clean: MySQLSession = reset_pool.acquire()
+	check(clean.is_db_connected(), "the recycled connection is still connected after the reset")
+	var leaked_state: MySQLResult = clean.execute_text(
+		"SELECT @smoke_leaked_variable, @@SESSION.sql_mode LIKE '%NO_BACKSLASH_ESCAPES%', DATABASE(), @@SESSION.collation_connection, @@SESSION.autocommit"
+	)
+	if leaked_state.is_ok():
+		var state_row: Array = leaked_state.get_rows()[0]
+		check(state_row[0] == null, "a user variable does not reach the next lease (%s)" % [state_row[0]])
+		check(int(state_row[1]) == 0, "a session sql_mode does not reach the next lease")
+		check(state_row[2] == database, "the next lease is back on the configured schema (%s)" % [state_row[2]])
+		check(fresh_collation.is_ok() and state_row[3] == fresh_collation.get_rows()[0][0], "the next lease has the collation of a fresh connection (%s, fresh %s)" % [state_row[3], fresh_collation.get_rows()[0][0] if fresh_collation.is_ok() else "?"])
+		check(int(state_row[4]) == 1, "autocommit is back on in the next lease")
+	else:
+		check(false, "reading the session state of the next lease (%s)" % [leaked_state.get_error()])
+	var leaked_temp: MySQLResult = clean.execute_text("SELECT * FROM smoke_leaked_temp")
+	check(not leaked_temp.is_ok(), "a temporary table does not reach the next lease")
+	var leaked_row: MySQLResult = session.execute_text("SELECT COUNT(*) FROM t_mysql_module_smoke_test WHERE txt = 'leaked_uncommitted'")
+	check(leaked_row.is_ok() and int(leaked_row.get_rows()[0][0]) == 0, "an open transaction of the previous lease was rolled back")
+	var after_reset_formatted: MySQLResult = clean.execute_formatted("SELECT ? AS v", ["it's"])
+	check(after_reset_formatted.is_ok() and after_reset_formatted.get_rows()[0][0] == "it's", "execute_formatted works after the reset (%s)" % [after_reset_formatted.get_error()])
+	var after_reset_prepared: MySQLResult = clean.execute_prepared("SELECT ? + 100", [1])
+	check(after_reset_prepared.is_ok() and after_reset_prepared.get_rows()[0][0] == 101, "a statement prepared by the previous lease is prepared again (%s)" % [after_reset_prepared.get_error()])
+	var connection_id_result: MySQLResult = clean.execute_text("SELECT CONNECTION_ID()")
+	clean = null
+
+	# If the reset fails (here: the idle connection was killed on the server), the lease
+	# gets a closed connection, and the usual is_db_connected()/connect_db() check recovers.
+	if connection_id_result.is_ok():
+		session.execute_text("KILL %d" % [int(connection_id_result.get_rows()[0][0])])
+	var after_kill: MySQLSession = reset_pool.acquire()
+	check(not after_kill.is_db_connected(), "a lease whose reset failed reports is_db_connected() == false")
+	check(after_kill.connect_db().is_empty(), "connect_db() recovers a lease whose reset failed")
+	var after_kill_result: MySQLResult = after_kill.execute_text("SELECT 'recovered'")
+	check(after_kill_result.is_ok(), "the reconnected lease works (%s)" % [after_kill_result.get_error()])
+	after_kill = null
 
 	print("=== 11. execute_script ===")
 	var script_off: Array = session.execute_script("SELECT 1")

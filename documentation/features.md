@@ -75,7 +75,7 @@ classDiagram
 ```
 
 Internally (not exposed to GDScript), `MySQLSession` wraps a single `any_connection`
-(Boost.MySQL) plus a per-session prepared-statement LRU cache; `async_*` calls run on a
+(Boost.MySQL) plus a per-connection prepared-statement LRU cache; `async_*` calls run on a
 dedicated I/O thread per session, delivering the result back to the main thread via
 `call_deferred`, never directly from the background thread.
 
@@ -125,12 +125,13 @@ universal.
   (`with_params`/`format_sql`, no home-made escaping) are both supported.
 * Prepared statements: MySQL calls this the "binary protocol", because the result of
   executing a prepared statement is sent in binary format rather than text. Statements
-  are kept in a per-session LRU cache, sized by `statement_cache_size` (default 512).
+  are kept in a per-connection LRU cache, sized by `statement_cache_size` (default 512).
   When the cache is full, the least recently used statement is closed on the server
   before being dropped. `statement_cache_size` is per connection; a server's
   `max_prepared_stmt_count` system variable is a single limit shared by every connection
   on that server, so raising it a lot on a pool with many connections is worth checking
-  against that limit.
+  against that limit. A pooled connection is reset before every new lease, which closes
+  its prepared statements, so each lease starts with an empty cache.
 * Multi-function operations. They can contain stored procedures.
 * Stored procedures.
 * SQL scripts and multi-queries are **disabled by default** and independent of each

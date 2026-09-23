@@ -47,8 +47,9 @@ asynchronous path, including that the connection stays usable afterwards), trans
 (`commit`, `rollback` and automatic rollback), streaming, asynchronous calls
 (`async_execute_text`, `async_execute_prepared` and `await`), the connection pool
 (including asynchronous calls on a recycled connection, a session dropped with an
-asynchronous operation still running, and no prepared statement leak across leases,
-measured with the server's `Prepared_stmt_count`), failed `begin_transaction()`, multiple resultsets (including streaming
+asynchronous operation still running, no prepared statement leak across leases,
+measured with the server's `Prepared_stmt_count`, the reset between leases, and recovery
+when that reset fails), failed `begin_transaction()`, multiple resultsets (including streaming
 one), `execute_formatted` and `execute_script` with `?`/`;` inside literals and comments and
 under `NO_BACKSLASH_ESCAPES`, and `execute_script`.
 
