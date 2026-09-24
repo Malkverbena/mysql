@@ -14,7 +14,7 @@ self-contained example, with its own scene.
   schema itself does not need to exist yet: `connect_and_configure` creates it
   (`CREATE DATABASE IF NOT EXISTS`) the first time it runs. `transactions` and
   `streaming` create and populate their own tables inside it; the other examples create
-  nothing. None of them touches anything else.
+  nothing (`async_streaming` has the server generate its rows). None of them touches anything else.
 
 ## Setup
 
@@ -73,6 +73,7 @@ alone does not build the class cache, and would not find the `DemoConfig` class.
 | [`transactions/`](transactions/) | `transactions.tscn` | `begin_transaction()`, `commit()` and `rollback()`: transfers a balance between two rows once committed and once rolled back on purpose, printing the balances after each so the difference is visible. |
 | [`streaming/`](streaming/) | `streaming.tscn` | `execute_streaming()`: reads a few thousand rows back in batches with `next_batch()`/`has_more()`, instead of loading the whole result into memory at once. |
 | [`async/`](async/) | `async.tscn` | `async_execute_text()`/`async_execute_prepared()`: start a query without blocking, keep doing other work, then await the result through an `is_finished()` guard. Also shows the explicit error a second call gets while the session is still busy with the first. |
+| [`async_streaming/`](async_streaming/) | `async_streaming.tscn` | `async_execute_streaming()`: reads 100,000 server-generated rows in batches with `async_next_batch()`, each one awaited, while a frame counter shows the game keeps running. The **Cancel** button cancels the batch in flight and closes the cursor with `async_close()`. |
 | [`connection_pool/`](connection_pool/) | `connection_pool.tscn` | `MySQLPool`: six Godot `Thread`s share a pool of two connections, each leasing a session, running one query and releasing it for the next thread. |
 
 `demo_config.gd` (project root) is shared by every example: it loads `config.ini` into a
