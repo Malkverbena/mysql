@@ -223,7 +223,8 @@ for longer than needed, until Godot's reference counting destroys the object.
 * `async_timeout_ms` (default 30000, `0` = no timeout): applied per network round trip of
   an asynchronous operation (each step of reading the result), not once for the whole
   call — a result read in several batches or with several resultsets gets a fresh budget
-  on every step instead of one shared deadline for all of them.
+  on every step instead of one shared deadline for all of them. An operation that times
+  out fails with a fatal error and drops the connection (see the error model below).
 
 ## Error model
 
@@ -231,6 +232,14 @@ No exceptions in any layer (`no_exception`, like the Godot default). Every falli
 operation exposes `is_ok()` and `get_error() -> Dictionary`, with the keys `category`,
 `message`, `server_message` and `is_fatal`. There is no global or per-instance error
 state — each call carries its own result.
+
+A fatal error (`is_fatal == true`: a lost connection, a protocol error, an expired
+`async_timeout_ms`) leaves the connection in an unspecified state, so the module drops it
+instead of reusing it: `is_db_connected()` returns `false` and the next call fails with a
+"not connected" error until `connect_db()` reconnects. Without this, a timed-out query's
+reply would still be on its way, and the next query would read it as its own result. A
+pooled session dropped this way hands the pool an unconnected connection, which the next
+lease reconnects.
 
 ## Equivalent data types
 

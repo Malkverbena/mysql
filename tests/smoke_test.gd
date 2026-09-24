@@ -540,6 +540,54 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	var async_not_connected_result: MySQLResult = await await_operation(async_not_connected)
 	check(not async_not_connected_result.is_ok(), "an asynchronous call on a session without config fails explicitly")
 
+	print("=== 9b. Fatal errors drop the connection ===")
+	# Regression test: after async_timeout_ms cancels an operation, Boost.MySQL leaves the
+	# connection in an unspecified state (the reply of the cancelled query is still on its
+	# way). It used to stay "connected", and the next query read that reply as its own
+	# result, every later result shifted by one. A fatal error must now drop the connection.
+	var timeout_config := make_config(host, port, user, password, database)
+	timeout_config.transport_mode = MySQLConfig.TCP_TLS_DISABLED
+	timeout_config.async_timeout_ms = 300
+	var timeout_session := MySQLSession.new()
+	timeout_session.set_config(timeout_config)
+	timeout_session.connect_db()
+	var timed_out: MySQLResult = await await_operation(timeout_session.async_execute_text("SELECT SLEEP(1) AS slept"))
+	check(not timed_out.is_ok() and timed_out.get_error().get("is_fatal") == true, "an operation cancelled by async_timeout_ms fails with a fatal error (%s)" % [timed_out.get_error()])
+	check(not timeout_session.is_db_connected(), "the session is no longer connected after the timeout")
+	var after_timeout: MySQLResult = timeout_session.execute_text("SELECT 'after_timeout' AS v")
+	check(not after_timeout.is_ok(), "a query after the timeout fails explicitly instead of reading the cancelled reply (%s)" % [after_timeout.get_rows() if after_timeout.is_ok() else after_timeout.get_error().get("message", "")])
+	check(timeout_session.connect_db().is_empty(), "connect_db() reconnects after the timeout")
+	var reconnected: MySQLResult = timeout_session.execute_text("SELECT 'after_timeout' AS v")
+	check(reconnected.is_ok() and reconnected.get_rows()[0][0] == "after_timeout", "the reconnected session gets its own result (%s)" % [reconnected.get_rows() if reconnected.is_ok() else reconnected.get_error()])
+	var reprepared: MySQLResult = timeout_session.execute_prepared("SELECT ? + 1", [41])
+	check(reprepared.is_ok() and reprepared.get_rows()[0][0] == 42, "execute_prepared works after the reconnection (%s)" % [reprepared.get_error()])
+
+	# Same for a synchronous call: a connection killed on the server fails the next query
+	# with a fatal (network) error, and the session reports it as disconnected.
+	var killed_id: MySQLResult = timeout_session.execute_text("SELECT CONNECTION_ID()")
+	if killed_id.is_ok():
+		session.execute_text("KILL %d" % [int(killed_id.get_rows()[0][0])])
+	var after_kill_sync: MySQLResult = timeout_session.execute_text("SELECT 1")
+	check(not after_kill_sync.is_ok() and after_kill_sync.get_error().get("is_fatal") == true, "a query on a connection killed on the server fails with a fatal error (%s)" % [after_kill_sync.get_error()])
+	check(not timeout_session.is_db_connected(), "the session is no longer connected after a fatal synchronous error")
+	timeout_session = null
+
+	# A pooled connection that timed out is not handed to the next lease as connected.
+	var timeout_pool := MySQLPool.new()
+	timeout_pool.set_config(timeout_config)
+	timeout_pool.max_size = 1
+	var timeout_lease: MySQLSession = timeout_pool.acquire()
+	timeout_lease.connect_db()
+	await await_operation(timeout_lease.async_execute_text("SELECT SLEEP(1)"))
+	timeout_lease = null
+	var next_lease: MySQLSession = timeout_pool.acquire()
+	check(not next_lease.is_db_connected(), "the lease after a timed-out pooled connection is not connected")
+	if not next_lease.is_db_connected():
+		next_lease.connect_db()
+	var next_lease_result: MySQLResult = next_lease.execute_text("SELECT 'own_result' AS v")
+	check(next_lease_result.is_ok() and next_lease_result.get_rows()[0][0] == "own_result", "the next lease gets its own result (%s)" % [next_lease_result.get_rows() if next_lease_result.is_ok() else next_lease_result.get_error()])
+	next_lease = null
+
 	print("=== 10. Connection pool ===")
 	var pool := MySQLPool.new()
 	pool.set_config(config)

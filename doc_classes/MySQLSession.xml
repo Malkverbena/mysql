@@ -91,7 +91,7 @@
 		<method name="is_db_connected" qualifiers="const">
 			<return type="bool" />
 			<description>
-				Returns [code]true[/code] if [method connect_db] has succeeded and [method close_db] has not been called since.
+				Returns [code]true[/code] if [method connect_db] has succeeded and [method close_db] has not been called since. Also returns [code]false[/code] after any call fails with a fatal error ([code]is_fatal[/code] is [code]true[/code] in the error [Dictionary]), such as a lost connection or an [member MySQLConfig.async_timeout_ms] that expired: the module drops the connection instead of reusing it. Call [method connect_db] to reconnect.
 			</description>
 		</method>
 		<method name="set_config">

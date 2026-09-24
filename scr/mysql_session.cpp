@@ -17,9 +17,11 @@
 #include "core/object/class_db.h"
 
 #include <boost/asio/cancel_after.hpp>
+#include <boost/asio/post.hpp>
 #include <boost/mysql/client_errc.hpp>
 #include <boost/mysql/execution_state.hpp>
 #include <boost/mysql/format_sql.hpp>
+#include <boost/mysql/is_fatal_error.hpp>
 #include <boost/mysql/rows_view.hpp>
 #include <boost/mysql/statement.hpp>
 
@@ -35,6 +37,23 @@ void complete_deferred(const Ref<MySQLAsyncOperation> &p_operation, const Ref<My
 	// From here on the connection is free: nothing below touches it again.
 	p_operation->clear_running();
 	callable_mp(p_operation.ptr(), &MySQLAsyncOperation::_complete).call_deferred(p_result);
+}
+
+// Hands a failed operation's result to the main thread, first dropping the connection if
+// `p_connection_error` is fatal (see `MySQLConnection::drop()`), so the next call sees it
+// disconnected instead of reading the leftovers of the failed operation as its own result.
+// The drop is posted rather than run inline: it replaces the `any_connection` whose
+// operation is completing right now, which must not be destroyed from inside its own
+// completion handler. `running` stays set until the drop is done.
+void fail_deferred(const Ref<MySQLAsyncOperation> &p_operation, boost::mysql::error_code p_connection_error, const Ref<MySQLResult> &p_result) {
+	if (!boost::mysql::is_fatal_error(p_connection_error)) {
+		complete_deferred(p_operation, p_result);
+		return;
+	}
+	boost::asio::post(p_operation->connection->get_io_context(), [p_operation, p_connection_error, p_result]() {
+		p_operation->connection->drop(p_connection_error);
+		complete_deferred(p_operation, p_result);
+	});
 }
 
 Dictionary make_not_connected_error() {
@@ -67,6 +86,7 @@ void drain_execution_state(MySQLConnection &p_connection, boost::mysql::executio
 			p_connection.native().read_resultset_head(p_state, error, diagnostics);
 		}
 		if (error) {
+			p_connection.drop_if_fatal(error);
 			break;
 		}
 	}
@@ -84,7 +104,7 @@ Ref<MySQLResult> execute_with_limit(MySQLConnection &p_connection, Request &&p_r
 
 	p_connection.native().start_execution(std::forward<Request>(p_request), state, error, diagnostics);
 	if (error) {
-		return MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics));
+		return MySQLResult::from_error(mysql_module::make_error_dict(p_connection.drop_if_fatal(error), diagnostics));
 	}
 
 	MySQLResult::Builder builder;
@@ -96,7 +116,7 @@ Ref<MySQLResult> execute_with_limit(MySQLConnection &p_connection, Request &&p_r
 		if (state.should_read_rows()) {
 			boost::mysql::rows_view batch = p_connection.native().read_some_rows(state, error, diagnostics);
 			if (error) {
-				return MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics));
+				return MySQLResult::from_error(mysql_module::make_error_dict(p_connection.drop_if_fatal(error), diagnostics));
 			}
 			builder.add_rows(batch, state.meta(), p_config);
 			if (max_bytes > 0 && (int64_t)builder.get_estimated_bytes() > max_bytes) {
@@ -107,7 +127,7 @@ Ref<MySQLResult> execute_with_limit(MySQLConnection &p_connection, Request &&p_r
 			builder.end_resultset(state.affected_rows(), state.last_insert_id(), state.info());
 			p_connection.native().read_resultset_head(state, error, diagnostics);
 			if (error) {
-				return MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics));
+				return MySQLResult::from_error(mysql_module::make_error_dict(p_connection.drop_if_fatal(error), diagnostics));
 			}
 			builder.begin_resultset(state.meta());
 		}
@@ -145,7 +165,7 @@ struct AsyncDrainHeadHandler {
 
 void async_drain_step(const Ref<MySQLAsyncOperation> &p_operation, const Dictionary &p_error, boost::mysql::error_code p_drain_error) {
 	if (p_drain_error || p_operation->exec_state.complete()) {
-		complete_deferred(p_operation, MySQLResult::from_error(p_error));
+		fail_deferred(p_operation, p_drain_error, MySQLResult::from_error(p_error));
 		return;
 	}
 	if (p_operation->exec_state.should_read_rows()) {
@@ -165,7 +185,7 @@ struct AsyncRowsHandler {
 	Ref<MySQLAsyncOperation> operation;
 	void operator()(boost::mysql::error_code p_error, boost::mysql::rows_view p_rows) {
 		if (p_error) {
-			complete_deferred(operation, MySQLResult::from_error(mysql_module::make_error_dict(p_error, operation->diagnostics)));
+			fail_deferred(operation, p_error, MySQLResult::from_error(mysql_module::make_error_dict(p_error, operation->diagnostics)));
 			return;
 		}
 		operation->result_builder.add_rows(p_rows, operation->exec_state.meta(), operation->config);
@@ -186,7 +206,7 @@ struct AsyncHeadHandler {
 	Ref<MySQLAsyncOperation> operation;
 	void operator()(boost::mysql::error_code p_error) {
 		if (p_error) {
-			complete_deferred(operation, MySQLResult::from_error(mysql_module::make_error_dict(p_error, operation->diagnostics)));
+			fail_deferred(operation, p_error, MySQLResult::from_error(mysql_module::make_error_dict(p_error, operation->diagnostics)));
 			return;
 		}
 		operation->result_builder.begin_resultset(operation->exec_state.meta());
@@ -454,7 +474,7 @@ Ref<MySQLResult> MySQLSession::execute_prepared(const String &p_sql, const Array
 	boost::mysql::diagnostics diagnostics;
 	boost::mysql::statement statement;
 	if (!connection->get_statement_cache()->get_or_prepare(*connection, p_sql, statement, error, diagnostics)) {
-		return MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics));
+		return MySQLResult::from_error(mysql_module::make_error_dict(connection->drop_if_fatal(error), diagnostics));
 	}
 
 	if ((int)statement.num_params() != (int)fields.views.size()) {
@@ -558,7 +578,7 @@ Ref<MySQLAsyncOperation> MySQLSession::async_execute_prepared(const String &p_sq
 	boost::mysql::diagnostics diagnostics;
 	boost::mysql::statement statement;
 	if (!connection->get_statement_cache()->get_or_prepare(*connection, p_sql, statement, error, diagnostics)) {
-		complete_deferred(operation, MySQLResult::from_error(mysql_module::make_error_dict(error, diagnostics)));
+		complete_deferred(operation, MySQLResult::from_error(mysql_module::make_error_dict(connection->drop_if_fatal(error), diagnostics)));
 		return operation;
 	}
 	if ((int)statement.num_params() != (int)operation->params.views.size()) {

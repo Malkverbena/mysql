@@ -26,7 +26,7 @@ Ref<MySQLStreamingCursor> MySQLStreamingCursor::start(Ref<MySQLSession> p_sessio
 	p_connection.native().start_execution(p_sql, cursor->state, err, diag);
 	if (err) {
 		cursor->ok = false;
-		cursor->error = mysql_module::make_error_dict(err, diag);
+		cursor->error = mysql_module::make_error_dict(p_connection.drop_if_fatal(err), diag);
 	}
 	return cursor;
 }
@@ -64,7 +64,7 @@ Array MySQLStreamingCursor::next_batch() {
 	boost::mysql::rows_view batch = connection->native().read_some_rows(state, err, diag);
 	if (err) {
 		ok = false;
-		error = mysql_module::make_error_dict(err, diag);
+		error = mysql_module::make_error_dict(connection->drop_if_fatal(err), diag);
 		return out;
 	}
 
@@ -111,6 +111,7 @@ void MySQLStreamingCursor::_drain() {
 			connection->native().read_resultset_head(state, err, diag);
 		}
 		if (err) {
+			connection->drop_if_fatal(err);
 			break;
 		}
 	}

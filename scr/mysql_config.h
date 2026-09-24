@@ -51,7 +51,8 @@ private:
 	// Timeout of asynchronous operations. 0 means no timeout. Applied per network round trip
 	// (per Boost.MySQL async call chained while reading a result), not once for the whole
 	// logical execute_*() call: a result with many batches/resultsets gets a fresh budget on
-	// every hop instead of one shared deadline for all of them.
+	// every hop instead of one shared deadline for all of them. A timeout is a fatal error:
+	// the connection is dropped (see `MySQLConnection::drop()`).
 	int async_timeout_ms = 30000;
 	// Limit on the size of a packet or row. Boost.MySQL already defaults to 64 MB; this only
 	// exposes it as an option instead of leaving it hardcoded. This is NOT a limit on the

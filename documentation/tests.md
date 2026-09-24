@@ -47,7 +47,9 @@ with the server's `Com_stmt_prepare` and `Com_stmt_close` counters), the
 asynchronous path, including that the connection stays usable afterwards), transactions
 (`commit`, `rollback` and automatic rollback), streaming (including that an open cursor
 holds the connection), asynchronous calls
-(`async_execute_text`, `async_execute_prepared` and `await`), the connection pool
+(`async_execute_text`, `async_execute_prepared` and `await`), a fatal error dropping the
+connection (an expired `async_timeout_ms`, a connection killed on the server, and a pooled
+connection after a timeout), the connection pool
 (including asynchronous calls on a recycled connection, a session dropped with an
 asynchronous operation still running, no prepared statement leak across leases,
 measured with the server's `Prepared_stmt_count`, the reset between leases, and recovery
