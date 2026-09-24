@@ -1,0 +1,41 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://b07gdf34tbjvl" path="res://cancel/cancel.gd" id="1"]
+
+[node name="Cancel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Layout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Top" type="HBoxContainer" parent="Layout"]
+layout_mode = 2
+
+[node name="FrameLabel" type="Label" parent="Layout/Top"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 48
+text = "Frame 0"
+
+[node name="CancelButton" type="Button" parent="Layout/Top"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+text = "Cancel"
+
+[node name="Output" type="RichTextLabel" parent="Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/normal_font_size = 48
+bbcode_enabled = true
+scroll_following = true
