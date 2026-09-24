@@ -33,6 +33,7 @@ hardware is available to build and test it.
 | [documentation/instructions.md](documentation/instructions.md) | How to configure, compile and test the module together with Godot, per platform. |
 | [documentation/usage.md](documentation/usage.md) | How to use the module from GDScript: class overview and worked examples. |
 | [documentation/tests.md](documentation/tests.md) | How to run the unit tests, the desktop integration test and the Android integration test. |
+| [benchmark/](benchmark/) | Benchmarks of the module, one Godot scene per situation, and the results measured on the development machine. |
 | [doc_classes/](doc_classes/) | The reference used by Godot's own built-in help (`F1` in the editor), one XML file per class. |
 
 ## Old version note
