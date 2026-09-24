@@ -59,6 +59,14 @@ class MySQLSession : public RefCounted {
 	// `MySQLPool::release()`).
 	Ref<MySQLAsyncOperation> pending_async_operation;
 
+	// The streaming cursor last opened on this connection, cleared by the cursor when it
+	// closes. A raw pointer, not a `Ref`: the cursor holds a `Ref` to this session, so it
+	// never outlives it, and a `Ref` here would be a reference cycle. While it has not
+	// been read to the end, Boost.MySQL rejects any other command on the connection; the
+	// session rejects them first (`_busy_error()`), so that an `async_*` call cannot hand
+	// that rejection to the I/O thread while the main thread is still reading the cursor.
+	MySQLStreamingCursor *active_cursor = nullptr;
+
 	// Dedicated I/O thread, started on demand by the first `async_*` call. The work guard
 	// keeps `io_context::run()` from returning while no operation is pending, so the thread
 	// stays alive between asynchronous calls.
@@ -71,6 +79,10 @@ class MySQLSession : public RefCounted {
 	Ref<MySQLResult> _execute_text_std(const std::string &p_sql);
 	Ref<MySQLResult> _execute_formatted_std(const std::string &p_sql, const Array &p_params);
 	bool _is_async_busy() const;
+	// Why the connection cannot take a new command right now (an asynchronous operation
+	// is running, or a streaming cursor has not been read to the end), as the same error
+	// Boost.MySQL would give; empty if it is free.
+	Dictionary _busy_error() const;
 	// Whether the server currently treats `\` as an escape inside string literals.
 	bool _backslash_escapes() const;
 
@@ -109,6 +121,8 @@ public:
 	Ref<MySQLAsyncOperation> async_execute_text(const String &p_sql);
 	Ref<MySQLAsyncOperation> async_execute_prepared(const String &p_sql, const Array &p_params);
 	Ref<MySQLStreamingCursor> execute_streaming(const String &p_sql);
+	// Internal use by `MySQLStreamingCursor::close()`, not bound.
+	void _cursor_closed(const MySQLStreamingCursor *p_cursor);
 
 	// Internal use by `MySQLPool`.
 	MySQLConnection *get_connection() const { return connection; }

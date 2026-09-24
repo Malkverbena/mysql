@@ -87,9 +87,15 @@ void MySQLStreamingCursor::close() {
 		return;
 	}
 	closed = true;
-	if (!ok || !connection) {
-		return;
+	if (ok && connection) {
+		_drain();
 	}
+	if (owner_session.is_valid()) {
+		owner_session->_cursor_closed(this);
+	}
+}
+
+void MySQLStreamingCursor::_drain() {
 	// Drain the rest of the execution silently. See the comment in the header.
 	//
 	// The branch on `should_read_rows()` is required, not cosmetic: with

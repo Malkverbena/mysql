@@ -179,7 +179,9 @@ cursor.close()
 
 Reads incrementally, never loading the whole result into memory — the right tool for a
 result too large to fit in one `MySQLResult` (`max_result_bytes`, below, is the guard for
-everything that is *not* read this way).
+everything that is *not* read this way). Until the cursor is read to the end or closed,
+it holds the connection: any other call on the same session fails with an explicit
+`engaged_in_multi_function` error instead of waiting.
 
 ## Connection pool (multithreading)
 
