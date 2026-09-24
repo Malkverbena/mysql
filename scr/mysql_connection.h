@@ -9,6 +9,8 @@
 #include <boost/mysql/diagnostics.hpp>
 #include <boost/mysql/error_code.hpp>
 
+#include <atomic>
+
 class PreparedStatementCache;
 
 // A single physical socket (`any_connection` from Boost.MySQL) and its state machine
@@ -34,7 +36,9 @@ public:
 
 private:
 	Ref<MySQLConfig> config;
-	State state = NONE;
+	// Atomic because `drop()` can change it on the I/O thread (a fatal error in an
+	// asynchronous operation) while the main thread reads it through `is_connected()`.
+	std::atomic<State> state{ NONE };
 
 	// The declaration order matters: `ssl_context` must be constructed before, and destroyed
 	// after, `connection`, which keeps a pointer to it (see the contract of
@@ -72,6 +76,19 @@ public:
 	// reason.
 	bool connect();
 	void close();
+
+	// Drops the connection without talking to the server, after an operation failed with a
+	// fatal error (`boost::mysql::is_fatal_error()`, which includes a cancellation such as
+	// an `async_timeout_ms` expiring). Boost.MySQL leaves the connection in an unspecified
+	// state after such an error, and `close()` must not be used on it (it sends a quit
+	// request, and the protocol may be out of sync, with the reply of the failed operation
+	// still on its way). Replacing `any_connection` closes the socket at the transport
+	// level instead. The state becomes `FAILED` and `get_last_error()` has `p_error`;
+	// `connect()` opens a new connection. Does nothing if not connected.
+	void drop(const boost::mysql::error_code &p_error);
+	// Calls `drop()` if `p_error` is fatal. Returns `p_error`, to chain it into the error
+	// the caller reports.
+	const boost::mysql::error_code &drop_if_fatal(const boost::mysql::error_code &p_error);
 
 	// Internal use by `MySQLPool::acquire()` before handing a recycled connection to a new
 	// lease: runs `RESET CONNECTION` (rolls back an open transaction, drops temporary

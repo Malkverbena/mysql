@@ -10,6 +10,7 @@
 #include <boost/mysql/connect_params.hpp>
 #include <boost/mysql/character_set.hpp>
 #include <boost/mysql/format_sql.hpp>
+#include <boost/mysql/is_fatal_error.hpp>
 #include <boost/mysql/metadata_mode.hpp>
 #include <boost/mysql/pipeline.hpp>
 #include <boost/mysql/ssl_mode.hpp>
@@ -178,4 +179,24 @@ void MySQLConnection::close() {
 	// An error while closing is not fatal for the caller: the connection is unusable anyway.
 	// It is kept in `last_error` for whoever wants to inspect it.
 	state = last_error ? FAILED : NONE;
+}
+
+void MySQLConnection::drop(const boost::mysql::error_code &p_error) {
+	if (state != CONNECTED) {
+		return;
+	}
+	// Destroying the old `any_connection` closes its socket without sending anything.
+	connection = boost::mysql::any_connection(io_context.get_executor(), _make_any_connection_params(config, ssl_context));
+	// Every prepared statement handle belonged to the dropped connection.
+	statement_cache->clear();
+	last_error = p_error;
+	last_diagnostics.clear();
+	state = FAILED;
+}
+
+const boost::mysql::error_code &MySQLConnection::drop_if_fatal(const boost::mysql::error_code &p_error) {
+	if (boost::mysql::is_fatal_error(p_error)) {
+		drop(p_error);
+	}
+	return p_error;
 }

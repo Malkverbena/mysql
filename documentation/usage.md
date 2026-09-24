@@ -245,7 +245,7 @@ The error `Dictionary` always has the same four keys:
 | `category` | Where the error came from: `"mysql.common-server"` for one the server reported, `"mysql_module.client"` for one the module detected on its own (bad parameters, a limit reached, and so on) before talking to the server. |
 | `message` | A description written by the module. |
 | `server_message` | The server's own error text; empty for a client-side error. |
-| `is_fatal` | `true` if the connection itself is no longer usable (for example, after a failed TLS handshake); `false` if the session still accepts further calls. |
+| `is_fatal` | `true` if the connection itself is no longer usable (for example, after a failed TLS handshake, a lost connection or an expired `async_timeout_ms`); `false` if the session still accepts further calls. After a fatal error the module drops the connection: `is_db_connected()` returns `false` and `connect_db()` reconnects. |
 
 ```gdscript
 var result = session.execute_text("SELECT * FROM users")
