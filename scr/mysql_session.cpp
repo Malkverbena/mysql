@@ -46,6 +46,12 @@ Dictionary make_busy_error() {
 	return mysql_module::make_error_dict(boost::mysql::make_error_code(boost::mysql::client_errc::operation_in_progress), boost::mysql::diagnostics());
 }
 
+// The same error Boost.MySQL itself reports for a command sent while a streaming read
+// (`start_execution` + `read_some_rows`) has not been read to the end.
+Dictionary make_cursor_open_error() {
+	return mysql_module::make_error_dict(boost::mysql::make_error_code(boost::mysql::client_errc::engaged_in_multi_function), boost::mysql::diagnostics());
+}
+
 // Keeps the connection protocol in sync after a `max_result_bytes` overflow: the resultset
 // (and any further ones) must be fully read before the next command, the same reason
 // `MySQLStreamingCursor::close()` drains instead of abandoning the read midway. Errors while
@@ -295,6 +301,22 @@ bool MySQLSession::_is_async_busy() const {
 	return pending_async_operation.is_valid() && pending_async_operation->is_running();
 }
 
+Dictionary MySQLSession::_busy_error() const {
+	if (_is_async_busy()) {
+		return make_busy_error();
+	}
+	if (active_cursor && active_cursor->is_engaged()) {
+		return make_cursor_open_error();
+	}
+	return Dictionary();
+}
+
+void MySQLSession::_cursor_closed(const MySQLStreamingCursor *p_cursor) {
+	if (active_cursor == p_cursor) {
+		active_cursor = nullptr;
+	}
+}
+
 Dictionary MySQLSession::connect_db() {
 	if (!connection) {
 		return mysql_module::make_client_error_dict("MySQLSession: Call set_config() before connect_db().");
@@ -333,8 +355,9 @@ Ref<MySQLResult> MySQLSession::_execute_text_std(const std::string &p_sql) {
 	if (!connection || !connection->is_connected()) {
 		return MySQLResult::from_error(make_not_connected_error());
 	}
-	if (_is_async_busy()) {
-		return MySQLResult::from_error(make_busy_error());
+	Dictionary busy = _busy_error();
+	if (!busy.is_empty()) {
+		return MySQLResult::from_error(busy);
 	}
 
 	return execute_with_limit(*connection, p_sql, config);
@@ -348,8 +371,9 @@ Ref<MySQLResult> MySQLSession::_execute_formatted_std(const std::string &p_sql, 
 	if (!connection || !connection->is_connected()) {
 		return MySQLResult::from_error(make_not_connected_error());
 	}
-	if (_is_async_busy()) {
-		return MySQLResult::from_error(make_busy_error());
+	Dictionary busy = _busy_error();
+	if (!busy.is_empty()) {
+		return MySQLResult::from_error(busy);
 	}
 
 	mysql_module::FieldParams fields;
@@ -415,8 +439,9 @@ Ref<MySQLResult> MySQLSession::execute_prepared(const String &p_sql, const Array
 	if (!connection || !connection->is_connected()) {
 		return MySQLResult::from_error(make_not_connected_error());
 	}
-	if (_is_async_busy()) {
-		return MySQLResult::from_error(make_busy_error());
+	Dictionary busy = _busy_error();
+	if (!busy.is_empty()) {
+		return MySQLResult::from_error(busy);
 	}
 
 	mysql_module::FieldParams fields;
@@ -489,10 +514,11 @@ Ref<MySQLAsyncOperation> MySQLSession::async_execute_text(const String &p_sql) {
 		complete_deferred(operation, MySQLResult::from_error(make_not_connected_error()));
 		return operation;
 	}
-	if (_is_async_busy()) {
-		// Not tracked: the operation already running is still the one that owns the
-		// connection.
-		complete_deferred(operation, MySQLResult::from_error(make_busy_error()));
+	Dictionary busy = _busy_error();
+	if (!busy.is_empty()) {
+		// Not tracked: the operation already running (or the open cursor) is still the
+		// one that owns the connection.
+		complete_deferred(operation, MySQLResult::from_error(busy));
 		return operation;
 	}
 	pending_async_operation = operation;
@@ -513,10 +539,11 @@ Ref<MySQLAsyncOperation> MySQLSession::async_execute_prepared(const String &p_sq
 		complete_deferred(operation, MySQLResult::from_error(make_not_connected_error()));
 		return operation;
 	}
-	if (_is_async_busy()) {
-		// Not tracked: the operation already running is still the one that owns the
-		// connection.
-		complete_deferred(operation, MySQLResult::from_error(make_busy_error()));
+	Dictionary busy = _busy_error();
+	if (!busy.is_empty()) {
+		// Not tracked: the operation already running (or the open cursor) is still the
+		// one that owns the connection.
+		complete_deferred(operation, MySQLResult::from_error(busy));
 		return operation;
 	}
 	pending_async_operation = operation;
@@ -550,10 +577,15 @@ Ref<MySQLStreamingCursor> MySQLSession::execute_streaming(const String &p_sql) {
 	if (!connection || !connection->is_connected()) {
 		return MySQLStreamingCursor::from_error(make_not_connected_error());
 	}
-	if (_is_async_busy()) {
-		return MySQLStreamingCursor::from_error(make_busy_error());
+	Dictionary busy = _busy_error();
+	if (!busy.is_empty()) {
+		return MySQLStreamingCursor::from_error(busy);
 	}
-	return MySQLStreamingCursor::start(Ref<MySQLSession>(this), *connection, config, mysql_module::to_std_string(p_sql));
+	Ref<MySQLStreamingCursor> cursor = MySQLStreamingCursor::start(Ref<MySQLSession>(this), *connection, config, mysql_module::to_std_string(p_sql));
+	if (cursor->is_ok()) {
+		active_cursor = cursor.ptr();
+	}
+	return cursor;
 }
 
 void MySQLSession::_bind_methods() {

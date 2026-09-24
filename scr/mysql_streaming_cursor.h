@@ -18,8 +18,9 @@ class MySQLSession;
 // and `read_some_rows()` from Boost.MySQL, with `is_ok()` and `get_error()` (a
 // `Dictionary`). If it is closed midway, it drains the rest of the resultset: the protocol
 // requires the resultset to be fully read before the next command on the same connection,
-// otherwise the connection gets out of sync. Only one cursor can be open per connection at
-// a time; anyone who wants to run another query waits for it to close. It is synchronous
+// otherwise the connection gets out of sync. Until then, nothing else runs on the
+// connection: any other call on the session fails with `engaged_in_multi_function` (nothing
+// waits or queues), so only one cursor can be open per connection at a time. It is synchronous
 // (it blocks in `next_batch()`); an asynchronous variant would be a natural extension on
 // the same I/O thread engine.
 //
@@ -36,6 +37,8 @@ class MySQLStreamingCursor : public RefCounted {
 	bool ok = true;
 	bool closed = false;
 	Dictionary error;
+
+	void _drain();
 
 protected:
 	static void _bind_methods();
@@ -54,6 +57,9 @@ public:
 	// batches, because `read_some_rows()` in that state returns nothing and advances nothing.
 	// The resultsets left over are drained by `close()`.
 	bool has_more() const { return ok && !closed && state.should_read_rows(); }
+	// Whether the cursor still holds the connection: until the execution is complete (read
+	// to the end, or drained by `close()`), no other command can run on it.
+	bool is_engaged() const { return ok && !closed && !state.complete(); }
 	PackedStringArray get_column_names() const;
 	Array next_batch();
 	void close();

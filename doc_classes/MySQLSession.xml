@@ -71,7 +71,7 @@
 			<return type="MySQLStreamingCursor" />
 			<param index="0" name="sql" type="String" />
 			<description>
-				Runs [code]sql[/code] and returns a [MySQLStreamingCursor] that reads the result incrementally in batches via [method MySQLStreamingCursor.next_batch], instead of loading every row into memory at once like [method execute_text] does. Only one cursor can be open per connection at a time; only reads a single resultset (unlike [method execute_text] with [member MySQLConfig.allow_multi_queries]).
+				Runs [code]sql[/code] and returns a [MySQLStreamingCursor] that reads the result incrementally in batches via [method MySQLStreamingCursor.next_batch], instead of loading every row into memory at once like [method execute_text] does. Until the cursor is read to the end or closed, any other call on this session fails with an explicit error (see [MySQLStreamingCursor]); only reads a single resultset (unlike [method execute_text] with [member MySQLConfig.allow_multi_queries]).
 			</description>
 		</method>
 		<method name="execute_text">

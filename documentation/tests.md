@@ -44,7 +44,8 @@ statement cache (reuse and eviction with a configurable `statement_cache_size`, 
 with the server's `Com_stmt_prepare` and `Com_stmt_close` counters), the
 `max_result_bytes` result size limit (on `execute_text`, `execute_prepared` and the
 asynchronous path, including that the connection stays usable afterwards), transactions
-(`commit`, `rollback` and automatic rollback), streaming, asynchronous calls
+(`commit`, `rollback` and automatic rollback), streaming (including that an open cursor
+holds the connection), asynchronous calls
 (`async_execute_text`, `async_execute_prepared` and `await`), the connection pool
 (including asynchronous calls on a recycled connection, a session dropped with an
 asynchronous operation still running, no prepared statement leak across leases,

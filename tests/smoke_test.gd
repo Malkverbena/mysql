@@ -467,6 +467,22 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	var after_partial_stream: MySQLResult = session.execute_text("SELECT 1")
 	check(after_partial_stream.is_ok(), "the connection is still usable after closing a stream midway (%s)" % [after_partial_stream.get_error()])
 
+	# An open cursor holds the connection until it is read to the end or closed: every
+	# other call on the session fails explicitly (nothing waits or queues), including an
+	# asynchronous one, which must be rejected before it reaches the I/O thread.
+	var holding: MySQLStreamingCursor = session.execute_streaming("SELECT txt FROM t_mysql_module_smoke_test WHERE txt LIKE 'stream\\_%'")
+	var while_open: MySQLResult = session.execute_text("SELECT 1")
+	check(not while_open.is_ok() and String(while_open.get_error().get("message", "")).contains("multi-function"), "a query while a cursor is open fails explicitly (%s)" % [while_open.get_error().get("message", "")])
+	var async_while_open: MySQLResult = await await_operation(session.async_execute_text("SELECT 1"))
+	check(not async_while_open.is_ok() and String(async_while_open.get_error().get("message", "")).contains("multi-function"), "an asynchronous call while a cursor is open fails explicitly (%s)" % [async_while_open.get_error().get("message", "")])
+	check(not session.execute_streaming("SELECT 1").is_ok(), "a second cursor while one is open fails explicitly")
+	var held_rows := 0
+	while holding.has_more():
+		held_rows += holding.next_batch().size()
+	check(held_rows == 20, "the open cursor still reads all its rows after the rejected calls (%d)" % [held_rows])
+	check(session.execute_text("SELECT 1").is_ok(), "a cursor read to the end no longer holds the connection, even before close()")
+	holding.close()
+
 	var bad_cursor: MySQLStreamingCursor = session.execute_streaming("SELEC nothing")
 	check(not bad_cursor.is_ok() and not bad_cursor.has_more(), "a streaming syntax error is reported and the cursor has nothing to read")
 
