@@ -16,6 +16,7 @@ classDiagram
       +json_result_mode
       +statement_cache_size
       +max_buffer_size, max_result_bytes
+      +async_timeout_ms, cancel_timeout_ms
       +set_password(password)
     }
     class MySQLSession {
@@ -55,6 +56,7 @@ classDiagram
     class MySQLAsyncOperation {
       +is_finished() bool
       +get_result() MySQLResult
+      +cancel() bool
       +completed signal
     }
     class MySQLTransaction {
@@ -190,6 +192,39 @@ operation runs — `execute_*`, `execute_streaming`, `begin_transaction`, `conne
 particular, `close_db()` does not close it from under the running operation). Run
 parallel operations from separate sessions, for example one session per operation leased
 from a `MySQLPool`.
+
+#### Cancelling an operation
+
+`MySQLAsyncOperation.cancel()` stops an operation that is still running. It returns
+`false` if there is nothing to cancel (the operation already finished, or was rejected
+because the session was busy), `true` otherwise; calling it again does nothing more. The
+operation still finishes through `completed`, as usual:
+
+```gdscript
+var op := session.async_execute_text("SELECT ...")
+# ...
+op.cancel()
+var result := await await_result(op)
+```
+
+It works in two steps:
+
+1. **On the server.** The module opens a short-lived side connection with the same
+   `MySQLConfig` and runs `KILL QUERY` on the operation's connection. The server stops
+   the query, and the operation fails with the server's non-fatal "Query execution was
+   interrupted" error; the session stays connected and usable. Some functions do not
+   fail when interrupted and return early instead (`SLEEP()` returns `1`), so the
+   operation can also finish with a normal result. It finishes with its full result as
+   well if the query was already done when the `KILL` arrived.
+2. **Locally, as a fallback.** If the side connection cannot connect or run the `KILL`
+   within `cancel_timeout_ms` (default 5000, per step, `0` = no timeout), the module
+   cancels the operation on its own side. It fails with a fatal error, and the connection
+   is dropped (see "Error model" below): reconnect with `connect_db()`. The query may keep
+   running on the server until it finishes.
+
+`KILL QUERY` on a connection of the same user needs no extra privilege. Until the `KILL`
+is done, the session stays busy even if the operation already finished, so the `KILL`
+never reaches a query started after it.
 
 ### Automatic rollback
 

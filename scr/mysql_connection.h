@@ -58,11 +58,13 @@ private:
 	// connection closes or `reset_session()` resets it, and both clear the cache.
 	PreparedStatementCache *statement_cache = nullptr;
 
-	static boost::asio::ssl::context _make_ssl_context(const Ref<MySQLConfig> &p_config);
-	static boost::mysql::any_connection_params _make_any_connection_params(const Ref<MySQLConfig> &p_config, boost::asio::ssl::context &p_ssl_context);
-	boost::mysql::connect_params _make_connect_params() const;
-
 public:
+	// Also used by the side connection `MySQLAsyncOperation::cancel()` opens, so that it
+	// connects exactly like this one (same transport, TLS validation and credentials).
+	static boost::asio::ssl::context make_ssl_context(const Ref<MySQLConfig> &p_config);
+	static boost::mysql::any_connection_params make_any_connection_params(const Ref<MySQLConfig> &p_config, boost::asio::ssl::context &p_ssl_context);
+	static boost::mysql::connect_params make_connect_params(const Ref<MySQLConfig> &p_config);
+
 	explicit MySQLConnection(Ref<MySQLConfig> p_config);
 	~MySQLConnection();
 

@@ -588,6 +588,67 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	check(next_lease_result.is_ok() and next_lease_result.get_rows()[0][0] == "own_result", "the next lease gets its own result (%s)" % [next_lease_result.get_rows() if next_lease_result.is_ok() else next_lease_result.get_error()])
 	next_lease = null
 
+	print("=== 9c. Cancelling an asynchronous operation ===")
+	# cancel() stops the query on the server with KILL QUERY from a side connection: the
+	# operation finishes early with the server's "query interrupted" error, and the
+	# connection stays usable. A recursive CTE, because it fails when interrupted (SLEEP()
+	# and BENCHMARK() just return early, without an error).
+	const LONG_QUERY := "WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM r WHERE n < 4000000000) SELECT COUNT(*) FROM r"
+	var cancel_config := make_config(host, port, user, password, database)
+	cancel_config.transport_mode = MySQLConfig.TCP_TLS_DISABLED
+	cancel_config.async_timeout_ms = 0 # Only cancel() may stop the queries below.
+	var cancel_session := MySQLSession.new()
+	cancel_session.set_config(cancel_config)
+	cancel_session.connect_db()
+	cancel_session.execute_text("SET SESSION cte_max_recursion_depth = 4294967295")
+	var kills_before: MySQLResult = session.execute_text("SHOW GLOBAL STATUS LIKE 'Com_kill'")
+	var long_op: MySQLAsyncOperation = cancel_session.async_execute_text(LONG_QUERY)
+	await create_timer(0.2).timeout
+	var cancel_start := Time.get_ticks_msec()
+	check(long_op.cancel(), "cancel() on a running operation returns true")
+	check(long_op.cancel(), "a second cancel() returns true too")
+	var cancelled: MySQLResult = await await_operation(long_op)
+	var cancel_elapsed := Time.get_ticks_msec() - cancel_start
+	var kills_after: MySQLResult = session.execute_text("SHOW GLOBAL STATUS LIKE 'Com_kill'")
+	if kills_before.is_ok() and kills_after.is_ok():
+		var kill_count := int(kills_after.get_rows()[0][1]) - int(kills_before.get_rows()[0][1])
+		check(kill_count == 1, "the two cancel() calls sent exactly one KILL (%d)" % [kill_count])
+	check(not cancelled.is_ok() and cancelled.get_error().get("server_message", "") == "Query execution was interrupted" and cancelled.get_error().get("is_fatal") == false, "the cancelled operation fails with the server's non-fatal \"query interrupted\" error (%s)" % [cancelled.get_error()])
+	check(cancel_elapsed < 3000, "the cancelled operation finishes early (%d ms)" % [cancel_elapsed])
+	check(cancel_session.is_db_connected(), "the session is still connected after a server-side cancellation")
+	var after_cancel: MySQLResult = cancel_session.execute_text("SELECT 'after_cancel' AS v")
+	check(after_cancel.is_ok() and after_cancel.get_rows()[0][0] == "after_cancel", "the next query gets its own result (%s)" % [after_cancel.get_rows() if after_cancel.is_ok() else after_cancel.get_error()])
+	check(not long_op.cancel(), "cancel() on a finished operation returns false")
+	var running_op: MySQLAsyncOperation = cancel_session.async_execute_text("SELECT 1")
+	var rejected_op: MySQLAsyncOperation = cancel_session.async_execute_text("SELECT 2")
+	check(not rejected_op.cancel(), "cancel() on an operation rejected as busy returns false")
+	await await_operation(rejected_op)
+	await await_operation(running_op)
+
+	# If the side connection cannot reach the server (here: the config now points to a
+	# closed port, and the session is already connected), cancel() falls back to
+	# cancelling locally, which drops the connection.
+	var fallback_op: MySQLAsyncOperation = cancel_session.async_execute_text(LONG_QUERY)
+	await create_timer(0.2).timeout
+	cancel_config.port = 1
+	var fallback_start := Time.get_ticks_msec()
+	check(fallback_op.cancel(), "cancel() with a side connection that cannot connect returns true")
+	var fallback: MySQLResult = await await_operation(fallback_op)
+	var fallback_elapsed := Time.get_ticks_msec() - fallback_start
+	cancel_config.port = port
+	check(not fallback.is_ok() and fallback.get_error().get("is_fatal") == true, "the locally cancelled operation fails with a fatal error (%s)" % [fallback.get_error()])
+	check(fallback_elapsed < 3000, "the locally cancelled operation finishes early (%d ms)" % [fallback_elapsed])
+	check(not cancel_session.is_db_connected(), "the session is no longer connected after a local cancellation")
+	check(cancel_session.connect_db().is_empty(), "connect_db() reconnects after a local cancellation")
+	var after_fallback: MySQLResult = cancel_session.execute_text("SELECT 'after_fallback' AS v")
+	check(after_fallback.is_ok() and after_fallback.get_rows()[0][0] == "after_fallback", "the reconnected session gets its own result (%s)" % [after_fallback.get_rows() if after_fallback.is_ok() else after_fallback.get_error()])
+	# A local cancellation does not stop the query on the server; stop it here.
+	var leftover: MySQLResult = session.execute_text("SELECT ID FROM information_schema.PROCESSLIST WHERE INFO LIKE 'WITH RECURSIVE r(n)%'")
+	if leftover.is_ok():
+		for leftover_row in leftover.get_rows():
+			session.execute_text("KILL QUERY %d" % [int(leftover_row[0])])
+	cancel_session = null
+
 	print("=== 10. Connection pool ===")
 	var pool := MySQLPool.new()
 	pool.set_config(config)

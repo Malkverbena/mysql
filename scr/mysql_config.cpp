@@ -127,6 +127,11 @@ void MySQLConfig::set_async_timeout_ms(int p_timeout_ms) {
 	async_timeout_ms = p_timeout_ms;
 }
 
+void MySQLConfig::set_cancel_timeout_ms(int p_timeout_ms) {
+	ERR_FAIL_COND_MSG(p_timeout_ms < 0, "MySQLConfig: cancel_timeout_ms cannot be negative (0 means no timeout).");
+	cancel_timeout_ms = p_timeout_ms;
+}
+
 void MySQLConfig::set_max_buffer_size(int p_size) {
 	// Boost.MySQL starts every connection with a buffer of `default_initial_read_buffer_size`
 	// bytes and asserts that it fits within the maximum.
@@ -191,6 +196,9 @@ void MySQLConfig::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_async_timeout_ms", "timeout_ms"), &MySQLConfig::set_async_timeout_ms);
 	ClassDB::bind_method(D_METHOD("get_async_timeout_ms"), &MySQLConfig::get_async_timeout_ms);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "async_timeout_ms"), "set_async_timeout_ms", "get_async_timeout_ms");
+	ClassDB::bind_method(D_METHOD("set_cancel_timeout_ms", "timeout_ms"), &MySQLConfig::set_cancel_timeout_ms);
+	ClassDB::bind_method(D_METHOD("get_cancel_timeout_ms"), &MySQLConfig::get_cancel_timeout_ms);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "cancel_timeout_ms"), "set_cancel_timeout_ms", "get_cancel_timeout_ms");
 
 	ClassDB::bind_method(D_METHOD("set_max_buffer_size", "size"), &MySQLConfig::set_max_buffer_size);
 	ClassDB::bind_method(D_METHOD("get_max_buffer_size"), &MySQLConfig::get_max_buffer_size);

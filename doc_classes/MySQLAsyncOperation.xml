@@ -10,6 +10,14 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="cancel">
+			<return type="bool" />
+			<description>
+				Stops the operation if it is still running. Returns [code]false[/code] if there is nothing to cancel (the operation already finished, or was rejected because the session was busy), [code]true[/code] otherwise; calling it again does nothing more. The operation still finishes through [signal completed].
+				First, a short-lived side connection with the same [MySQLConfig] runs [code]KILL QUERY[/code] on the operation's connection: the operation then fails with the server's non-fatal "Query execution was interrupted" error, and the session stays connected. Some functions return early instead of failing when interrupted ([code]SLEEP()[/code] returns [code]1[/code]), and a query that was already done finishes with its full result.
+				If the side connection cannot connect or run the [code]KILL[/code] within [member MySQLConfig.cancel_timeout_ms], the operation is cancelled locally instead: it fails with a fatal error, and the connection is dropped ([method MySQLSession.is_db_connected] returns [code]false[/code] until [method MySQLSession.connect_db]). The query may keep running on the server until it finishes.
+			</description>
+		</method>
 		<method name="get_result" qualifiers="const">
 			<return type="MySQLResult" />
 			<description>

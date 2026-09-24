@@ -30,6 +30,9 @@
 			Timeout, in milliseconds, of an asynchronous operation ([method MySQLSession.async_execute_text], [method MySQLSession.async_execute_prepared]). [code]0[/code] means no timeout; a negative value is rejected with an error and the previous value is kept. It is applied per network round trip of the operation (each step of reading the result), not once for the whole call: a result read in several batches or with several resultsets gets a fresh budget on every step instead of one shared deadline for all of them. Has no effect on the synchronous [code]execute_*[/code] methods, which block until the server answers.
 			[b]Note:[/b] An operation that times out fails with a fatal error ([code]is_fatal[/code] is [code]true[/code]) and drops the connection: the query may still be running on the server, and its reply cannot be told apart from the next one. [method MySQLSession.is_db_connected] then returns [code]false[/code]; call [method MySQLSession.connect_db] to reconnect.
 		</member>
+		<member name="cancel_timeout_ms" type="int" setter="set_cancel_timeout_ms" getter="get_cancel_timeout_ms" default="5000">
+			Timeout, in milliseconds, of each step of the short-lived side connection [method MySQLAsyncOperation.cancel] opens to stop the query on the server (connecting, then running [code]KILL QUERY[/code]). [code]0[/code] means no timeout; a negative value is rejected with an error and the previous value is kept. If a step fails or times out, the cancellation falls back to cancelling the operation locally, which drops the connection (see [method MySQLAsyncOperation.cancel]).
+		</member>
 		<member name="database" type="String" setter="set_database" getter="get_database" default="&quot;&quot;">
 			Schema selected right after connecting, equivalent to [code]USE[/code].
 		</member>

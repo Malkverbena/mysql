@@ -144,6 +144,11 @@ Four rules apply to every asynchronous call:
   until the operation finishes. Use a separate session per parallel operation — for example, one leased from a
   `MySQLPool`.
 
+To stop an operation that is still running, call `op.cancel()` and keep awaiting it: it
+still completes, usually with the server's "Query execution was interrupted" error. If
+the server cannot be reached to stop the query, the module cancels it locally and drops
+the connection instead (`is_db_connected()` returns `false`).
+
 See "Asynchronous methods" in [features.md](features.md) for the full explanation.
 
 ## Transactions

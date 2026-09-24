@@ -54,6 +54,11 @@ private:
 	// every hop instead of one shared deadline for all of them. A timeout is a fatal error:
 	// the connection is dropped (see `MySQLConnection::drop()`).
 	int async_timeout_ms = 30000;
+	// Timeout of each step (connect, then `KILL QUERY`) of the short-lived side connection
+	// `MySQLAsyncOperation::cancel()` opens to stop the query on the server. 0 means no
+	// timeout. When a step fails or times out, the cancellation falls back to cancelling
+	// the operation locally, which drops the connection.
+	int cancel_timeout_ms = 5000;
 	// Limit on the size of a packet or row. Boost.MySQL already defaults to 64 MB; this only
 	// exposes it as an option instead of leaving it hardcoded. This is NOT a limit on the
 	// total size of a result (see `max_result_bytes`): Boost.MySQL enforces it per protocol
@@ -116,6 +121,8 @@ public:
 
 	void set_async_timeout_ms(int p_timeout_ms);
 	int get_async_timeout_ms() const { return async_timeout_ms; }
+	void set_cancel_timeout_ms(int p_timeout_ms);
+	int get_cancel_timeout_ms() const { return cancel_timeout_ms; }
 
 	void set_max_buffer_size(int p_size);
 	int get_max_buffer_size() const { return max_buffer_size; }

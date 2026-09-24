@@ -16,16 +16,21 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 
+#include <boost/asio/bind_cancellation_slot.hpp>
 #include <boost/asio/cancel_after.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/mysql/client_errc.hpp>
 #include <boost/mysql/execution_state.hpp>
 #include <boost/mysql/format_sql.hpp>
 #include <boost/mysql/is_fatal_error.hpp>
+#include <boost/mysql/results.hpp>
 #include <boost/mysql/rows_view.hpp>
 #include <boost/mysql/statement.hpp>
 
+#include <openssl/crypto.h>
+
 #include <chrono>
+#include <memory>
 
 namespace {
 
@@ -39,6 +44,17 @@ void complete_deferred(const Ref<MySQLAsyncOperation> &p_operation, const Ref<My
 	callable_mp(p_operation.ptr(), &MySQLAsyncOperation::_complete).call_deferred(p_result);
 }
 
+// Every asynchronous operation ends here, on the I/O thread. The result waits in
+// `held_result` while a `KILL QUERY` from `cancel()` is still in flight (see the comment on
+// `MySQLAsyncOperation::kill_in_flight`); `finish_kill()` hands it over then.
+void finish_on_io_thread(const Ref<MySQLAsyncOperation> &p_operation, const Ref<MySQLResult> &p_result) {
+	if (p_operation->kill_in_flight) {
+		p_operation->held_result = p_result;
+		return;
+	}
+	complete_deferred(p_operation, p_result);
+}
+
 // Hands a failed operation's result to the main thread, first dropping the connection if
 // `p_connection_error` is fatal (see `MySQLConnection::drop()`), so the next call sees it
 // disconnected instead of reading the leftovers of the failed operation as its own result.
@@ -47,12 +63,12 @@ void complete_deferred(const Ref<MySQLAsyncOperation> &p_operation, const Ref<My
 // completion handler. `running` stays set until the drop is done.
 void fail_deferred(const Ref<MySQLAsyncOperation> &p_operation, boost::mysql::error_code p_connection_error, const Ref<MySQLResult> &p_result) {
 	if (!boost::mysql::is_fatal_error(p_connection_error)) {
-		complete_deferred(p_operation, p_result);
+		finish_on_io_thread(p_operation, p_result);
 		return;
 	}
 	boost::asio::post(p_operation->connection->get_io_context(), [p_operation, p_connection_error, p_result]() {
 		p_operation->connection->drop(p_connection_error);
-		complete_deferred(p_operation, p_result);
+		finish_on_io_thread(p_operation, p_result);
 	});
 }
 
@@ -214,8 +230,15 @@ struct AsyncHeadHandler {
 	}
 };
 
+// Binds a step of the operation to its `cancel_signal`, the local fallback of `cancel()`.
+// `cancel_after` forwards that slot to the step as well, next to its own timer.
+template <typename Handler>
+auto bind_cancel(const Ref<MySQLAsyncOperation> &p_operation, Handler p_handler) {
+	return boost::asio::bind_cancellation_slot(p_operation->cancel_signal.slot(), std::move(p_handler));
+}
+
 void issue_read_rows(const Ref<MySQLAsyncOperation> &p_operation) {
-	AsyncRowsHandler handler{ p_operation };
+	auto handler = bind_cancel(p_operation, AsyncRowsHandler{ p_operation });
 	if (p_operation->timeout_ms > 0) {
 		p_operation->connection->native().async_read_some_rows(p_operation->exec_state, p_operation->diagnostics, boost::asio::cancel_after(std::chrono::milliseconds(p_operation->timeout_ms), handler));
 	} else {
@@ -224,7 +247,7 @@ void issue_read_rows(const Ref<MySQLAsyncOperation> &p_operation) {
 }
 
 void issue_read_head(const Ref<MySQLAsyncOperation> &p_operation) {
-	AsyncHeadHandler handler{ p_operation };
+	auto handler = bind_cancel(p_operation, AsyncHeadHandler{ p_operation });
 	if (p_operation->timeout_ms > 0) {
 		p_operation->connection->native().async_read_resultset_head(p_operation->exec_state, p_operation->diagnostics, boost::asio::cancel_after(std::chrono::milliseconds(p_operation->timeout_ms), handler));
 	} else {
@@ -235,7 +258,7 @@ void issue_read_head(const Ref<MySQLAsyncOperation> &p_operation) {
 void async_advance(const Ref<MySQLAsyncOperation> &p_operation) {
 	if (p_operation->exec_state.complete()) {
 		p_operation->result_builder.end_resultset(p_operation->exec_state.affected_rows(), p_operation->exec_state.last_insert_id(), p_operation->exec_state.info());
-		complete_deferred(p_operation, p_operation->result_builder.finish());
+		finish_on_io_thread(p_operation, p_operation->result_builder.finish());
 		return;
 	}
 	if (p_operation->exec_state.should_read_rows()) {
@@ -253,7 +276,10 @@ void start_async_execute(MySQLConnection &p_connection, Request &&p_request, con
 	p_operation->set_running();
 	p_operation->connection = &p_connection;
 	p_operation->timeout_ms = p_timeout_ms;
-	AsyncHeadHandler handler{ p_operation };
+	boost::optional<std::uint32_t> server_id = p_connection.native().connection_id();
+	p_operation->has_server_connection_id = server_id.has_value();
+	p_operation->server_connection_id = server_id.value_or(0);
+	auto handler = bind_cancel(p_operation, AsyncHeadHandler{ p_operation });
 	if (p_timeout_ms > 0) {
 		p_connection.native().async_start_execution(std::forward<Request>(p_request), p_operation->exec_state, p_operation->diagnostics, boost::asio::cancel_after(std::chrono::milliseconds(p_timeout_ms), handler));
 	} else {
@@ -261,7 +287,126 @@ void start_async_execute(MySQLConnection &p_connection, Request &&p_request, con
 	}
 }
 
+// The local fallback of `cancel()`: cancels the step in flight. Boost.MySQL then fails it
+// with `operation_aborted`, a fatal error, and the connection is dropped (`fail_deferred()`).
+void cancel_locally(const Ref<MySQLAsyncOperation> &p_operation) {
+	p_operation->cancel_signal.emit(boost::asio::cancellation_type::terminal);
+}
+
+// The short-lived side connection of `cancel()`: connects with the same config and runs
+// `KILL QUERY <id>`, all on the I/O thread of the session (its own `any_connection`, on
+// the same `io_context`). Stopping the query on the server keeps the connection usable:
+// the operation fails with the server's "query interrupted" error, not a fatal one. Kept
+// alive by the `shared_ptr` each of its completion handlers holds.
+struct QueryKiller : std::enable_shared_from_this<QueryKiller> {
+	Ref<MySQLAsyncOperation> operation;
+	int timeout_ms = 0;
+	boost::asio::ssl::context ssl_context;
+	boost::mysql::any_connection side_connection;
+	boost::mysql::connect_params params;
+	std::string kill_sql;
+	boost::mysql::results results;
+	bool connected = false;
+
+	QueryKiller(const Ref<MySQLAsyncOperation> &p_operation, boost::asio::io_context &p_io_context) :
+			operation(p_operation),
+			timeout_ms(p_operation->config->get_cancel_timeout_ms()),
+			ssl_context(MySQLConnection::make_ssl_context(p_operation->config)),
+			side_connection(p_io_context.get_executor(), MySQLConnection::make_any_connection_params(p_operation->config, ssl_context)),
+			params(MySQLConnection::make_connect_params(p_operation->config)),
+			kill_sql("KILL QUERY " + std::to_string(p_operation->server_connection_id)) {}
+
+	~QueryKiller() {
+		wipe_password();
+	}
+
+	void wipe_password() {
+		if (!params.password.empty()) {
+			OPENSSL_cleanse(params.password.data(), params.password.size());
+			params.password.clear();
+		}
+	}
+
+	template <typename Handler>
+	void connect(Handler p_handler) {
+		if (timeout_ms > 0) {
+			side_connection.async_connect(params, boost::asio::cancel_after(std::chrono::milliseconds(timeout_ms), std::move(p_handler)));
+		} else {
+			side_connection.async_connect(params, std::move(p_handler));
+		}
+	}
+
+	template <typename Handler>
+	void execute(Handler p_handler) {
+		if (timeout_ms > 0) {
+			side_connection.async_execute(kill_sql, results, boost::asio::cancel_after(std::chrono::milliseconds(timeout_ms), std::move(p_handler)));
+		} else {
+			side_connection.async_execute(kill_sql, results, std::move(p_handler));
+		}
+	}
+
+	void start() {
+		std::shared_ptr<QueryKiller> self = shared_from_this();
+		connect([self](boost::mysql::error_code p_error) {
+			self->wipe_password();
+			if (p_error) {
+				self->finish(false);
+				return;
+			}
+			self->connected = true;
+			if (self->operation->held_result.is_valid()) {
+				// The operation finished while connecting: nothing left to stop.
+				self->finish(true);
+				return;
+			}
+			self->execute([self](boost::mysql::error_code p_kill_error) {
+				self->finish(!p_kill_error);
+			});
+		});
+	}
+
+	void finish(bool p_killed) {
+		operation->kill_in_flight = false;
+		if (operation->held_result.is_valid()) {
+			Ref<MySQLResult> result = operation->held_result;
+			operation->held_result = Ref<MySQLResult>();
+			complete_deferred(operation, result);
+		} else if (!p_killed) {
+			cancel_locally(operation);
+		}
+		// Otherwise the KILL reached the server, and the operation finishes on its own
+		// with the server's "query interrupted" error (or with its result, if the query
+		// had already finished).
+		if (connected) {
+			// Best effort: a clean close avoids an "aborted connection" note in the
+			// server's log. Errors are irrelevant, the side connection is done either way.
+			std::shared_ptr<QueryKiller> self = shared_from_this();
+			if (timeout_ms > 0) {
+				side_connection.async_close(boost::asio::cancel_after(std::chrono::milliseconds(timeout_ms), [self](boost::mysql::error_code) {}));
+			} else {
+				side_connection.async_close([self](boost::mysql::error_code) {});
+			}
+		}
+	}
+};
+
 } //namespace
+
+void mysql_module::start_async_cancel(const Ref<MySQLAsyncOperation> &p_operation) {
+	boost::asio::post(p_operation->connection->get_io_context(), [p_operation]() {
+		// On the I/O thread from here on. `running` is only cleared on this thread, so the
+		// operation cannot finish between this check and the KILL taking over.
+		if (!p_operation->is_running() || p_operation->held_result.is_valid()) {
+			return;
+		}
+		if (!p_operation->has_server_connection_id) {
+			cancel_locally(p_operation);
+			return;
+		}
+		p_operation->kill_in_flight = true;
+		std::make_shared<QueryKiller>(p_operation, p_operation->connection->get_io_context())->start();
+	});
+}
 
 MySQLSession::~MySQLSession() {
 	if (io_thread.is_started()) {
@@ -278,6 +423,10 @@ MySQLSession::~MySQLSession() {
 	// The I/O thread is stopped at this point: if the operation was still running, it
 	// never will finish, and the connection is left mid-operation.
 	bool connection_healthy = !_is_async_busy();
+	if (!connection_healthy) {
+		// A later `cancel()` on the operation must not reach the connection discarded below.
+		pending_async_operation->abandon();
+	}
 	if (owner_pool.is_valid() && connection) {
 		owner_pool->release(connection, connection_healthy);
 	} else {
