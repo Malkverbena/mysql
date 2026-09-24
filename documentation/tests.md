@@ -140,3 +140,11 @@ working alternative below. To run `tests/smoke_test.gd` on a device:
 Godot has built-in options: add `use_asan=yes use_ubsan=yes`, or `use_tsan=yes` (TSan
 cannot be combined with ASan), to the `scons` line and run the integration test with the
 resulting binary.
+
+## Examples and benchmarks
+
+The example project in [`../examples/`](../examples/) and the benchmarks in
+[`../benchmark/`](../benchmark/) are not tests: they check nothing and never fail on a
+wrong result. They still run the module end to end against a real server, so running
+their scenes headless after a change is a quick extra check (see the `README.md` of each
+folder).
