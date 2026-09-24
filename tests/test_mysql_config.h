@@ -42,18 +42,23 @@ TEST_CASE("[Modules][MySQL] Config rejects a negative timeout or result limit") 
 	Ref<MySQLConfig> config;
 	config.instantiate();
 	config->set_async_timeout_ms(500);
+	config->set_cancel_timeout_ms(700);
 	config->set_max_result_bytes(4096);
 	ERR_PRINT_OFF;
 	config->set_async_timeout_ms(-1);
+	config->set_cancel_timeout_ms(-1);
 	config->set_max_result_bytes(-1);
 	ERR_PRINT_ON;
 	CHECK(config->get_async_timeout_ms() == 500);
+	CHECK(config->get_cancel_timeout_ms() == 700);
 	CHECK(config->get_max_result_bytes() == 4096);
 
-	// 0 stays valid for both: no timeout, no limit.
+	// 0 stays valid for all three: no timeout, no limit.
 	config->set_async_timeout_ms(0);
+	config->set_cancel_timeout_ms(0);
 	config->set_max_result_bytes(0);
 	CHECK(config->get_async_timeout_ms() == 0);
+	CHECK(config->get_cancel_timeout_ms() == 0);
 	CHECK(config->get_max_result_bytes() == 0);
 }
 

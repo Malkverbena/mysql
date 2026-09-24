@@ -23,7 +23,7 @@ bool wants_tls(MySQLConfig::TransportMode p_mode) {
 
 } //namespace
 
-boost::asio::ssl::context MySQLConnection::_make_ssl_context(const Ref<MySQLConfig> &p_config) {
+boost::asio::ssl::context MySQLConnection::make_ssl_context(const Ref<MySQLConfig> &p_config) {
 	boost::asio::ssl::context ctx(boost::asio::ssl::context::tls_client);
 	if (wants_tls(p_config->get_transport_mode())) {
 		// Certificate validation is on by default, with the host name derived from the real
@@ -36,7 +36,7 @@ boost::asio::ssl::context MySQLConnection::_make_ssl_context(const Ref<MySQLConf
 	return ctx;
 }
 
-boost::mysql::any_connection_params MySQLConnection::_make_any_connection_params(const Ref<MySQLConfig> &p_config, boost::asio::ssl::context &p_ssl_context) {
+boost::mysql::any_connection_params MySQLConnection::make_any_connection_params(const Ref<MySQLConfig> &p_config, boost::asio::ssl::context &p_ssl_context) {
 	boost::mysql::any_connection_params params;
 	if (wants_tls(p_config->get_transport_mode())) {
 		params.ssl_context = &p_ssl_context;
@@ -47,8 +47,8 @@ boost::mysql::any_connection_params MySQLConnection::_make_any_connection_params
 
 MySQLConnection::MySQLConnection(Ref<MySQLConfig> p_config) :
 		config(p_config),
-		ssl_context(_make_ssl_context(p_config)),
-		connection(io_context.get_executor(), _make_any_connection_params(p_config, ssl_context)) {
+		ssl_context(make_ssl_context(p_config)),
+		connection(io_context.get_executor(), make_any_connection_params(p_config, ssl_context)) {
 	statement_cache = memnew(PreparedStatementCache(p_config->get_statement_cache_size()));
 	state = CONFIGURED;
 }
@@ -57,20 +57,20 @@ MySQLConnection::~MySQLConnection() {
 	memdelete(statement_cache);
 }
 
-boost::mysql::connect_params MySQLConnection::_make_connect_params() const {
+boost::mysql::connect_params MySQLConnection::make_connect_params(const Ref<MySQLConfig> &p_config) {
 	boost::mysql::connect_params params;
 
-	if (config->get_transport_mode() == MySQLConfig::UNIX_SOCKET) {
-		params.server_address = boost::mysql::unix_path{ mysql_module::to_std_string(config->get_unix_socket_path()) };
+	if (p_config->get_transport_mode() == MySQLConfig::UNIX_SOCKET) {
+		params.server_address = boost::mysql::unix_path{ mysql_module::to_std_string(p_config->get_unix_socket_path()) };
 		// There is no UNIX+TLS: a UNIX socket is local and never uses TLS.
 		params.ssl = boost::mysql::ssl_mode::disable;
 	} else {
 		boost::mysql::host_and_port address;
-		address.host = mysql_module::to_std_string(config->get_host());
-		address.port = (unsigned short)config->get_port();
+		address.host = mysql_module::to_std_string(p_config->get_host());
+		address.port = (unsigned short)p_config->get_port();
 		params.server_address = address;
 
-		switch (config->get_transport_mode()) {
+		switch (p_config->get_transport_mode()) {
 			case MySQLConfig::TCP_TLS_DISABLED:
 				params.ssl = boost::mysql::ssl_mode::disable;
 				break;
@@ -84,10 +84,10 @@ boost::mysql::connect_params MySQLConnection::_make_connect_params() const {
 		}
 	}
 
-	params.username = mysql_module::to_std_string(config->get_user());
-	params.password = config->get_password_std();
-	params.database = mysql_module::to_std_string(config->get_database());
-	params.multi_queries = config->get_allow_multi_queries();
+	params.username = mysql_module::to_std_string(p_config->get_user());
+	params.password = p_config->get_password_std();
+	params.database = mysql_module::to_std_string(p_config->get_database());
+	params.multi_queries = p_config->get_allow_multi_queries();
 
 	return params;
 }
@@ -97,7 +97,7 @@ bool MySQLConnection::connect() {
 	last_error.clear();
 	last_diagnostics.clear();
 
-	boost::mysql::connect_params params = _make_connect_params();
+	boost::mysql::connect_params params = make_connect_params(config);
 	connection.connect(params, last_error, last_diagnostics);
 
 	if (last_error) {
@@ -186,7 +186,7 @@ void MySQLConnection::drop(const boost::mysql::error_code &p_error) {
 		return;
 	}
 	// Destroying the old `any_connection` closes its socket without sending anything.
-	connection = boost::mysql::any_connection(io_context.get_executor(), _make_any_connection_params(config, ssl_context));
+	connection = boost::mysql::any_connection(io_context.get_executor(), make_any_connection_params(config, ssl_context));
 	// Every prepared statement handle belonged to the dropped connection.
 	statement_cache->clear();
 	last_error = p_error;
