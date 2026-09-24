@@ -16,7 +16,7 @@ classDiagram
       +json_result_mode
       +statement_cache_size
       +max_buffer_size, max_result_bytes
-      +async_timeout_ms, cancel_timeout_ms
+      +async_timeout_ms, cancel_timeout_ms, async_batch_rows
       +set_password(password)
     }
     class MySQLSession {
@@ -29,6 +29,7 @@ classDiagram
       +execute_prepared(sql, params) MySQLResult
       +execute_script(script) Array
       +execute_streaming(sql) MySQLStreamingCursor
+      +async_execute_streaming(sql) MySQLStreamingCursor
       +async_execute_text(sql) MySQLAsyncOperation
       +async_execute_prepared(sql, params) MySQLAsyncOperation
       +begin_transaction() MySQLTransaction
@@ -49,8 +50,10 @@ classDiagram
     }
     class MySQLStreamingCursor {
       +next_batch() Array
+      +async_next_batch() MySQLAsyncOperation
       +has_more() bool
       +close()
+      +async_close() MySQLAsyncOperation
       +is_ok() bool
     }
     class MySQLAsyncOperation {
@@ -70,7 +73,8 @@ classDiagram
     MySQLPool --> MySQLConfig : set_config
     MySQLPool ..> MySQLSession : acquire
     MySQLSession ..> MySQLResult : execute_*
-    MySQLSession ..> MySQLStreamingCursor : execute_streaming
+    MySQLSession ..> MySQLStreamingCursor : execute_streaming, async_execute_streaming
+    MySQLStreamingCursor ..> MySQLAsyncOperation : async_next_batch
     MySQLSession ..> MySQLAsyncOperation : async_execute_*
     MySQLSession ..> MySQLTransaction : begin_transaction
     MySQLAsyncOperation ..> MySQLResult : get_result
@@ -140,7 +144,8 @@ universal.
   other: `allow_sql_script_execution` (manual script API) and `allow_multi_queries`
   (capability negotiated with the server).
 * **Streaming:** incremental reading of large results (`MySQLStreamingCursor`), without
-  loading everything in memory at once.
+  loading everything in memory at once — synchronous (`execute_streaming()`) or
+  asynchronous (`async_execute_streaming()`, see below).
 * **Asynchronous methods** that run without blocking the calling thread. See
   "Asynchronous methods" below.
 * Transactions (`MySQLTransaction`, obtained via `MySQLSession.begin_transaction()`) and
@@ -192,6 +197,39 @@ operation runs — `execute_*`, `execute_streaming`, `begin_transaction`, `conne
 particular, `close_db()` does not close it from under the running operation). Run
 parallel operations from separate sessions, for example one session per operation leased
 from a `MySQLPool`.
+
+#### Asynchronous streaming
+
+`async_execute_streaming()` returns a `MySQLStreamingCursor` right away and opens it on the
+I/O thread. Each `async_next_batch()` reads one batch there and returns a
+`MySQLAsyncOperation` whose `MySQLResult` holds the rows of that batch, so the loop never
+blocks the calling thread:
+
+```gdscript
+var cursor = session.async_execute_streaming("SELECT * FROM big_table")
+while cursor.has_more():
+    var batch = await cursor.async_next_batch().completed
+    if not batch.is_ok():
+        push_error(batch.get_error())
+        break
+    for row in batch.get_rows():
+        process(row)
+```
+
+* The first `async_next_batch()` waits for the cursor to open. An error while opening
+  reaches its result and `cursor.is_ok()`. `has_more()` stays `true` until that first
+  batch has been taken, even if it already arrived.
+* Every batch gathers at least `async_batch_rows` rows (default 500), fewer only at the end
+  of the resultset. One read from the server returns only what fits in the connection's
+  read buffer, often a handful of rows, and each batch costs at least a frame to `await`.
+* One batch at a time: calling `async_next_batch()` again before the previous batch
+  arrives fails with an explicit error. Between batches the cursor holds the connection,
+  as a synchronous cursor does.
+* `async_close()` drains what is left on the I/O thread and completes once the connection
+  is free. A cursor released without closing it drains in the background; the session
+  stays busy until that ends. `close()` still works, but it blocks while it drains.
+* `async_timeout_ms` applies to every read, and `cancel()` works on the operation of a
+  batch (below). Like `execute_streaming()`, it reads one resultset only.
 
 #### Cancelling an operation
 

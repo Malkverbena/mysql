@@ -13,7 +13,6 @@
 #include "prepared_statement_cache.h"
 #include "sql_script.h"
 
-#include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 
 #include <boost/asio/bind_cancellation_slot.hpp>
@@ -23,6 +22,7 @@
 #include <boost/mysql/execution_state.hpp>
 #include <boost/mysql/format_sql.hpp>
 #include <boost/mysql/is_fatal_error.hpp>
+#include <boost/mysql/metadata_collection_view.hpp>
 #include <boost/mysql/results.hpp>
 #include <boost/mysql/rows_view.hpp>
 #include <boost/mysql/statement.hpp>
@@ -34,15 +34,7 @@
 
 namespace {
 
-// Hands the result to the main thread, where `completed` is emitted. Through
-// `callable_mp` rather than `call_deferred()` by method name, so `_complete` does not
-// need to be bound, and a script cannot call it to fire `completed` spuriously. Like a
-// deferred call by name, it is dropped if the operation was freed in the meantime.
-void complete_deferred(const Ref<MySQLAsyncOperation> &p_operation, const Ref<MySQLResult> &p_result) {
-	// From here on the connection is free: nothing below touches it again.
-	p_operation->clear_running();
-	callable_mp(p_operation.ptr(), &MySQLAsyncOperation::_complete).call_deferred(p_result);
-}
+using mysql_module::complete_deferred;
 
 // Every asynchronous operation ends here, on the I/O thread. The result waits in
 // `held_result` while a `KILL QUERY` from `cancel()` is still in flight (see the comment on
@@ -269,21 +261,163 @@ void async_advance(const Ref<MySQLAsyncOperation> &p_operation) {
 	}
 }
 
-// `p_request` must stay valid until the operation ends: pass either the SQL string owned by
-// the operation or a bound statement whose parameters are owned by the operation.
-template <typename Request>
-void start_async_execute(MySQLConnection &p_connection, Request &&p_request, const Ref<MySQLAsyncOperation> &p_operation, int p_timeout_ms) {
+// Common setup of every asynchronous operation, on the main thread, right before its first
+// step is handed to Boost.MySQL.
+void prepare_operation(const Ref<MySQLAsyncOperation> &p_operation, MySQLConnection &p_connection, int p_timeout_ms) {
 	p_operation->set_running();
 	p_operation->connection = &p_connection;
 	p_operation->timeout_ms = p_timeout_ms;
 	boost::optional<std::uint32_t> server_id = p_connection.native().connection_id();
 	p_operation->has_server_connection_id = server_id.has_value();
 	p_operation->server_connection_id = server_id.value_or(0);
+}
+
+// Starts one step: `p_initiate` receives the completion token, already bound to the
+// operation's `cancel_signal` and wrapped in its timeout, if any.
+template <typename Handler, typename Initiate>
+void issue_step(const Ref<MySQLAsyncOperation> &p_operation, Handler p_handler, Initiate &&p_initiate) {
+	auto handler = bind_cancel(p_operation, std::move(p_handler));
+	if (p_operation->timeout_ms > 0) {
+		p_initiate(boost::asio::cancel_after(std::chrono::milliseconds(p_operation->timeout_ms), std::move(handler)));
+	} else {
+		p_initiate(std::move(handler));
+	}
+}
+
+// `p_request` must stay valid until the operation ends: pass either the SQL string owned by
+// the operation or a bound statement whose parameters are owned by the operation.
+template <typename Request>
+void start_async_execute(MySQLConnection &p_connection, Request &&p_request, const Ref<MySQLAsyncOperation> &p_operation, int p_timeout_ms) {
+	prepare_operation(p_operation, p_connection, p_timeout_ms);
 	auto handler = bind_cancel(p_operation, AsyncHeadHandler{ p_operation });
 	if (p_timeout_ms > 0) {
 		p_connection.native().async_start_execution(std::forward<Request>(p_request), p_operation->exec_state, p_operation->diagnostics, boost::asio::cancel_after(std::chrono::milliseconds(p_timeout_ms), handler));
 	} else {
 		p_connection.native().async_start_execution(std::forward<Request>(p_request), p_operation->exec_state, p_operation->diagnostics, handler);
+	}
+}
+
+// Steps of an asynchronous `MySQLStreamingCursor`: open (then read the first batch), read
+// one batch, and drain what is left. Each one is its own `MySQLAsyncOperation`, tracked by
+// the session like any other, so the busy guard, `async_timeout_ms` and `cancel()` apply
+// to them unchanged.
+
+// A batch as a `MySQLResult`: the rows just read, with the column names.
+Ref<MySQLResult> make_batch_result(const boost::mysql::execution_state &p_state, const boost::mysql::rows_view &p_rows, const Ref<MySQLConfig> &p_config) {
+	MySQLResult::Builder builder;
+	builder.begin_resultset(p_state.meta());
+	builder.add_rows(p_rows, p_state.meta(), p_config);
+	builder.end_resultset(0, 0, boost::mysql::string_view());
+	return builder.finish();
+}
+
+// Ends a cursor step on the I/O thread, leaving the cursor's new state on the operation
+// for `MySQLStreamingCursor::_apply_async_step()`.
+void finish_cursor_step(const Ref<MySQLAsyncOperation> &p_step, const boost::mysql::execution_state &p_state, boost::mysql::error_code p_error, const Ref<MySQLResult> &p_result) {
+	if (p_error) {
+		// A failed read ends the cursor, whether or not the connection survives it.
+		p_step->cursor_more = false;
+		p_step->cursor_engaged = false;
+		fail_deferred(p_step, p_error, p_result);
+		return;
+	}
+	// Like the synchronous cursor, only one resultset is read: `should_read_head()`
+	// (another resultset follows) means no more rows, and the rest is drained on close.
+	p_step->cursor_more = p_state.should_read_rows();
+	p_step->cursor_engaged = !p_state.complete();
+	finish_on_io_thread(p_step, p_result);
+}
+
+void issue_cursor_read(const Ref<MySQLAsyncOperation> &p_step, MySQLStreamingCursor &p_cursor);
+
+// Gathers reads into one batch until it has `batch_target` rows or the resultset ends.
+struct CursorRowsHandler {
+	Ref<MySQLAsyncOperation> step;
+	MySQLStreamingCursor *cursor;
+	void operator()(boost::mysql::error_code p_error, boost::mysql::rows_view p_rows) {
+		if (p_error) {
+			finish_cursor_step(step, cursor->state, p_error, MySQLResult::from_error(mysql_module::make_error_dict(p_error, step->diagnostics)));
+			return;
+		}
+		if (!step->batch_started) {
+			step->result_builder.begin_resultset(cursor->state.meta());
+			step->batch_started = true;
+		}
+		step->result_builder.add_rows(p_rows, cursor->state.meta(), step->config);
+		step->batch_rows += (int64_t)p_rows.size();
+		if (step->batch_rows < step->batch_target && cursor->state.should_read_rows()) {
+			issue_cursor_read(step, *cursor);
+			return;
+		}
+		step->result_builder.end_resultset(0, 0, boost::mysql::string_view());
+		finish_cursor_step(step, cursor->state, p_error, step->result_builder.finish());
+	}
+};
+
+void issue_cursor_read(const Ref<MySQLAsyncOperation> &p_step, MySQLStreamingCursor &p_cursor) {
+	MySQLConnection *connection = p_step->connection;
+	issue_step(p_step, CursorRowsHandler{ p_step, &p_cursor }, [&](auto &&p_token) {
+		connection->native().async_read_some_rows(p_cursor.state, p_step->diagnostics, std::forward<decltype(p_token)>(p_token));
+	});
+}
+
+struct CursorOpenHandler {
+	Ref<MySQLAsyncOperation> step;
+	MySQLStreamingCursor *cursor;
+	void operator()(boost::mysql::error_code p_error) {
+		if (p_error) {
+			finish_cursor_step(step, cursor->state, p_error, MySQLResult::from_error(mysql_module::make_error_dict(p_error, step->diagnostics)));
+			return;
+		}
+		step->cursor_opened = true;
+		boost::mysql::metadata_collection_view meta = cursor->state.meta();
+		step->cursor_columns.resize((int)meta.size());
+		for (std::size_t i = 0; i < meta.size(); i++) {
+			boost::mysql::string_view name = meta[i].column_name();
+			step->cursor_columns.set((int)i, mysql_module::to_godot_string(name.data(), name.size()));
+		}
+		if (cursor->state.should_read_rows()) {
+			issue_cursor_read(step, *cursor);
+			return;
+		}
+		// No rows to read (a statement that returns none, or an empty result).
+		finish_cursor_step(step, cursor->state, p_error, make_batch_result(cursor->state, boost::mysql::rows_view(), step->config));
+	}
+};
+
+void cursor_drain_step(const Ref<MySQLAsyncOperation> &p_drain);
+
+struct CursorDrainHandler {
+	Ref<MySQLAsyncOperation> drain;
+	void operator()(boost::mysql::error_code p_error, boost::mysql::rows_view) {
+		(*this)(p_error);
+	}
+	void operator()(boost::mysql::error_code p_error) {
+		if (p_error) {
+			fail_deferred(drain, p_error, MySQLResult::from_error(mysql_module::make_error_dict(p_error, drain->diagnostics)));
+			return;
+		}
+		cursor_drain_step(drain);
+	}
+};
+
+void cursor_drain_step(const Ref<MySQLAsyncOperation> &p_drain) {
+	if (p_drain->exec_state.complete()) {
+		MySQLResult::Builder builder;
+		builder.begin_resultset(boost::mysql::metadata_collection_view());
+		builder.end_resultset(0, 0, boost::mysql::string_view());
+		finish_on_io_thread(p_drain, builder.finish());
+		return;
+	}
+	MySQLConnection *connection = p_drain->connection;
+	if (p_drain->exec_state.should_read_rows()) {
+		issue_step(p_drain, CursorDrainHandler{ p_drain }, [&](auto &&p_token) {
+			connection->native().async_read_some_rows(p_drain->exec_state, p_drain->diagnostics, std::forward<decltype(p_token)>(p_token));
+		});
+	} else { // should_read_head()
+		issue_step(p_drain, CursorDrainHandler{ p_drain }, [&](auto &&p_token) {
+			connection->native().async_read_resultset_head(p_drain->exec_state, p_drain->diagnostics, std::forward<decltype(p_token)>(p_token));
+		});
 	}
 }
 
@@ -405,6 +539,34 @@ void mysql_module::start_async_cancel(const Ref<MySQLAsyncOperation> &p_operatio
 		}
 		p_operation->kill_in_flight = true;
 		std::make_shared<QueryKiller>(p_operation, p_operation->connection->get_io_context())->start();
+	});
+}
+
+void mysql_module::start_cursor_open(const Ref<MySQLAsyncOperation> &p_step, MySQLStreamingCursor &p_cursor) {
+	MySQLConnection *connection = p_cursor.get_connection();
+	prepare_operation(p_step, *connection, p_step->config->get_async_timeout_ms());
+	p_step->batch_target = p_step->config->get_async_batch_rows();
+	issue_step(p_step, CursorOpenHandler{ p_step, &p_cursor }, [&](auto &&p_token) {
+		connection->native().async_start_execution(p_step->sql, p_cursor.state, p_step->diagnostics, std::forward<decltype(p_token)>(p_token));
+	});
+}
+
+void mysql_module::start_cursor_read(const Ref<MySQLAsyncOperation> &p_step, MySQLStreamingCursor &p_cursor, MySQLConnection &p_connection) {
+	prepare_operation(p_step, p_connection, p_step->config->get_async_timeout_ms());
+	p_step->batch_target = p_step->config->get_async_batch_rows();
+	// No step is running, so the state is safe to read here. The cursor's copy of it may
+	// be a step behind (see `MySQLStreamingCursor::_apply_async_step()`).
+	if (!p_cursor.state.should_read_rows()) {
+		finish_cursor_step(p_step, p_cursor.state, boost::mysql::error_code(), make_batch_result(p_cursor.state, boost::mysql::rows_view(), p_step->config));
+		return;
+	}
+	issue_cursor_read(p_step, p_cursor);
+}
+
+void mysql_module::start_cursor_drain(const Ref<MySQLAsyncOperation> &p_drain, MySQLConnection &p_connection) {
+	prepare_operation(p_drain, p_connection, p_drain->config->get_async_timeout_ms());
+	boost::asio::post(p_connection.get_io_context(), [p_drain]() {
+		cursor_drain_step(p_drain);
 	});
 }
 
@@ -742,6 +904,25 @@ Ref<MySQLAsyncOperation> MySQLSession::async_execute_prepared(const String &p_sq
 	return operation;
 }
 
+void MySQLSession::_track_async_operation(const Ref<MySQLAsyncOperation> &p_operation) {
+	pending_async_operation = p_operation;
+	_ensure_io_thread_started();
+}
+
+Ref<MySQLStreamingCursor> MySQLSession::async_execute_streaming(const String &p_sql) {
+	if (!connection || !connection->is_connected()) {
+		return MySQLStreamingCursor::from_error(make_not_connected_error(), true);
+	}
+	Dictionary busy = _busy_error();
+	if (!busy.is_empty()) {
+		return MySQLStreamingCursor::from_error(busy, true);
+	}
+	Ref<MySQLAsyncOperation> first_step;
+	Ref<MySQLStreamingCursor> cursor = MySQLStreamingCursor::start_async(Ref<MySQLSession>(this), *connection, config, p_sql, first_step);
+	active_cursor = cursor.ptr();
+	return cursor;
+}
+
 Ref<MySQLStreamingCursor> MySQLSession::execute_streaming(const String &p_sql) {
 	if (!connection || !connection->is_connected()) {
 		return MySQLStreamingCursor::from_error(make_not_connected_error());
@@ -775,4 +956,5 @@ void MySQLSession::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("async_execute_text", "sql"), &MySQLSession::async_execute_text);
 	ClassDB::bind_method(D_METHOD("async_execute_prepared", "sql", "params"), &MySQLSession::async_execute_prepared);
 	ClassDB::bind_method(D_METHOD("execute_streaming", "sql"), &MySQLSession::execute_streaming);
+	ClassDB::bind_method(D_METHOD("async_execute_streaming", "sql"), &MySQLSession::async_execute_streaming);
 }

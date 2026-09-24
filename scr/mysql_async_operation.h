@@ -6,6 +6,7 @@
 #include "mysql_result.h"
 
 #include "core/object/ref_counted.h"
+#include "core/variant/variant.h"
 #include "core/templates/safe_refcount.h"
 
 #include <boost/asio/cancellation_signal.hpp>
@@ -17,6 +18,7 @@
 #include <string>
 
 class MySQLConnection;
+class MySQLStreamingCursor;
 
 // `RefCounted` with a `completed` signal, returned by every `async_*` call. It carries the
 // `MySQLResult` (or the error, inside it) once the operation finishes.
@@ -72,9 +74,26 @@ public:
 	bool kill_in_flight = false;
 	Ref<MySQLResult> held_result;
 
-	// Internal use by `MySQLSession`, not bound: runs on the main thread through a deferred
-	// `callable_mp` (see `complete_deferred()` in `mysql_session.cpp`).
+	// Set when the operation is a step of an asynchronous `MySQLStreamingCursor` (declared
+	// as `RefCounted` to avoid a circular include). The step leaves the cursor's new state
+	// in the `cursor_*` fields on the I/O thread, and `_complete()` applies it to the
+	// cursor on the main thread, then releases the cursor there (never on the I/O thread,
+	// where its destructor could run).
+	Ref<RefCounted> cursor;
+	bool cursor_opened = false;
+	bool cursor_more = false;
+	bool cursor_engaged = false;
+	PackedStringArray cursor_columns;
+	// The batch a cursor step is gathering (in `result_builder`), up to `batch_target` rows
+	// (`MySQLConfig::async_batch_rows`, read on the main thread when the step starts).
+	bool batch_started = false;
+	int64_t batch_rows = 0;
+	int64_t batch_target = 1;
+
+	// Internal use, not bound: runs on the main thread, deferred by
+	// `mysql_module::complete_deferred()`.
 	void _complete(Ref<MySQLResult> p_result);
+	static void _deliver(Ref<MySQLAsyncOperation> p_operation, Ref<MySQLResult> p_result);
 
 	bool is_finished() const { return finished_flag; }
 	bool is_running() const { return running.is_set(); }
@@ -94,8 +113,21 @@ public:
 
 namespace mysql_module {
 
+// Hands the result to the main thread, where `completed` is emitted. Safe to call from any
+// thread. The deferred call holds a reference to the operation, so the operation (and a
+// cursor it steps) is released on the main thread, not on the I/O thread. Through
+// `callable_mp_static` rather than `call_deferred()` by method name, so `_complete` does not
+// need to be bound, and a script cannot call it to fire `completed` spuriously.
+void complete_deferred(const Ref<MySQLAsyncOperation> &p_operation, const Ref<MySQLResult> &p_result);
+
 // Defined in `mysql_session.cpp`, next to the rest of the asynchronous machinery. Called by
 // `MySQLAsyncOperation::cancel()` on the main thread; the work runs on the I/O thread.
 void start_async_cancel(const Ref<MySQLAsyncOperation> &p_operation);
+
+// Defined in `mysql_session.cpp`: the steps of an asynchronous `MySQLStreamingCursor`.
+// Called on the main thread with the step already tracked by the session.
+void start_cursor_open(const Ref<MySQLAsyncOperation> &p_step, MySQLStreamingCursor &p_cursor);
+void start_cursor_read(const Ref<MySQLAsyncOperation> &p_step, MySQLStreamingCursor &p_cursor, MySQLConnection &p_connection);
+void start_cursor_drain(const Ref<MySQLAsyncOperation> &p_drain, MySQLConnection &p_connection);
 
 } // namespace mysql_module

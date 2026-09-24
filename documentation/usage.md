@@ -11,11 +11,11 @@ generated from [`../doc_classes/`](../doc_classes/).
 | Class | What it is |
 |---|---|
 | `MySQLConfig` | Connection settings: host/port/database, credentials, `transport_mode`, timeouts and limits. Passed to a session or a pool with `set_config()`. |
-| `MySQLSession` | A single connection. `connect_db()`/`close_db()`, and every way to run SQL: `execute_text`, `execute_formatted`, `execute_prepared`, `execute_streaming`, `execute_script`, `async_execute_text`, `async_execute_prepared`, `begin_transaction`. |
+| `MySQLSession` | A single connection. `connect_db()`/`close_db()`, and every way to run SQL: `execute_text`, `execute_formatted`, `execute_prepared`, `execute_streaming`, `execute_script`, `async_execute_text`, `async_execute_prepared`, `async_execute_streaming`, `begin_transaction`. |
 | `MySQLPool` | Hands out `MySQLSession` instances (`acquire()`) from a shared, thread-safe pool — one session per thread that needs one, never one session shared between threads. |
 | `MySQLResult` | The outcome of a non-streaming query: `is_ok()`, `get_error()`, `get_rows()`, `get_column_names()`, `get_affected_rows()`, `get_last_insert_id()`; multi-resultset aware (`get_resultset_count()`, and a `resultset` index on the other getters). |
-| `MySQLStreamingCursor` | Incremental reading of a large result: `next_batch()`/`has_more()`, without loading everything into memory. |
-| `MySQLAsyncOperation` | What an `async_*` call returns: `await`able via its `completed` signal, or poll with `is_finished()`/`get_result()`. |
+| `MySQLStreamingCursor` | Incremental reading of a large result: `next_batch()`/`has_more()`, or `async_next_batch()` on a cursor from `async_execute_streaming()`, without loading everything into memory. |
+| `MySQLAsyncOperation` | What an `async_*` call returns: `await`able via its `completed` signal, or poll with `is_finished()`/`get_result()`. `cancel()` stops it. |
 | `MySQLTransaction` | `commit()`/`rollback()`, obtained from `MySQLSession.begin_transaction()`; `is_ok()`/`get_error()` say whether it started. |
 
 ## Connecting
@@ -187,6 +187,24 @@ result too large to fit in one `MySQLResult` (`max_result_bytes`, below, is the 
 everything that is *not* read this way). Until the cursor is read to the end or closed,
 it holds the connection: any other call on the same session fails with an explicit
 `engaged_in_multi_function` error instead of waiting.
+
+`next_batch()` blocks while it reads. To stream without blocking, use
+`async_execute_streaming()`: each batch is then an asynchronous operation carrying a
+`MySQLResult`, with at least `async_batch_rows` rows (default 500):
+
+```gdscript
+var cursor = session.async_execute_streaming("SELECT * FROM big_table")
+while cursor.has_more():
+    var batch = await cursor.async_next_batch().completed
+    if not batch.is_ok():
+        push_error(batch.get_error())
+        break
+    for row in batch.get_rows():
+        process(row)
+```
+
+Close it early with `await cursor.async_close().completed`. See "Asynchronous streaming"
+in [features.md](features.md).
 
 ## Connection pool (multithreading)
 

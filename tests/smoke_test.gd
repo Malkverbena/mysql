@@ -121,6 +121,16 @@ func _on_operation_timeout(operation: MySQLAsyncOperation) -> void:
 		quit(1)
 
 
+# Waits (a frame at a time, up to about 5 seconds) until the session accepts a query again,
+# for a background drain to finish. Returns whether it did.
+func _wait_until_usable(session: MySQLSession) -> bool:
+	for i in range(300):
+		if session.execute_text("SELECT 1").is_ok():
+			return true
+		await process_frame
+	return false
+
+
 # Runs in a worker thread: leases a session from the pool, runs one query and gives the
 # session back (it is released when the function returns). Returns 1 on success.
 func _pool_worker(pool: MySQLPool, index: int) -> int:
@@ -486,6 +496,104 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	var bad_cursor: MySQLStreamingCursor = session.execute_streaming("SELEC nothing")
 	check(not bad_cursor.is_ok() and not bad_cursor.has_more(), "a streaming syntax error is reported and the cursor has nothing to read")
 
+	print("=== 8b. Asynchronous streaming ===")
+	# async_execute_streaming() returns the cursor right away and opens it on the I/O
+	# thread; each async_next_batch() is an asynchronous operation carrying one batch as a
+	# MySQLResult. The first one waits for the opening.
+	var async_cursor: MySQLStreamingCursor = session.async_execute_streaming("SELECT txt FROM t_mysql_module_smoke_test WHERE txt LIKE 'stream\\_%' ORDER BY id")
+	check(async_cursor.is_ok() and async_cursor.has_more(), "async_execute_streaming() returns a cursor with rows to read")
+	var async_streamed := 0
+	var async_batches_ok := true
+	while async_cursor.has_more():
+		var async_batch: MySQLResult = await async_cursor.async_next_batch().completed
+		async_batches_ok = async_batches_ok and async_batch.is_ok()
+		async_streamed += async_batch.get_rows().size() if async_batch.is_ok() else 0
+	check(async_batches_ok and async_streamed == 20, "the asynchronous cursor read the 20 rows (read %d)" % [async_streamed])
+	check(async_cursor.get_column_names() == PackedStringArray(["txt"]), "the asynchronous cursor exposes its column names (%s)" % [async_cursor.get_column_names()])
+	check(session.execute_text("SELECT 1").is_ok(), "an asynchronous cursor read to the end no longer holds the connection")
+	var past_end: MySQLResult = await async_cursor.async_next_batch().completed
+	check(past_end.is_ok() and past_end.get_rows().is_empty(), "async_next_batch() past the end returns an empty batch")
+
+	# A result larger than one batch arrives in several, without blocking the main thread.
+	const BIG_STREAM := "WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM r WHERE n < 50000) SELECT n, REPEAT('x', 100) FROM r"
+	session.execute_text("SET SESSION cte_max_recursion_depth = 100000")
+	var big_cursor: MySQLStreamingCursor = session.async_execute_streaming(BIG_STREAM)
+	var big_rows := 0
+	var big_batches := 0
+	var big_last := 0
+	while big_cursor.has_more():
+		var big_batch: MySQLResult = await big_cursor.async_next_batch().completed
+		if not big_batch.is_ok():
+			check(false, "a batch of a large asynchronous stream (%s)" % [big_batch.get_error()])
+			break
+		big_batches += 1
+		big_rows += big_batch.get_rows().size()
+		if not big_batch.get_rows().is_empty():
+			big_last = big_batch.get_rows()[-1][0]
+	var batch_target: int = config.async_batch_rows
+	check(big_rows == 50000 and big_last == 50000 and big_batches > 1, "a large asynchronous stream arrives complete, in several batches (%d rows, %d batches)" % [big_rows, big_batches])
+	check(big_batches <= 50000 / batch_target + 1, "the batches gather at least async_batch_rows rows each (%d batches of about %d rows for %d rows)" % [big_batches, batch_target, big_rows])
+
+	# While a batch is in flight the I/O thread owns the connection, and between batches
+	# the cursor does: every other call fails explicitly, as with the synchronous cursor.
+	var held_async: MySQLStreamingCursor = session.async_execute_streaming(BIG_STREAM)
+	var in_flight: MySQLResult = session.execute_text("SELECT 1")
+	check(not in_flight.is_ok(), "a query while the cursor opens fails explicitly (%s)" % [in_flight.get_error().get("message", "")])
+	var first_batch_op: MySQLAsyncOperation = held_async.async_next_batch()
+	var second_batch_op: MySQLAsyncOperation = held_async.async_next_batch()
+	var second_batch: MySQLResult = await await_operation(second_batch_op)
+	check(not second_batch.is_ok(), "a second async_next_batch() while one is running fails explicitly (%s)" % [second_batch.get_error().get("message", "")])
+	var first_batch: MySQLResult = await await_operation(first_batch_op)
+	check(first_batch.is_ok() and not first_batch.get_rows().is_empty(), "the running batch still arrives (%s)" % [first_batch.get_error()])
+	var between: MySQLResult = session.execute_text("SELECT 1")
+	check(not between.is_ok() and String(between.get_error().get("message", "")).contains("multi-function"), "a query between batches fails explicitly (%s)" % [between.get_error().get("message", "")])
+	check(not session.async_execute_streaming("SELECT 1").is_ok(), "a second cursor while an asynchronous one is open fails explicitly")
+	check(held_async.next_batch().is_empty(), "next_batch() is not available on an asynchronous cursor")
+	var closed_async: MySQLResult = await held_async.async_close().completed
+	check(closed_async.is_ok(), "async_close() drains the rest of the stream (%s)" % [closed_async.get_error()])
+	check(not held_async.has_more(), "a closed asynchronous cursor has nothing more to read")
+	var after_async_close: MySQLResult = session.execute_text("SELECT 'after_async_close'")
+	check(after_async_close.is_ok(), "the connection is usable after async_close() (%s)" % [after_async_close.get_error()])
+
+	# close() while a batch is in flight drains once the batch arrives; a cursor released
+	# midway drains in the background. Either way the session is busy until the drain ends.
+	var close_early: MySQLStreamingCursor = session.async_execute_streaming(BIG_STREAM)
+	var close_early_op: MySQLAsyncOperation = close_early.async_next_batch()
+	close_early.close()
+	await await_operation(close_early_op)
+	var close_early_drain: MySQLResult = await await_operation(close_early.async_close())
+	check(close_early_drain.is_ok(), "async_close() after close() during a running batch waits for the drain (%s)" % [close_early_drain.get_error()])
+	check(session.execute_text("SELECT 1").is_ok(), "the session is usable once that drain finished")
+	var dropped: MySQLStreamingCursor = session.async_execute_streaming(BIG_STREAM)
+	await await_operation(dropped.async_next_batch())
+	dropped = null # Released midway, without close().
+	check(await _wait_until_usable(session), "the session is usable after an asynchronous cursor is released midway")
+
+	# Errors and empty results.
+	var bad_async: MySQLStreamingCursor = session.async_execute_streaming("SELEC nothing")
+	var bad_batch: MySQLResult = await bad_async.async_next_batch().completed
+	check(not bad_batch.is_ok() and not bad_async.is_ok() and not bad_async.has_more(), "an asynchronous streaming syntax error reaches the first batch and the cursor (%s)" % [bad_batch.get_error().get("message", "")])
+	check(session.execute_text("SELECT 1").is_ok(), "a failed asynchronous cursor does not hold the connection")
+	var empty_async: MySQLStreamingCursor = session.async_execute_streaming("SELECT txt FROM t_mysql_module_smoke_test WHERE 1 = 0")
+	var empty_batch: MySQLResult = await empty_async.async_next_batch().completed
+	check(empty_batch.is_ok() and empty_batch.get_rows().is_empty() and not empty_async.has_more(), "an empty asynchronous stream gives one empty batch")
+	check(empty_batch.get_column_names() == PackedStringArray(["txt"]), "the empty batch still has the column names (%s)" % [empty_batch.get_column_names()])
+	var no_rows_async: MySQLStreamingCursor = session.async_execute_streaming("DO 1")
+	var no_rows_batch: MySQLResult = await no_rows_async.async_next_batch().completed
+	check(no_rows_batch.is_ok() and no_rows_batch.get_rows().is_empty() and not no_rows_async.has_more(), "a statement without a resultset gives one empty batch (%s)" % [no_rows_batch.get_error()])
+	check(session.execute_text("SELECT 1").is_ok(), "a statement without a resultset does not hold the connection")
+	var sync_cursor_async: MySQLResult = await session.execute_streaming("SELECT 1").async_next_batch().completed
+	check(not sync_cursor_async.is_ok(), "async_next_batch() is not available on a synchronous cursor")
+
+	# The first batch arriving after other awaits: has_more() keeps saying so until it is
+	# taken, and awaiting .completed directly still returns.
+	var late: MySQLStreamingCursor = session.async_execute_streaming("SELECT 'late' AS v")
+	await create_timer(0.2).timeout
+	check(late.has_more(), "has_more() is true until the first batch is taken, even if it already arrived")
+	var late_batch: MySQLResult = await late.async_next_batch().completed
+	check(late_batch.is_ok() and late_batch.get_rows() == [["late"]], "a first batch that already arrived is still delivered (%s)" % [late_batch.get_rows() if late_batch.is_ok() else late_batch.get_error()])
+	check(not late.has_more(), "has_more() is false once the only batch is taken")
+
 	print("=== 9. Asynchronous ===")
 	# Use await on the signal, not a blocking polling loop: a loop with OS.delay_msec()
 	# never gives control back to the SceneTree to run frames, and running frames is what
@@ -624,6 +732,18 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	check(not rejected_op.cancel(), "cancel() on an operation rejected as busy returns false")
 	await await_operation(rejected_op)
 	await await_operation(running_op)
+
+	# cancel() works on a step of an asynchronous cursor as well: the cursor fails, and the
+	# connection is free again.
+	var cancel_cursor: MySQLStreamingCursor = cancel_session.async_execute_streaming(LONG_QUERY)
+	var cursor_step: MySQLAsyncOperation = cancel_cursor.async_next_batch()
+	await create_timer(0.2).timeout
+	check(cursor_step.cancel(), "cancel() on a running cursor step returns true")
+	var cancelled_step: MySQLResult = await await_operation(cursor_step)
+	check(not cancelled_step.is_ok() and cancelled_step.get_error().get("server_message", "") == "Query execution was interrupted", "the cancelled cursor step fails with \"query interrupted\" (%s)" % [cancelled_step.get_error()])
+	check(not cancel_cursor.is_ok() and not cancel_cursor.has_more(), "the cursor of a cancelled step reports the error and has nothing more to read")
+	var after_cursor_cancel: MySQLResult = cancel_session.execute_text("SELECT 'after_cursor_cancel' AS v")
+	check(after_cursor_cancel.is_ok() and after_cursor_cancel.get_rows()[0][0] == "after_cursor_cancel", "the session is usable after cancelling a cursor step (%s)" % [after_cursor_cancel.get_error()])
 
 	# If the side connection cannot reach the server (here: the config now points to a
 	# closed port, and the session is already connected), cancel() falls back to
@@ -888,6 +1008,21 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	multi_cursor.close()
 	var after_multi_stream: MySQLResult = multi_session.execute_text("SELECT 3")
 	check(after_multi_stream.is_ok(), "the connection is usable after closing a multi-statement stream (%s)" % [after_multi_stream.get_error()])
+	# The same on an asynchronous cursor: it reads the first resultset only, and
+	# async_close() drains the others.
+	var multi_async: MySQLStreamingCursor = multi_session.async_execute_streaming("SELECT 1 AS a; SELECT 2 AS b")
+	var multi_async_rows: Array = []
+	var multi_async_batches := 0
+	while multi_async.has_more() and multi_async_batches < 1000:
+		var multi_async_batch: MySQLResult = await multi_async.async_next_batch().completed
+		if multi_async_batch.is_ok():
+			multi_async_rows.append_array(multi_async_batch.get_rows())
+		multi_async_batches += 1
+	check(multi_async_batches < 1000 and multi_async_rows == [[1]], "an asynchronous multi-statement stream reads the first resultset and ends (%s in %d batches)" % [multi_async_rows, multi_async_batches])
+	var multi_async_closed: MySQLResult = await multi_async.async_close().completed
+	check(multi_async_closed.is_ok(), "async_close() drains the other resultsets (%s)" % [multi_async_closed.get_error()])
+	var after_multi_async: MySQLResult = multi_session.execute_text("SELECT 3")
+	check(after_multi_async.is_ok() and after_multi_async.get_rows() == [[3]], "the connection is usable after an asynchronous multi-statement stream (%s)" % [after_multi_async.get_error()])
 	multi_session.close_db()
 
 	print("=== 13. Cleanup ===")

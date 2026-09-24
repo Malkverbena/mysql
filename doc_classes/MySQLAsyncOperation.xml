@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="MySQLAsyncOperation" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
-		A pending [method MySQLSession.async_execute_text]/[method MySQLSession.async_execute_prepared] call.
+		A pending asynchronous call: [method MySQLSession.async_execute_text], [method MySQLSession.async_execute_prepared], or a batch or close of an asynchronous [MySQLStreamingCursor].
 	</brief_description>
 	<description>
-		Returned immediately by [method MySQLSession.async_execute_text] and [method MySQLSession.async_execute_prepared], before the server has answered. Wait for it by awaiting [signal completed] only if [method is_finished] is still [code]false[/code] (otherwise read [method get_result] directly): [signal completed] fires only once, so if the operation already finished while something else was being awaited, a bare [code]await async_op.completed[/code] would never return. Alternatively, poll [method is_finished] across frames (driven by [method Object.call_deferred] under the hood, so it only progresses while the [SceneTree] is processing frames, never from a busy [code]while[/code] loop).
+		Returned immediately by [method MySQLSession.async_execute_text], [method MySQLSession.async_execute_prepared], [method MySQLStreamingCursor.async_next_batch] and [method MySQLStreamingCursor.async_close], before the server has answered. Wait for it by awaiting [signal completed] only if [method is_finished] is still [code]false[/code] (otherwise read [method get_result] directly): [signal completed] fires only once, so if the operation already finished while something else was being awaited, a bare [code]await async_op.completed[/code] would never return. Alternatively, poll [method is_finished] across frames (driven by [method Object.call_deferred] under the hood, so it only progresses while the [SceneTree] is processing frames, never from a busy [code]while[/code] loop).
 		Once finished, [method get_result] returns the same [MySQLResult] that [signal completed] carries.
 	</description>
 	<tutorials>

@@ -121,6 +121,10 @@ public:
 	Ref<MySQLAsyncOperation> async_execute_text(const String &p_sql);
 	Ref<MySQLAsyncOperation> async_execute_prepared(const String &p_sql, const Array &p_params);
 	Ref<MySQLStreamingCursor> execute_streaming(const String &p_sql);
+	Ref<MySQLStreamingCursor> async_execute_streaming(const String &p_sql);
+	// Internal use by `MySQLStreamingCursor`, not bound: makes `p_operation` the one that
+	// owns the connection (see `pending_async_operation`) and starts the I/O thread.
+	void _track_async_operation(const Ref<MySQLAsyncOperation> &p_operation);
 	// Internal use by `MySQLStreamingCursor::close()`, not bound.
 	void _cursor_closed(const MySQLStreamingCursor *p_cursor);
 
