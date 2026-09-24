@@ -372,6 +372,25 @@ Used by `execute_formatted()`, `execute_prepared()` and `async_execute_prepared(
 > `get_parsed_json(resultset, row, column)` — it does not depend on the column type and
 > parses whatever text you point at.
 
+## Performance
+
+[`../benchmark/`](../benchmark/) measures the module from GDScript, one Godot scene per
+situation, and [`../benchmark/RESULTS.md`](../benchmark/RESULTS.md) has the results on
+the development machine. In short, with the server on the same machine:
+
+* `execute_text`, `execute_formatted` and `execute_prepared` cost about the same per call.
+  A prepared statement that has to be prepared again on every call (its cache too small)
+  costs almost three times as much.
+* An awaited asynchronous call waits for the next frame, so a series of them runs at one
+  per frame; in exchange, a heavy query no longer stalls the frame it runs in.
+* `async_batch_rows` trades frames for memory: small batches make a large result take many
+  frames, large ones hold more rows at once.
+* Leasing a pooled session resets its connection, one extra round trip: lease a session
+  once per task, not once per query.
+* `DATE`/`DATETIME`/`TIME` and JSON parsed into a `Variant` are the most expensive types to
+  convert; `LAZY_PARSED_VARIANT` (the default) defers the JSON cost until
+  `get_parsed_json()`.
+
 ## Platforms
 
 * **Linux x86_64**: primary development and testing platform.

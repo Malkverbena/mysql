@@ -4,7 +4,9 @@ How to use this module from GDScript, once it is compiled into your Godot build 
 [instructions.md](instructions.md)). For the full list of what it can do, see
 [features.md](features.md); for the exact signature of every method, member and signal,
 use Godot's own built-in help (`F1` in the editor, or hover a class name) — it is
-generated from [`../doc_classes/`](../doc_classes/).
+generated from [`../doc_classes/`](../doc_classes/). To see the code below running, open
+the example project in [`../examples/`](../examples/); to measure it, see
+[`../benchmark/`](../benchmark/) (both are described at the end of this page).
 
 ## Classes Overview
 
@@ -279,3 +281,28 @@ if not result.is_ok():
         print("Server said: ", error.server_message)
     return
 ```
+
+## Example projects and benchmarks
+
+The repository has two Godot projects next to the module's code. Both read the connection
+settings from their own `config.ini` (never commit a real password there) and run from the
+editor or headless; each folder's `README.md` explains the setup.
+
+[`../examples/`](../examples/) has one scene per feature, each running by itself and
+printing what it does:
+
+| Scene | Shows |
+|---|---|
+| `connect_and_configure` | `MySQLConfig`, `connect_db()`, one query, `close_db()`; creates the schema named in `config.ini`. Run it first. |
+| `transactions` | `begin_transaction()`, `commit()` and `rollback()`. |
+| `streaming` | `execute_streaming()` with `next_batch()`/`has_more()`. |
+| `async_streaming` | `async_execute_streaming()` with `async_next_batch()` and `async_close()`, with a frame counter and a **Cancel** button. |
+| `async` | `async_execute_text()`/`async_execute_prepared()`, and the error a second call gets while the session is busy. |
+| `cancel` | `MySQLAsyncOperation.cancel()` on a long query, and the session still usable afterwards. |
+| `connection_pool` | `MySQLPool` shared by several threads. |
+
+[`../benchmark/`](../benchmark/) has one scene per measurement, printing Markdown tables:
+the three ways to run SQL, synchronous vs asynchronous calls, streaming (with several
+`async_batch_rows` values), the connection pool with 1 to 8 threads, and the cost of
+converting each type. The numbers measured on the development machine, and what they say,
+are in [`../benchmark/RESULTS.md`](../benchmark/RESULTS.md).

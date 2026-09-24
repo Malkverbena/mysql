@@ -33,7 +33,8 @@ hardware is available to build and test it.
 | [documentation/instructions.md](documentation/instructions.md) | How to configure, compile and test the module together with Godot, per platform. |
 | [documentation/usage.md](documentation/usage.md) | How to use the module from GDScript: class overview and worked examples. |
 | [documentation/tests.md](documentation/tests.md) | How to run the unit tests, the desktop integration test and the Android integration test. |
-| [benchmark/](benchmark/) | Benchmarks of the module, one Godot scene per situation, and the results measured on the development machine. |
+| [examples/](examples/) | A Godot project with one runnable scene per feature: connecting, transactions, streaming (synchronous and asynchronous), asynchronous calls, cancelling a query and the connection pool. |
+| [benchmark/](benchmark/) | A Godot project with one benchmark scene per situation (execution modes, synchronous vs asynchronous, streaming, connection pool, type conversion), and the results measured on the development machine in [benchmark/RESULTS.md](benchmark/RESULTS.md). |
 | [doc_classes/](doc_classes/) | The reference used by Godot's own built-in help (`F1` in the editor), one XML file per class. |
 
 ## Old version note
