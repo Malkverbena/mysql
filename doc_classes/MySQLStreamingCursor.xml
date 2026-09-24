@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MySQLStreamingCursor" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		Reads a [method MySQLSession.execute_streaming] or [method MySQLSession.async_execute_streaming] result incrementally, in batches, instead of all at once.
+	</brief_description>
+	<description>
+		Returned by [method MySQLSession.execute_streaming]. Unlike [method MySQLSession.execute_text], which loads every row into memory before returning, this reads and returns rows a batch at a time via [method next_batch], which is useful for a query that can return more rows than comfortably fit in memory at once.
+		Typical use: check [method is_ok] first, then loop while [method has_more] is [code]true[/code], calling [method next_batch] each time.
+		While the cursor has not been read to the end or closed, it holds the connection: any other call on the same [MySQLSession] (another [method MySQLSession.execute_streaming], any [code]execute_*[/code] or [code]async_execute_*[/code] method, [method MySQLSession.begin_transaction]) fails immediately with an explicit [code]engaged_in_multi_function[/code] error, instead of waiting or queuing. Read it to the end or call [method close] first. [method MySQLSession.close_db] is still allowed; the cursor then fails on its next read. Only reads a single resultset, even if [member MySQLConfig.allow_multi_queries] is enabled on the session's config. If closed before being fully read (explicitly with [method close], or by being destroyed), it drains the rest of the resultset by itself first, since the underlying connection needs it fully read before running anything else.
+		A cursor returned by [method MySQLSession.async_execute_streaming] is asynchronous: it opens on the session's I/O thread without blocking, and [method async_next_batch] reads each batch the same way, returning a [MySQLAsyncOperation] whose [MySQLResult] holds the rows of the batch. The first [method async_next_batch] waits for the cursor to open, and an error while opening reaches its result and [method is_ok]. Close it early with [method async_close], or release it: the rest is then drained in the background, and the session stays busy until that ends. [method next_batch] is not available on an asynchronous cursor, nor [method async_next_batch] and [method async_close] on a synchronous one.
+		[codeblock]
+		var cursor = session.async_execute_streaming("SELECT * FROM big_table")
+		while cursor.has_more():
+		    var batch = await cursor.async_next_batch().completed
+		    if not batch.is_ok():
+		        push_error(batch.get_error())
+		        break
+		    for row in batch.get_rows():
+		        process(row)
+		[/codeblock]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="async_close">
+			<return type="MySQLAsyncOperation" />
+			<description>
+				Closes an asynchronous cursor without blocking: the rows left to read are drained on the session's I/O thread, and the returned operation completes once the connection is free again. Its [MySQLResult] is empty, or holds the error if the drain failed. Fails with an explicit error while a batch is still being read (await it, or [method MySQLAsyncOperation.cancel] it, first), and on a synchronous cursor (use [method close]).
+			</description>
+		</method>
+		<method name="async_next_batch">
+			<return type="MySQLAsyncOperation" />
+			<description>
+				Reads the next batch of an asynchronous cursor on the session's I/O thread. The returned operation completes with a [MySQLResult] holding the rows of the batch ([method MySQLResult.get_rows]) and the column names, or the error if the read failed (the cursor then fails too). Each batch gathers at least [member MySQLConfig.async_batch_rows] rows, fewer only at the end of the resultset. Returns an empty batch once [method has_more] is [code]false[/code]. Only one batch is read at a time: calling it again before the previous batch arrives fails with an explicit error. [method MySQLAsyncOperation.cancel] on the operation stops the query. Not available on a synchronous cursor (use [method next_batch]).
+			</description>
+		</method>
+		<method name="close">
+			<return type="void" />
+			<description>
+				Closes the cursor. If it still had rows left to read, they are drained (read and discarded) first, so the connection is usable again right after this returns. Safe to call more than once, and called automatically when the cursor is destroyed.
+				On an asynchronous cursor, the drain also blocks, unless a batch is still being read: the cursor then drains once that batch arrives, on the I/O thread. Prefer [method async_close] there.
+			</description>
+		</method>
+		<method name="get_column_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Column names of the resultset, in order. Available as soon as the cursor is opened, before any [method next_batch] call. On an asynchronous cursor, available once the first batch has arrived.
+			</description>
+		</method>
+		<method name="get_error" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				The error, if [method is_ok] is [code]false[/code]; an empty [Dictionary] otherwise. Same shape as [method MySQLResult.get_error].
+			</description>
+		</method>
+		<method name="has_more" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if [method next_batch] can still return more rows: the cursor is ok, not closed, and the resultset is not fully read yet. On an asynchronous cursor, it reflects the last batch that arrived, and stays [code]true[/code] until the first batch has been taken with [method async_next_batch].
+			</description>
+		</method>
+		<method name="is_ok" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the cursor opened without error and no read has failed since. Stays [code]true[/code] after the resultset has been fully read (exhausted is not the same as failed); check [method has_more] to tell those apart.
+			</description>
+		</method>
+		<method name="next_batch">
+			<return type="Array" />
+			<description>
+				Reads and returns the next batch of rows (an [Array] of [Array]s, same row shape as [method MySQLResult.get_rows]). The batch size is not fixed: it depends on the connection's buffer size and how much data the server has ready. Returns an empty [Array] once [method has_more] is [code]false[/code], or if a read fails (check [method is_ok] afterwards).
+			</description>
+		</method>
+	</methods>
+</class>

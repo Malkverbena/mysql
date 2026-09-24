@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MySQLSession" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A single connection to a MySQL/MariaDB server: the main entry point of the module.
+	</brief_description>
+	<description>
+		Runs SQL three ways ([method execute_text], [method execute_formatted], [method execute_prepared]), each with an asynchronous or streaming variant where it makes sense, plus transactions ([method begin_transaction]) and manual scripts ([method execute_script]).
+		A session needs a [MySQLConfig] before it can be used: call [method set_config] (which also creates the underlying connection), or get one already configured from [method MySQLPool.acquire]. Every method that needs the connection returns an explicit error (category [code]mysql_module.client[/code] in the returned [Dictionary]/[MySQLResult]) when called before [method set_config] or before [method connect_db], instead of crashing.
+		A session is [b]not[/b] thread safe and runs at most one operation (synchronous or asynchronous) at a time on its connection: while an asynchronous operation is in flight, any other call on the session (a second asynchronous call, any [code]execute_*[/code] method, [method begin_transaction], [method connect_db], [method close_db]) fails explicitly with an [code]operation_in_progress[/code] error, without touching the connection. Use one session per thread, or lease one per thread from a [MySQLPool].
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="async_execute_prepared">
+			<return type="MySQLAsyncOperation" />
+			<param index="0" name="sql" type="String" />
+			<param index="1" name="params" type="Array" />
+			<description>
+				Asynchronous version of [method execute_prepared]: does not block, and returns immediately with a [MySQLAsyncOperation] that emits [signal MySQLAsyncOperation.completed] once the server has answered. Runs on a dedicated I/O thread owned by this session (started on demand by the first asynchronous call).
+			</description>
+		</method>
+		<method name="async_execute_streaming">
+			<return type="MySQLStreamingCursor" />
+			<param index="0" name="sql" type="String" />
+			<description>
+				Asynchronous counterpart of [method execute_streaming]: returns the [MySQLStreamingCursor] right away and opens it on the session's I/O thread. Read it with [method MySQLStreamingCursor.async_next_batch], each batch a [MySQLAsyncOperation], so the calling thread never blocks. Until the cursor is read to the end or closed, and while a batch is being read, any other call on this session fails with an explicit error, as with [method execute_streaming].
+			</description>
+		</method>
+		<method name="async_execute_text">
+			<return type="MySQLAsyncOperation" />
+			<param index="0" name="sql" type="String" />
+			<description>
+				Asynchronous version of [method execute_text]. See [method async_execute_prepared] for how the returned [MySQLAsyncOperation] works.
+			</description>
+		</method>
+		<method name="begin_transaction">
+			<return type="MySQLTransaction" />
+			<description>
+				Runs [code]START TRANSACTION[/code] and returns a [MySQLTransaction] to [method MySQLTransaction.commit] or [method MySQLTransaction.rollback] it. If the returned [MySQLTransaction] is destroyed without either having been called, it rolls back automatically as a safety net. Never returns [code]null[/code]: if [code]START TRANSACTION[/code] fails, the returned transaction reports it through [method MySQLTransaction.is_ok] and [method MySQLTransaction.get_error].
+			</description>
+		</method>
+		<method name="close_db">
+			<return type="Dictionary" />
+			<description>
+				Closes the connection. Returns an empty [Dictionary] on success, or an error [Dictionary] (same shape as [method MySQLResult.get_error]) otherwise. Safe to call on a session that is not connected.
+			</description>
+		</method>
+		<method name="connect_db">
+			<return type="Dictionary" />
+			<description>
+				Opens the connection using the [MySQLConfig] passed to [method set_config]. Returns an empty [Dictionary] on success, or an error [Dictionary] (same shape as [method MySQLResult.get_error]) otherwise — for example, if [member MySQLConfig.transport_mode] is [constant MySQLConfig.TCP_TLS_REQUIRED] and the server's certificate cannot be validated.
+			</description>
+		</method>
+		<method name="execute_formatted">
+			<return type="MySQLResult" />
+			<param index="0" name="sql" type="String" />
+			<param index="1" name="params" type="Array" />
+			<description>
+				Runs [code]sql[/code] with [code]?[/code] placeholders filled in from [code]params[/code], escaped by Boost.MySQL itself (never by the module's own code) and sent as a single formatted text query, not a prepared statement. Blocks until the server answers. A [code]?[/code] inside a quoted literal ([code]'...'[/code], [code]"..."[/code] or a backtick-quoted identifier) or inside a comment ([code]-- [/code], [code]#[/code], [code]/* */[/code]) is text, not a placeholder; inside a versioned [code]/*! ... */[/code] comment, which the server runs as code, it is a placeholder. Backslash escapes inside literals follow the connection's current SQL mode ([code]NO_BACKSLASH_ESCAPES[/code]). Fails explicitly, without running anything, if the number of placeholders and parameters do not match, or if a parameter is of an unsupported [Variant] type. A [Dictionary] parameter is read as [code]DATE[/code]/[code]DATETIME[/code]/[code]TIME[/code], using the same shape [method MySQLResult.get_rows] returns for that type.
+			</description>
+		</method>
+		<method name="execute_prepared">
+			<return type="MySQLResult" />
+			<param index="0" name="sql" type="String" />
+			<param index="1" name="params" type="Array" />
+			<description>
+				Runs [code]sql[/code] as a server-side prepared statement bound to [code]params[/code]. The prepared statement is cached per connection (see [member MySQLConfig.statement_cache_size]), so calling this repeatedly with the same [code]sql[/code] text only prepares it once. Blocks until the server answers. Fails explicitly if the number of parameters does not match what the statement expects, or if a parameter is of an unsupported [Variant] type. A [Dictionary] parameter is read as [code]DATE[/code]/[code]DATETIME[/code]/[code]TIME[/code], using the same shape [method MySQLResult.get_rows] returns for that type.
+			</description>
+		</method>
+		<method name="execute_script">
+			<return type="Array" />
+			<param index="0" name="content" type="String" />
+			<description>
+				Splits [code]content[/code] into individual statements (correctly, even with semicolons inside quoted string literals or inside [code]-- [/code], [code]#[/code] and [code]/* */[/code] comments) and runs them one by one with [method execute_text], stopping at the first one that fails. Returns an [Array] of [MySQLResult], one per statement that ran. Refused (returns a single error result) unless [member MySQLConfig.allow_sql_script_execution] is [code]true[/code] on this session's config. Comments are sent to the server as part of the statement they sit in; a fragment made only of comments is skipped, except a versioned [code]/*! ... */[/code] comment, whose content the server runs as code. Statements are found one at a time, each with the backslash escaping of the SQL mode in force at that point, so a script that itself sets [code]NO_BACKSLASH_ESCAPES[/code] is still split correctly. [code]DELIMITER[/code] is a client command of the [code]mysql[/code] tool, not SQL, and is not understood. Takes the script's content directly, not a file path.
+			</description>
+		</method>
+		<method name="execute_streaming">
+			<return type="MySQLStreamingCursor" />
+			<param index="0" name="sql" type="String" />
+			<description>
+				Runs [code]sql[/code] and returns a [MySQLStreamingCursor] that reads the result incrementally in batches via [method MySQLStreamingCursor.next_batch], instead of loading every row into memory at once like [method execute_text] does. Until the cursor is read to the end or closed, any other call on this session fails with an explicit error (see [MySQLStreamingCursor]); only reads a single resultset (unlike [method execute_text] with [member MySQLConfig.allow_multi_queries]).
+			</description>
+		</method>
+		<method name="execute_text">
+			<return type="MySQLResult" />
+			<param index="0" name="sql" type="String" />
+			<description>
+				Runs [code]sql[/code] as-is, with no parameters. Blocks until the server answers. If [member MySQLConfig.allow_multi_queries] is enabled, [code]sql[/code] may contain several [code];[/code]-separated statements and the returned [MySQLResult] holds one resultset per statement (see [method MySQLResult.get_resultset_count]).
+				[b]Never build [code]sql[/code] by concatenating untrusted input into it.[/b] Use [method execute_formatted] or [method execute_prepared] with parameters instead.
+			</description>
+		</method>
+		<method name="get_config" qualifiers="const">
+			<return type="MySQLConfig" />
+			<description>
+				Returns the [MySQLConfig] passed to [method set_config], or [code]null[/code] if it has not been called yet.
+			</description>
+		</method>
+		<method name="is_db_connected" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if [method connect_db] has succeeded and [method close_db] has not been called since. Also returns [code]false[/code] after any call fails with a fatal error ([code]is_fatal[/code] is [code]true[/code] in the error [Dictionary]), such as a lost connection or an [member MySQLConfig.async_timeout_ms] that expired: the module drops the connection instead of reusing it. Call [method connect_db] to reconnect.
+			</description>
+		</method>
+		<method name="set_config">
+			<return type="void" />
+			<param index="0" name="config" type="MySQLConfig" />
+			<description>
+				Sets the [MySQLConfig] this session connects with and creates the underlying connection. Must be called exactly once, before [method connect_db]; calling it again on a session that already has one is an error. Not needed when the session comes from [method MySQLPool.acquire], which already calls it.
+			</description>
+		</method>
+	</methods>
+</class>

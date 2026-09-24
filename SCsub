@@ -2,64 +2,136 @@
 #SCsub
 
 
-import os
-from tools import helpers, openssl, boost
-
-
-
 ##### ENVIROMENT #####
 
 Import('env')
 mysql_env = env.Clone()
 
-# You don't have to compile third-party libraries each time you compile the module.
-# With the "recompile" option you can recompile just Openssl or just Boost, both of them or none of them.
-opts = Variables(["customs.py"], ARGUMENTS)
-opts.Add(EnumVariable("recompile_sql", "Recompile third party library", "all", ("all", "openssl", "boost", "none")))
-opts.Update(mysql_env)
 
+##### CONFIG (config.cfg) #####
+
+# The Boost and OpenSSL paths and the build mode come from config.cfg, in the module
+# folder. See documentation/instructions.md.
+#
+# Building for more than one platform from the same module folder needs different paths per
+# platform (each one has its own compiled Boost and OpenSSL). When a config.<platform>.cfg
+# exists (for example config.windows.cfg), it is read instead of config.cfg for the build
+# with that platform=. Without it, the main config.cfg (usually the Linux one) applies to
+# any platform= that has no file of its own.
+#
+# Android additionally builds one .so per architecture (arch=arm64/arm32/x86_64/x86_32),
+# each needing its own Boost/OpenSSL (different ABI/instruction set). config.android.cfg
+# points at the *root* of the per-arch tree (thirdparty/boost-android,
+# thirdparty/openssl-android); env["arch"] is appended below to reach the actual build
+# (thirdparty/boost-android/arm64, etc). This is Android-specific: no other platform in
+# this module builds more than one architecture from the same module folder.
+
+import os
+import re
+import configparser
+
+# SConscripts have no __file__: use the folder of this SCsub.
+_module_dir = Dir(".").srcnode().abspath
+_platform_config_file = os.path.join(_module_dir, "config.%s.cfg" % env["platform"])
+_config_file = _platform_config_file if os.path.isfile(_platform_config_file) else os.path.join(_module_dir, "config.cfg")
+
+_cfg = configparser.ConfigParser()
+if not _cfg.read(_config_file):
+	print("mysql: configuration file not found: " + _config_file)
+	Exit(255)
+print("mysql: using " + _config_file)
+
+
+def _cfg_path(key):
+	path = os.path.normpath(os.path.join(_module_dir, os.path.expanduser(_cfg.get("paths", key))))
+	if env["platform"] == "android":
+		path = os.path.join(path, env["arch"])
+	if not os.path.isdir(path):
+		print("mysql: config.cfg [paths] %s points to a folder that does not exist: %s" % (key, path))
+		Exit(255)
+	return path
+
+
+def _check_boost(path):
+	# Check the headers and the minimum version (1.85, when Boost.MySQL started requiring a
+	# compiled Boost.Charconv) so that a clear message appears here instead of a harder to
+	# understand link error later.
+	mysql_header = os.path.join(path, "boost", "mysql.hpp")
+	version_header = os.path.join(path, "boost", "version.hpp")
+	if not os.path.isfile(version_header) or not os.path.isfile(mysql_header):
+		print("mysql: boost_path (%s) does not look like a compiled Boost tree (boost/version.hpp or boost/mysql.hpp is missing; use a full clone of boostorg/boost, which includes Boost.MySQL since 1.82)" % path)
+		Exit(255)
+	with open(version_header) as f:
+		match = re.search(r"#\s*define\s+BOOST_VERSION\s+(\d+)", f.read())
+	if not match:
+		print("mysql: could not read BOOST_VERSION in %s" % version_header)
+		Exit(255)
+	version = int(match.group(1))
+	if version < 108500:
+		print("mysql: Boost %d.%d.%d is older than the required minimum (1.85.0)" % (version // 100000, (version // 100) % 1000, version % 100))
+		Exit(255)
+
+
+def _check_openssl_include(path):
+	include = os.path.join(path, "include")
+	ssl_header = os.path.join(include, "openssl", "ssl.h")
+	version_header = os.path.join(include, "openssl", "opensslv.h")
+	if not os.path.isfile(ssl_header) or not os.path.isfile(version_header):
+		print("mysql: openssl_path (%s) does not look like a compiled OpenSSL tree (include/openssl/ssl.h or opensslv.h is missing)" % path)
+		Exit(255)
+	with open(version_header) as f:
+		match = re.search(r"#\s*define\s+OPENSSL_VERSION_MAJOR\s+(\d+)", f.read())
+	if not match or int(match.group(1)) < 3:
+		print("mysql: openssl_path (%s) is older than the required minimum (OpenSSL 3.0), or the version could not be read from opensslv.h" % path)
+		Exit(255)
+	return include
+
+
+def _openssl_lib_path(path):
+	# lib64/ or lib/, depending on how OpenSSL was configured. It is not hardcoded.
+	for subdir in ("lib64", "lib"):
+		candidate = os.path.join(path, subdir)
+		if os.path.isfile(os.path.join(candidate, "libssl.a")) and os.path.isfile(os.path.join(candidate, "libcrypto.a")):
+			return candidate
+	print("mysql: libssl.a/libcrypto.a not found in %s/lib64 or %s/lib. Check openssl_path in config.cfg" % (path, path))
+	Exit(255)
+
+
+boost_path = _cfg_path("boost_path")
+openssl_path = _cfg_path("openssl_path")
+
+_check_boost(boost_path)
+
+# There is no default value here: the option must be set in config.cfg.
+if not _cfg.has_option("build", "boost_mysql_mode"):
+	print("mysql: config.cfg [build] boost_mysql_mode is not set ('header-only' or 'separate')")
+	Exit(255)
+boost_mysql_mode = _cfg.get("build", "boost_mysql_mode").strip().lower()
+if boost_mysql_mode not in ("header-only", "separate"):
+	print("mysql: config.cfg [build] boost_mysql_mode must be 'header-only' or 'separate' (current value: '%s')" % boost_mysql_mode)
+	Exit(255)
+
+boost_include_path = boost_path
+boost_lib_path = os.path.join(boost_path, "stage", "lib")
+if not os.path.isfile(os.path.join(boost_lib_path, "libboost_charconv.a")):
+	print("mysql: libboost_charconv.a not found in %s. Run b2 as described in documentation/instructions.md" % boost_lib_path)
+	Exit(255)
+
+openssl_include_path = _check_openssl_include(openssl_path)
+openssl_lib_path = _openssl_lib_path(openssl_path)
 
 
 ##### FLAGS #####
 
-# Enable Boost separate compilation mode
-#mysql_env.Append(CPPDEFINES=["BOOST_MYSQL_SEPARATE_COMPILATION"])
+# C++17, no exceptions (the Godot default: disable_exceptions=yes). No exception flag is
+# added here; the module uses the error_code/diagnostics overloads of Boost.MySQL.
+if mysql_env.msvc:
+	mysql_env.Append(CXXFLAGS=["/std:c++17"])
+else:
+	mysql_env.Append(CPPFLAGS=["-std=c++17"])
 
-# Build with exceptions!
-#if env["disable_exceptions"]:
-#	if env.msvc and ("_HAS_EXCEPTIONS", 0) in mysql_env["CPPDEFINES"]:
-#		mysql_env["CPPDEFINES"].remove(("_HAS_EXCEPTIONS", 0))
-#		mysql_env.AppendUnique(CPPFLAGS=["/EHsc"])
-#	elif not env.msvc and "-fno-exceptions" in mysql_env["CPPFLAGS"]:
-#		mysql_env["CPPFLAGS"].remove("-fno-exceptions")
-
-mysql_env.Append(CPPFLAGS=[
-	'-fexceptions',
-	'-std=c++20',
-])
-
-target_bits = "64" if env["arch"] in ["x86_64", "arm64", "rv64", "ppc64"] else "32"
-
-
-
-##### PATHS #####
-
-# Use absolut paths to avoid problem between platforms.
-# dep_path = os.path.join(os.getcwd(), "thirdparty")
-
-openssl_path = openssl.get_openssl_install_path(mysql_env)
-openssl_include_path = openssl_path + "/include"
-openssl_lib_path = openssl_path + "/lib64"
-boost_path = boost.get_boost_install_path(mysql_env)
-boost_include_path = boost_path + "/include"
-boost_lib_path = boost_path + "/stage/lib"
-
-
-##### THIRDPARTY COMPILATION #####
-
-# Update and compile thirdparty.
-helpers.apply_config(mysql_env)
-
+if boost_mysql_mode == "separate":
+	mysql_env.Append(CPPDEFINES=["BOOST_MYSQL_SEPARATE_COMPILATION"])
 
 
 ##### GODOT MODULE #####
@@ -68,24 +140,31 @@ helpers.apply_config(mysql_env)
 mysql_env.Prepend(CPPPATH=[
 	openssl_include_path,
 	boost_include_path,
-#	openssl_path
 ])
+
+# The doctest files in tests/ are compiled into the engine's test runner, outside this
+# module's build environment, and they include Boost headers.
+if env["tests"]:
+	env.Prepend(CPPPATH=[
+		openssl_include_path,
+		boost_include_path,
+	])
+	if boost_mysql_mode == "separate":
+		env.Append(CPPDEFINES=["BOOST_MYSQL_SEPARATE_COMPILATION"])
 
 # LIB
 env.Prepend(LIBPATH=[
 	openssl_lib_path,
 	boost_lib_path,
-#	openssl_path
 ])
 
 mysql_env.add_source_files(env.modules_sources, "*.cpp")
 mysql_env.add_source_files(env.modules_sources, "scr/**.cpp")
 
 
-env.Prepend(LIBS=["libboost_thread", "libcrypto", "libssl"])
-
-
-
-
-
-
+# Link dependencies of Boost.MySQL (see "Integrating Boost.MySQL" in its documentation):
+# Boost.Charconv (the only Boost library with a compiled part), OpenSSL (SSL + Crypto) and
+# threads (pthread already comes with Godot). Boost.Context would only be needed with
+# asio::spawn/yield_context, which the module does not use.
+# The order matters for static libraries: libssl depends on libcrypto, so it comes first.
+env.Prepend(LIBS=["libboost_charconv", "libssl", "libcrypto"])

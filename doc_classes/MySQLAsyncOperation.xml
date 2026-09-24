@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MySQLAsyncOperation" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A pending asynchronous call: [method MySQLSession.async_execute_text], [method MySQLSession.async_execute_prepared], or a batch or close of an asynchronous [MySQLStreamingCursor].
+	</brief_description>
+	<description>
+		Returned immediately by [method MySQLSession.async_execute_text], [method MySQLSession.async_execute_prepared], [method MySQLStreamingCursor.async_next_batch] and [method MySQLStreamingCursor.async_close], before the server has answered. Wait for it by awaiting [signal completed] only if [method is_finished] is still [code]false[/code] (otherwise read [method get_result] directly): [signal completed] fires only once, so if the operation already finished while something else was being awaited, a bare [code]await async_op.completed[/code] would never return. Alternatively, poll [method is_finished] across frames (driven by [method Object.call_deferred] under the hood, so it only progresses while the [SceneTree] is processing frames, never from a busy [code]while[/code] loop).
+		Once finished, [method get_result] returns the same [MySQLResult] that [signal completed] carries.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="cancel">
+			<return type="bool" />
+			<description>
+				Stops the operation if it is still running. Returns [code]false[/code] if there is nothing to cancel (the operation already finished, or was rejected because the session was busy), [code]true[/code] otherwise; calling it again does nothing more. The operation still finishes through [signal completed].
+				First, a short-lived side connection with the same [MySQLConfig] runs [code]KILL QUERY[/code] on the operation's connection: the operation then fails with the server's non-fatal "Query execution was interrupted" error, and the session stays connected. Some functions return early instead of failing when interrupted ([code]SLEEP()[/code] returns [code]1[/code]), and a query that was already done finishes with its full result.
+				If the side connection cannot connect or run the [code]KILL[/code] within [member MySQLConfig.cancel_timeout_ms], the operation is cancelled locally instead: it fails with a fatal error, and the connection is dropped ([method MySQLSession.is_db_connected] returns [code]false[/code] until [method MySQLSession.connect_db]). The query may keep running on the server until it finishes.
+			</description>
+		</method>
+		<method name="get_result" qualifiers="const">
+			<return type="MySQLResult" />
+			<description>
+				The [MySQLResult] of this operation, or [code]null[/code] if it has not finished yet (check [method is_finished] first).
+			</description>
+		</method>
+		<method name="is_finished" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] once [signal completed] has fired and [method get_result] is available.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="completed">
+			<param index="0" name="result" type="MySQLResult" />
+			<description>
+				Emitted once, when the operation finishes (successfully or not), and never again. [code]result[/code] is the same [MySQLResult] [method get_result] then returns. Check [method is_finished] before awaiting it (see the class description).
+			</description>
+		</signal>
+	</signals>
+</class>
