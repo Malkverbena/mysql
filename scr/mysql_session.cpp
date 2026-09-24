@@ -27,8 +27,6 @@
 #include <boost/mysql/rows_view.hpp>
 #include <boost/mysql/statement.hpp>
 
-#include <openssl/crypto.h>
-
 #include <chrono>
 #include <memory>
 
@@ -451,14 +449,7 @@ struct QueryKiller : std::enable_shared_from_this<QueryKiller> {
 			kill_sql("KILL QUERY " + std::to_string(p_operation->server_connection_id)) {}
 
 	~QueryKiller() {
-		wipe_password();
-	}
-
-	void wipe_password() {
-		if (!params.password.empty()) {
-			OPENSSL_cleanse(params.password.data(), params.password.size());
-			params.password.clear();
-		}
+		MySQLConnection::wipe_password(params);
 	}
 
 	template <typename Handler>
@@ -482,7 +473,7 @@ struct QueryKiller : std::enable_shared_from_this<QueryKiller> {
 	void start() {
 		std::shared_ptr<QueryKiller> self = shared_from_this();
 		connect([self](boost::mysql::error_code p_error) {
-			self->wipe_password();
+			MySQLConnection::wipe_password(self->params);
 			if (p_error) {
 				self->finish(false);
 				return;

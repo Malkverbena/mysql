@@ -15,6 +15,8 @@
 #include <boost/mysql/pipeline.hpp>
 #include <boost/mysql/ssl_mode.hpp>
 
+#include <openssl/crypto.h>
+
 namespace {
 
 bool wants_tls(MySQLConfig::TransportMode p_mode) {
@@ -92,6 +94,13 @@ boost::mysql::connect_params MySQLConnection::make_connect_params(const Ref<MySQ
 	return params;
 }
 
+void MySQLConnection::wipe_password(boost::mysql::connect_params &r_params) {
+	if (!r_params.password.empty()) {
+		OPENSSL_cleanse(r_params.password.data(), r_params.password.size());
+		r_params.password.clear();
+	}
+}
+
 bool MySQLConnection::connect() {
 	state = CONNECTING;
 	last_error.clear();
@@ -99,6 +108,7 @@ bool MySQLConnection::connect() {
 
 	boost::mysql::connect_params params = make_connect_params(config);
 	connection.connect(params, last_error, last_diagnostics);
+	wipe_password(params);
 
 	if (last_error) {
 		state = FAILED;

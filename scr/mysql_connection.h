@@ -64,6 +64,10 @@ public:
 	static boost::asio::ssl::context make_ssl_context(const Ref<MySQLConfig> &p_config);
 	static boost::mysql::any_connection_params make_any_connection_params(const Ref<MySQLConfig> &p_config, boost::asio::ssl::context &p_ssl_context);
 	static boost::mysql::connect_params make_connect_params(const Ref<MySQLConfig> &p_config);
+	// Wipes the copy of the password `make_connect_params()` put in `r_params`, with
+	// `OPENSSL_cleanse()` like `MySQLConfig` does with its own. Call it as soon as the
+	// connection attempt no longer needs it, whether it succeeded or not.
+	static void wipe_password(boost::mysql::connect_params &r_params);
 
 	explicit MySQLConnection(Ref<MySQLConfig> p_config);
 	~MySQLConnection();
