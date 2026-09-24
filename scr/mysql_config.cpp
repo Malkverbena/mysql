@@ -132,6 +132,11 @@ void MySQLConfig::set_cancel_timeout_ms(int p_timeout_ms) {
 	cancel_timeout_ms = p_timeout_ms;
 }
 
+void MySQLConfig::set_async_batch_rows(int p_rows) {
+	ERR_FAIL_COND_MSG(p_rows < 1, "MySQLConfig: async_batch_rows must be at least 1.");
+	async_batch_rows = p_rows;
+}
+
 void MySQLConfig::set_max_buffer_size(int p_size) {
 	// Boost.MySQL starts every connection with a buffer of `default_initial_read_buffer_size`
 	// bytes and asserts that it fits within the maximum.
@@ -199,6 +204,9 @@ void MySQLConfig::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_cancel_timeout_ms", "timeout_ms"), &MySQLConfig::set_cancel_timeout_ms);
 	ClassDB::bind_method(D_METHOD("get_cancel_timeout_ms"), &MySQLConfig::get_cancel_timeout_ms);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "cancel_timeout_ms"), "set_cancel_timeout_ms", "get_cancel_timeout_ms");
+	ClassDB::bind_method(D_METHOD("set_async_batch_rows", "rows"), &MySQLConfig::set_async_batch_rows);
+	ClassDB::bind_method(D_METHOD("get_async_batch_rows"), &MySQLConfig::get_async_batch_rows);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "async_batch_rows"), "set_async_batch_rows", "get_async_batch_rows");
 
 	ClassDB::bind_method(D_METHOD("set_max_buffer_size", "size"), &MySQLConfig::set_max_buffer_size);
 	ClassDB::bind_method(D_METHOD("get_max_buffer_size"), &MySQLConfig::get_max_buffer_size);

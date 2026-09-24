@@ -19,6 +19,13 @@
 				Asynchronous version of [method execute_prepared]: does not block, and returns immediately with a [MySQLAsyncOperation] that emits [signal MySQLAsyncOperation.completed] once the server has answered. Runs on a dedicated I/O thread owned by this session (started on demand by the first asynchronous call).
 			</description>
 		</method>
+		<method name="async_execute_streaming">
+			<return type="MySQLStreamingCursor" />
+			<param index="0" name="sql" type="String" />
+			<description>
+				Asynchronous counterpart of [method execute_streaming]: returns the [MySQLStreamingCursor] right away and opens it on the session's I/O thread. Read it with [method MySQLStreamingCursor.async_next_batch], each batch a [MySQLAsyncOperation], so the calling thread never blocks. Until the cursor is read to the end or closed, and while a batch is being read, any other call on this session fails with an explicit error, as with [method execute_streaming].
+			</description>
+		</method>
 		<method name="async_execute_text">
 			<return type="MySQLAsyncOperation" />
 			<param index="0" name="sql" type="String" />

@@ -31,7 +31,7 @@ scons platform=linuxbsd arch=x86_64 target=editor \
 |---|---|
 | `test_mysql_type_convert.h` | The pure `field_view` to `Variant` conversion: integer ranges, `BIGINT UNSIGNED` above `INT64_MAX`, `TINYINT(1)` and `tinyint1_mode`, UTF-8 text, blobs, floats, `DATE`/`DATETIME` with microseconds, negative and above 24h `TIME`, and every `json_result_mode`. |
 | `test_mysql_params.h` | The opposite direction, `Variant` to `field_view` parameters: `DATE`/`DATETIME`/`TIME` `Dictionary` shapes (with microseconds and a negative `TIME`), telling `DATE` and `DATETIME` apart by their keys, out-of-range and calendar-invalid components, a `TIME` outside MySQL's range, an unrecognized `Dictionary`, and an `Array` parameter, each an explicit error rather than a wrapped or `NULL` value. |
-| `test_mysql_config.h` | Range checks of the numeric `MySQLConfig` setters (`port`, `max_buffer_size`, `async_timeout_ms`, `cancel_timeout_ms`, `max_result_bytes`): an out-of-range value is rejected and the previous one kept. |
+| `test_mysql_config.h` | Range checks of the numeric `MySQLConfig` setters (`port`, `max_buffer_size`, `async_timeout_ms`, `cancel_timeout_ms`, `async_batch_rows`, `max_result_bytes`): an out-of-range value is rejected and the previous one kept. |
 | `test_sql_script.h` | The SQL script splitter behind `execute_script()`: semicolons, quoted literals, doubled quotes, backslash escapes, `--`/`#`/`/* */` comments (including versioned `/*! */` ones and comment-only fragments), `NO_BACKSLASH_ESCAPES`, one-statement-at-a-time splitting, empty statements, multi-byte text. Also the placeholder scan `execute_formatted()` uses to tell a `?` in a literal or comment from a real placeholder. |
 
 ## Integration test (`smoke_test.gd`), desktop
@@ -46,12 +46,15 @@ with the server's `Com_stmt_prepare` and `Com_stmt_close` counters), the
 `max_result_bytes` result size limit (on `execute_text`, `execute_prepared` and the
 asynchronous path, including that the connection stays usable afterwards), transactions
 (`commit`, `rollback` and automatic rollback), streaming (including that an open cursor
-holds the connection), asynchronous calls
+holds the connection), asynchronous streaming (batches of at least `async_batch_rows` rows,
+one batch at a time, `async_close()`, closing or releasing a cursor midway, errors, empty
+results, a first batch that arrived before it was asked for, and a multi-statement stream),
+asynchronous calls
 (`async_execute_text`, `async_execute_prepared` and `await`), a fatal error dropping the
 connection (an expired `async_timeout_ms`, a connection killed on the server, and a pooled
 connection after a timeout), cancelling an asynchronous operation (on the server with `KILL
-QUERY`, one `KILL` for repeated calls, and the local fallback when the side connection
-cannot connect), the connection pool
+QUERY`, one `KILL` for repeated calls, a step of an asynchronous cursor, and the local
+fallback when the side connection cannot connect), the connection pool
 (including asynchronous calls on a recycled connection, a session dropped with an
 asynchronous operation still running, no prepared statement leak across leases,
 measured with the server's `Prepared_stmt_count`, the reset between leases, and recovery

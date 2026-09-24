@@ -38,6 +38,19 @@ TEST_CASE("[Modules][MySQL] Config rejects a max_buffer_size below the initial b
 	CHECK(config->get_max_buffer_size() == 1024);
 }
 
+TEST_CASE("[Modules][MySQL] Config rejects an asynchronous batch below one row") {
+	Ref<MySQLConfig> config;
+	config.instantiate();
+	int default_rows = config->get_async_batch_rows();
+	ERR_PRINT_OFF;
+	config->set_async_batch_rows(0);
+	config->set_async_batch_rows(-5);
+	ERR_PRINT_ON;
+	CHECK(config->get_async_batch_rows() == default_rows);
+	config->set_async_batch_rows(1);
+	CHECK(config->get_async_batch_rows() == 1);
+}
+
 TEST_CASE("[Modules][MySQL] Config rejects a negative timeout or result limit") {
 	Ref<MySQLConfig> config;
 	config.instantiate();
