@@ -108,18 +108,24 @@ test network — not the recommended setting for production (see
 
 ## Integration test (`smoke_test.gd`), Android
 
-An exported Android app cannot use `--script` the way desktop/Wine can — reasons and the
-working alternative below. To run `tests/smoke_test.gd` on a device:
+An exported Android app cannot use `--script` the way the editor build on desktop/Wine
+can: export templates ignore it by default (see step 2). To run `tests/smoke_test.gd` on a
+device:
 
 1. Build a small Godot project whose only content is `tests/smoke_test.gd` (or a symlink
    to it) and a minimal main scene (a `.tscn` with a single empty `Node` is enough).
 2. In its Project Settings, set **Run > Main Loop Type** to `MySQLSmokeTest` (the
    `class_name` the script declares) — **do not** rely on `command_line/extra_args =
-   "--script res://smoke_test.gd"`. That argument does reach the native layer intact
-   (visible in `adb logcat`), but was found to silently never execute on Android in this
-   Godot build, reproduced on two different-vendor devices. `main_loop_type` is a
-   supported, documented Godot mechanism and does not have this problem; it does need
-   `run/main_scene` to point at a valid scene too (a bare script is not accepted there).
+   "--script res://smoke_test.gd"`. That argument reaches the native layer (visible in
+   `adb logcat`), but an export template built with Godot's default
+   `disable_path_overrides=yes` (the default since
+   [godotengine/godot#111909](https://github.com/godotengine/godot/pull/111909)) clears
+   `--script`, `--main-loop`, `--path`, `--scene` and `--main-pack` at startup, without a
+   warning. The Main Loop Type project setting is not a command-line argument, so it is
+   still read. It needs `run/main_scene` to point at a valid scene too (a bare script is
+   not accepted there). Building the Android export template with
+   `disable_path_overrides=no` should keep `--script` as well, according to Godot's
+   source, but that has not been tested here.
 3. Export a **debug** APK (`--export-debug`) with that project. `INTERNET` permission is
    required.
 4. Credentials: an installed app has no shell environment to read `MYSQL_TEST_*` from.
