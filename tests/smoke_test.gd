@@ -27,11 +27,12 @@
 #
 # class_name lets this script also run as a packaged app's main loop (Project Settings ->
 # Application -> Run -> Main Loop Type, with any minimal Main Scene set). This is how the
-# Android smoke test runs it: `--script`, baked into the export as
-# command_line/extra_args, reaches the native layer (confirmed in logcat) but silently
-# never executes on Android in this Godot build (reproduced on two different devices) —
-# main_loop_type is the workaround. See notes/android_smoke_project/ in the mysql_dev
-# workspace (outside this repository).
+# Android smoke test runs it: export templates ignore `--script` by default. Godot's
+# `disable_path_overrides` build option (on by default since godotengine/godot#111909)
+# clears `--script`, `--main-loop`, `--path`, `--scene` and `--main-pack` at startup in a
+# template build, without a warning, while the Main Loop Type project setting is still
+# read. See notes/android_smoke_project/ in the mysql_dev workspace (outside this
+# repository).
 
 extends SceneTree
 
