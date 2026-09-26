@@ -14,8 +14,10 @@
 	<methods>
 		<method name="acquire">
 			<return type="MySQLSession" />
+			<param index="0" name="timeout_ms" type="int" default="0" />
 			<description>
 				Returns a [MySQLSession] backed by an idle connection from the pool (reset first, see the class description), creating a new one first if the pool has not yet reached [member max_size]. Blocks if the pool is full and no connection is idle. [method set_config] must be called first.
+				With [param timeout_ms] greater than [code]0[/code], it waits for at most that many milliseconds and returns [code]null[/code] if no connection became free in time. With [code]0[/code] (the default) it waits without a limit; avoid that on the main thread, where it freezes the game until another thread releases a session.
 			</description>
 		</method>
 		<method name="get_config" qualifiers="const">

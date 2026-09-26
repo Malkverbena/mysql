@@ -36,7 +36,7 @@ classDiagram
     }
     class MySQLPool {
       +set_config(config)
-      +acquire() MySQLSession
+      +acquire(timeout_ms) MySQLSession
     }
     class MySQLResult {
       +is_ok() bool

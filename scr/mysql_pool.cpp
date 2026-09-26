@@ -6,6 +6,8 @@
 
 #include "core/object/class_db.h"
 
+#include <chrono>
+
 MySQLPool::~MySQLPool() {
 	// Every leased session holds a reference to the pool, so by now all connections
 	// are idle.
@@ -27,7 +29,7 @@ void MySQLPool::set_max_size(int p_max_size) {
 
 void MySQLPool::release(MySQLConnection *p_connection, bool p_healthy) {
 	{
-		MutexLock lock(mutex);
+		THREADING_NAMESPACE::lock_guard<THREADING_NAMESPACE::mutex> lock(mutex);
 		if (p_healthy) {
 			idle.push_back(p_connection);
 		} else {
@@ -44,13 +46,16 @@ void MySQLPool::release(MySQLConnection *p_connection, bool p_healthy) {
 	condition.notify_one();
 }
 
-Ref<MySQLSession> MySQLPool::acquire() {
+Ref<MySQLSession> MySQLPool::acquire(int p_timeout_ms) {
 	ERR_FAIL_COND_V_MSG(config.is_null(), Ref<MySQLSession>(), "MySQLPool: Call set_config() before acquire().");
+	ERR_FAIL_COND_V_MSG(p_timeout_ms < 0, Ref<MySQLSession>(), "MySQLPool: acquire() timeout_ms cannot be negative (0 waits without a limit).");
 
+	const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(p_timeout_ms);
 	MySQLConnection *connection = nullptr;
 	bool create_new = false;
 	{
-		MutexLock lock(mutex);
+		THREADING_NAMESPACE::unique_lock<THREADING_NAMESPACE::mutex> lock(mutex);
+		bool timed_out = false;
 		while (true) {
 			if (!idle.is_empty()) {
 				connection = idle[idle.size() - 1];
@@ -62,7 +67,16 @@ Ref<MySQLSession> MySQLPool::acquire() {
 				create_new = true;
 				break;
 			}
-			condition.wait(lock);
+			if (timed_out) {
+				return Ref<MySQLSession>(); // Nothing became free in time.
+			}
+			if (p_timeout_ms == 0) {
+				condition.wait(lock);
+			} else {
+				// Checked once more after a timeout: a connection may have been released
+				// right at the deadline.
+				timed_out = condition.wait_until(lock, deadline) == THREADING_NAMESPACE::cv_status::timeout;
+			}
 		}
 	}
 
@@ -93,5 +107,5 @@ void MySQLPool::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_max_size"), &MySQLPool::get_max_size);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_size"), "set_max_size", "get_max_size");
 
-	ClassDB::bind_method(D_METHOD("acquire"), &MySQLPool::acquire);
+	ClassDB::bind_method(D_METHOD("acquire", "timeout_ms"), &MySQLPool::acquire, DEFVAL(0));
 }

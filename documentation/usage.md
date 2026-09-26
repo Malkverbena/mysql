@@ -223,7 +223,9 @@ var result = session.execute_text("SELECT 1")
 
 Each thread must use its own acquired `MySQLSession` — never share one session between
 threads at the same time. `pool.acquire()` blocks if the pool is already at
-`MySQLPool.max_size`.
+`MySQLPool.max_size`, until another thread releases a session. `pool.acquire(timeout_ms)`
+waits for at most that many milliseconds and returns `null` if none became free; use it
+on the main thread, where waiting without a limit freezes the game.
 
 A recycled connection is reset before it is handed out, so a lease never sees what the
 previous one left behind (open transaction, temporary tables, variables, `sql_mode`, a

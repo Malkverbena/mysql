@@ -900,6 +900,20 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 		var pool_async_c_result: MySQLResult = await await_operation(pool_async_c)
 		check(pool_async_c_result.is_ok() and pool_async_c_result.get_rows()[0][0] == "recycled_async", "an asynchronous operation works on a recycled pooled connection (%s)" % [pool_async_c_result.get_error()])
 
+	print("=== 10a. acquire() with a time limit ===")
+	var limited_pool := MySQLPool.new()
+	limited_pool.set_config(config)
+	limited_pool.max_size = 1
+	var holder: MySQLSession = limited_pool.acquire()
+	var wait_start := Time.get_ticks_msec()
+	var no_session: MySQLSession = limited_pool.acquire(200)
+	var waited := Time.get_ticks_msec() - wait_start
+	check(no_session == null and waited >= 190 and waited < 2000, "acquire(200) on an exhausted pool returns null after about 200 ms (%d ms)" % [waited])
+	holder = null # Back to the pool.
+	var freed_session: MySQLSession = limited_pool.acquire(200)
+	check(freed_session != null, "acquire(200) returns a session once one is free")
+	freed_session = null
+
 	print("=== 10b. Pool used from several threads ===")
 	# More threads than max_size: the extra ones must block in acquire() until a session is
 	# released, and every thread must finish with a correct result.
