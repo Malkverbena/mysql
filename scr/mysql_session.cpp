@@ -669,6 +669,10 @@ Dictionary MySQLSession::close_db() {
 	return Dictionary();
 }
 
+uint64_t MySQLSession::get_connection_generation() const {
+	return connection ? connection->get_generation() : 0;
+}
+
 bool MySQLSession::is_db_connected() const {
 	return connection && connection->is_connected();
 }

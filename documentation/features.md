@@ -286,6 +286,11 @@ the call fails with that error and the transaction stays open, so it can be call
 once the session is free. The automatic rollback cannot run on a busy session either: the
 transaction then stays open until the connection closes, and the warning says so.
 
+A transaction belongs to the connection it started on. If that connection is closed or
+lost, the server rolls the transaction back; `commit()` and `rollback()` then return an
+error, even after `connect_db()` reconnected the session, instead of running on the new
+connection and reporting a success for data that is gone.
+
 ## Limits
 
 * `max_buffer_size` (default 64 MB): limits the size of a single protocol packet — one

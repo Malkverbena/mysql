@@ -508,6 +508,28 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	check(busy_row.is_ok() and int(busy_row.get_rows()[0][0]) == 0, "the transaction was rolled back, not left open")
 	busy_tx = null
 
+	print("=== 7d. Transaction across a lost connection ===")
+	# Regression test: when the connection is lost, the server rolls back its transaction.
+	# After connect_db(), commit() used to run COMMIT on the new connection and report
+	# success for data that was gone. It must fail explicitly instead.
+	var lost_session := MySQLSession.new()
+	lost_session.set_config(config)
+	lost_session.connect_db()
+	var lost_tx := lost_session.begin_transaction()
+	lost_session.execute_text("INSERT INTO t_mysql_module_smoke_test (txt) VALUES ('tx_lost')")
+	var lost_id: MySQLResult = lost_session.execute_text("SELECT CONNECTION_ID()")
+	if lost_id.is_ok():
+		session.execute_text("KILL %d" % [int(lost_id.get_rows()[0][0])])
+	lost_session.execute_text("SELECT 1") # Fails: the connection is gone, and is dropped.
+	check(lost_session.connect_db().is_empty(), "connect_db() reconnects after the connection was killed")
+	var lost_commit: Dictionary = lost_tx.commit()
+	check(not lost_commit.is_empty(), "commit() of a transaction whose connection was lost fails explicitly (%s)" % [lost_commit.get("message", "")])
+	var lost_row: MySQLResult = session.execute_text("SELECT COUNT(*) FROM t_mysql_module_smoke_test WHERE txt = 'tx_lost'")
+	check(lost_row.is_ok() and int(lost_row.get_rows()[0][0]) == 0, "nothing of the lost transaction was stored")
+	check(not lost_tx.rollback().is_empty(), "rollback() after that reports the transaction as finished")
+	lost_tx = null
+	lost_session = null
+
 	print("=== 8. Streaming ===")
 	for i in range(20):
 		session.execute_prepared("INSERT INTO t_mysql_module_smoke_test (txt) VALUES (?)", ["stream_%d" % i])

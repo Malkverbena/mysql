@@ -122,6 +122,9 @@ public:
 	// Internal use by `MySQLTransaction`, not bound: the error a statement would get right
 	// now because the session is busy (see `_busy_error()`), or an empty `Dictionary`.
 	Dictionary get_busy_error() const { return _busy_error(); }
+	// Internal use by `MySQLTransaction`, not bound: see `MySQLConnection::generation`.
+	// 0 when there is no connection.
+	uint64_t get_connection_generation() const;
 
 	Ref<MySQLAsyncOperation> async_execute_text(const String &p_sql);
 	Ref<MySQLAsyncOperation> async_execute_prepared(const String &p_sql, const Array &p_params);

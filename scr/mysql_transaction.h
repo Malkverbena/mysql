@@ -21,9 +21,16 @@ class MySQLTransaction : public RefCounted {
 
 	Ref<MySQLSession> session;
 	bool finished = false;
+	// The connection generation the transaction started in (see
+	// `MySQLConnection::generation`). If the connection was lost and reopened since, the
+	// server already rolled the transaction back, and COMMIT on the new connection would
+	// report success for data that is gone.
+	uint64_t generation = 0;
 	// Error from `START TRANSACTION`; empty when the transaction started.
 	Dictionary start_error;
 
+	// Whether the connection is still the one the transaction started on.
+	bool _still_exists() const;
 	// COMMIT or ROLLBACK, unless the session is busy (see the `.cpp`).
 	Dictionary _finish(const char *p_statement, const char *p_method);
 

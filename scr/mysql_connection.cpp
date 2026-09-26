@@ -123,6 +123,7 @@ bool MySQLConnection::connect() {
 	// required here.
 	connection.set_meta_mode(boost::mysql::metadata_mode::full);
 
+	generation++;
 	state = CONNECTED;
 	return true;
 }
@@ -171,6 +172,7 @@ bool MySQLConnection::reset_session() {
 		last_diagnostics = reset_diagnostics;
 		return false;
 	}
+	generation++;
 	return true;
 }
 

@@ -50,6 +50,12 @@ private:
 	boost::mysql::error_code last_error;
 	boost::mysql::diagnostics last_diagnostics;
 
+	// Changes every time the server starts a new session on this connection: each
+	// successful `connect()` and `reset_session()`. Server-side state (an open transaction,
+	// temporary tables, variables) belongs to one generation and is gone in the next, so a
+	// `MySQLTransaction` compares it to tell whether its transaction still exists.
+	uint64_t generation = 0;
+
 	// Owned here, not by `MySQLSession`: a connection leased from a `MySQLPool` outlives
 	// any single session that borrows it, and the prepared statement handles it holds are
 	// only valid on this specific connection. When the cache belonged to the session, it
@@ -104,6 +110,7 @@ public:
 	bool reset_session();
 
 	bool is_connected() const { return state == CONNECTED; }
+	uint64_t get_generation() const { return generation; }
 	State get_state() const { return state; }
 
 	const boost::mysql::error_code &get_last_error() const { return last_error; }
