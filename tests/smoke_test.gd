@@ -415,6 +415,18 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	check(session_status(cache_session, "Com_stmt_prepare") == prepares_mid + 1, "the least recently used statement was evicted and is prepared again")
 	cache_session.close_db()
 
+	# Regression test: connect_db() on a connected session opens a new connection. The
+	# statements cached for the old one used to stay in the cache, and execute_prepared()
+	# then failed with "Unknown prepared statement handler".
+	var reprepare_session := MySQLSession.new()
+	reprepare_session.set_config(config)
+	reprepare_session.connect_db()
+	reprepare_session.execute_prepared("SELECT ? + 1", [1])
+	check(reprepare_session.connect_db().is_empty(), "connect_db() on a connected session reconnects")
+	var reprepared_after: MySQLResult = reprepare_session.execute_prepared("SELECT ? + 1", [1])
+	check(reprepared_after.is_ok() and reprepared_after.get_rows()[0][0] == 2, "execute_prepared() works after connect_db() on a connected session (%s)" % [reprepared_after.get_error()])
+	reprepare_session.close_db()
+
 	print("=== 6. Explicit errors (never silent) ===")
 	var bad_param_result: MySQLResult = session.execute_prepared("INSERT INTO t_mysql_module_smoke_test (txt) VALUES (?)", [])
 	check(not bad_param_result.is_ok(), "a wrong parameter count is an explicit error (%s)" % [bad_param_result.get_error()])

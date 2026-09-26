@@ -49,6 +49,7 @@
 			<return type="Dictionary" />
 			<description>
 				Opens the connection using the [MySQLConfig] passed to [method set_config]. Returns an empty [Dictionary] on success, or an error [Dictionary] (same shape as [method MySQLResult.get_error]) otherwise — for example, if [member MySQLConfig.transport_mode] is [constant MySQLConfig.TCP_TLS_REQUIRED] and the server's certificate cannot be validated.
+				On a session that is already connected, it opens a new connection in place of the current one: whatever the server kept for the old one (an open transaction, temporary tables, variables, prepared statements) is discarded.
 			</description>
 		</method>
 		<method name="execute_formatted">

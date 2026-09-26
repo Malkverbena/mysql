@@ -108,6 +108,11 @@ bool MySQLConnection::connect() {
 	state = CONNECTING;
 	last_error.clear();
 	last_diagnostics.clear();
+	// `connect()` on a connection that is already open replaces it (Boost.MySQL closes the
+	// old one at the transport level): the prepared statement handles cached for it are
+	// not valid on the new one. Without this, `execute_prepared()` kept reusing them and
+	// failed with "Unknown prepared statement handler" after a reconnection.
+	statement_cache->clear();
 
 	boost::mysql::connect_params params = make_connect_params(config);
 	connection.connect(params, last_error, last_diagnostics);
