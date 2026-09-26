@@ -24,6 +24,9 @@ class MySQLTransaction : public RefCounted {
 	// Error from `START TRANSACTION`; empty when the transaction started.
 	Dictionary start_error;
 
+	// COMMIT or ROLLBACK, unless the session is busy (see the `.cpp`).
+	Dictionary _finish(const char *p_statement, const char *p_method);
+
 protected:
 	static void _bind_methods();
 

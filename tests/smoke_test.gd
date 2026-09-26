@@ -491,6 +491,23 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	var after_auto: MySQLResult = session.execute_text("SELECT COUNT(*) FROM t_mysql_module_smoke_test WHERE txt = 'tx_auto_rollback'")
 	check(after_auto.is_ok() and int(after_auto.get_rows()[0][0]) == 0, "the automatic rollback (destructor without commit or rollback) undid the row")
 
+	print("=== 7c. COMMIT refused while the session is busy ===")
+	# Regression test: commit() on a busy session is refused before anything is sent. It
+	# used to mark the transaction finished anyway, leaving it open on the server for good
+	# (holding its locks): rollback() then said "already finished" and the destructor did
+	# nothing. The transaction must stay open, and a later rollback() must end it.
+	var busy_tx := session.begin_transaction()
+	session.execute_text("INSERT INTO t_mysql_module_smoke_test (txt) VALUES ('tx_busy')")
+	var busy_op: MySQLAsyncOperation = session.async_execute_text("SELECT SLEEP(0.3)")
+	var refused_commit: Dictionary = busy_tx.commit()
+	check(not refused_commit.is_empty(), "commit() while an asynchronous operation runs is refused (%s)" % [refused_commit.get("message", "")])
+	await await_operation(busy_op)
+	var late_rollback: Dictionary = busy_tx.rollback()
+	check(late_rollback.is_empty(), "rollback() works once the session is free again (%s)" % [late_rollback])
+	var busy_row: MySQLResult = session.execute_text("SELECT COUNT(*) FROM t_mysql_module_smoke_test WHERE txt = 'tx_busy'")
+	check(busy_row.is_ok() and int(busy_row.get_rows()[0][0]) == 0, "the transaction was rolled back, not left open")
+	busy_tx = null
+
 	print("=== 8. Streaming ===")
 	for i in range(20):
 		session.execute_prepared("INSERT INTO t_mysql_module_smoke_test (txt) VALUES (?)", ["stream_%d" % i])

@@ -280,6 +280,12 @@ transaction yourself, on the success path and on the error path (`commit()` on o
 `rollback()` on the other). Relying on the automatic rollback keeps the transaction open
 for longer than needed, until Godot's reference counting destroys the object.
 
+If the session is busy when `commit()` or `rollback()` is called (an asynchronous
+operation is running, or a streaming cursor still holds the connection), nothing is sent:
+the call fails with that error and the transaction stays open, so it can be called again
+once the session is free. The automatic rollback cannot run on a busy session either: the
+transaction then stays open until the connection closes, and the warning says so.
+
 ## Limits
 
 * `max_buffer_size` (default 64 MB): limits the size of a single protocol packet — one
