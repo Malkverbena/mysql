@@ -65,6 +65,7 @@
 			<param index="0" name="resultset" type="int" default="0" />
 			<description>
 				Rows of the given resultset. See the class description for the shape (an [Array] of [Array]s). Returns a new outer [Array] on every call, so resizing or sorting it does not change this result; the row [Array]s inside it are still shared with this result.
+				Because every call copies the outer [Array], store the returned [Array] in a variable before a loop instead of calling [method get_rows] in each iteration: [code]result.get_rows()[i][/code] inside a loop copies all the rows on every pass.
 			</description>
 		</method>
 		<method name="is_ok" qualifiers="const">

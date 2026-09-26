@@ -61,6 +61,10 @@ for row in result.get_rows():
     print(row[0], " ", row[1])  # row is an Array, one entry per column, in get_column_names() order
 ```
 
+`get_rows()` returns a new copy of the row list on every call. To index rows in a loop,
+keep it in a variable first (`var rows = result.get_rows()`), not `result.get_rows()[i]`
+inside the loop, which copies every row on each pass.
+
 ### Formatted text (safe interpolation, no prepared statement)
 
 ```gdscript
