@@ -173,6 +173,32 @@ func _initialize() -> void:
 	var config := make_config(host, port, user, password, database)
 	config.transport_mode = MySQLConfig.TCP_TLS_DISABLED
 
+	print("=== 0b. The session keeps a copy of its config ===")
+	# Regression test: the TLS context of a connection is built when the session gets its
+	# config, and the transport mode is read again when it connects. Changing the config in
+	# between (DISABLED -> REQUIRED) used to connect with TLS but without verifying the
+	# certificate. The session now keeps its own copy, so a later change has no effect.
+	var late_config := make_config(host, port, user, password, database)
+	late_config.transport_mode = MySQLConfig.TCP_TLS_DISABLED
+	var late_session := MySQLSession.new()
+	late_session.set_config(late_config)
+	late_config.transport_mode = MySQLConfig.TCP_TLS_REQUIRED
+	check(late_session.get_config().transport_mode == MySQLConfig.TCP_TLS_DISABLED, "changing a config after set_config() does not change the session's copy")
+	late_session.get_config().transport_mode = MySQLConfig.TCP_TLS_REQUIRED
+	check(late_session.get_config().transport_mode == MySQLConfig.TCP_TLS_DISABLED, "get_config() returns a copy: changing it does not change the session")
+	var late_err: Dictionary = late_session.connect_db()
+	var late_cipher: MySQLResult = late_session.execute_text("SHOW SESSION STATUS LIKE 'Ssl_cipher'")
+	check(late_err.is_empty() and late_cipher.is_ok() and String(late_cipher.get_rows()[0][1]).is_empty(), "the session connects with the transport mode it was configured with, not the changed one (%s)" % [late_err])
+	late_session.close_db()
+	var required_again := MySQLSession.new()
+	required_again.set_config(late_config)
+	var required_err: Dictionary = required_again.connect_db()
+	check(not required_err.is_empty() and required_err.get("is_fatal") == true, "a session configured with TCP_TLS_REQUIRED still rejects the self-signed certificate (%s)" % [required_err])
+	var bad_mode_config := make_config(host, port, user, password, database)
+	bad_mode_config.transport_mode = MySQLConfig.TCP_TLS_REQUIRED
+	bad_mode_config.set("transport_mode", 7)
+	check(bad_mode_config.transport_mode == MySQLConfig.TCP_TLS_REQUIRED, "a transport_mode outside the enum is rejected (it used to mean TLS without verification)")
+
 	print("=== 1. Connection ===")
 	var session := MySQLSession.new()
 	session.set_config(config)
@@ -277,14 +303,20 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	# one is running and check the behavior that actually applies to it.
 	var version_result: MySQLResult = session.execute_text("SELECT VERSION()")
 	var is_mariadb: bool = String(version_result.get_rows()[0][0]).to_lower().contains("mariadb")
-	config.json_result_mode = MySQLConfig.PARSED_VARIANT
-	var select_parsed: MySQLResult = session.execute_text("SELECT js FROM t_mysql_module_smoke_test WHERE id = 1")
+	# A session keeps a copy of its config, so the mode is set on a config for a new session.
+	var json_config := make_config(host, port, user, password, database)
+	json_config.transport_mode = MySQLConfig.TCP_TLS_DISABLED
+	json_config.json_result_mode = MySQLConfig.PARSED_VARIANT
+	var json_session := MySQLSession.new()
+	json_session.set_config(json_config)
+	json_session.connect_db()
+	var select_parsed: MySQLResult = json_session.execute_text("SELECT js FROM t_mysql_module_smoke_test WHERE id = 1")
 	var js_parsed_variant: Variant = select_parsed.get_rows()[0][0]
 	if is_mariadb:
 		check(typeof(js_parsed_variant) == TYPE_STRING, "json_result_mode = PARSED_VARIANT on MariaDB: no JSON type in the protocol, behaves like RAW_STRING (%s)" % [js_parsed_variant])
 	else:
 		check(typeof(js_parsed_variant) == TYPE_DICTIONARY and js_parsed_variant.get("a") == 1, "json_result_mode = PARSED_VARIANT on MySQL: a native JSON type is reported, parsed eagerly into a Dictionary (%s)" % [js_parsed_variant])
-	config.json_result_mode = MySQLConfig.LAZY_PARSED_VARIANT # Back to the default.
+	json_session.close_db()
 
 	print("=== 3c. Result shape ===")
 	var duplicate_cols: MySQLResult = session.execute_text("SELECT 1 AS a, 2 AS a")
@@ -383,6 +415,18 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	check(session_status(cache_session, "Com_stmt_prepare") == prepares_mid + 1, "the least recently used statement was evicted and is prepared again")
 	cache_session.close_db()
 
+	# Regression test: connect_db() on a connected session opens a new connection. The
+	# statements cached for the old one used to stay in the cache, and execute_prepared()
+	# then failed with "Unknown prepared statement handler".
+	var reprepare_session := MySQLSession.new()
+	reprepare_session.set_config(config)
+	reprepare_session.connect_db()
+	reprepare_session.execute_prepared("SELECT ? + 1", [1])
+	check(reprepare_session.connect_db().is_empty(), "connect_db() on a connected session reconnects")
+	var reprepared_after: MySQLResult = reprepare_session.execute_prepared("SELECT ? + 1", [1])
+	check(reprepared_after.is_ok() and reprepared_after.get_rows()[0][0] == 2, "execute_prepared() works after connect_db() on a connected session (%s)" % [reprepared_after.get_error()])
+	reprepare_session.close_db()
+
 	print("=== 6. Explicit errors (never silent) ===")
 	var bad_param_result: MySQLResult = session.execute_prepared("INSERT INTO t_mysql_module_smoke_test (txt) VALUES (?)", [])
 	check(not bad_param_result.is_ok(), "a wrong parameter count is an explicit error (%s)" % [bad_param_result.get_error()])
@@ -458,6 +502,45 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	tx_auto = null # Drops the only reference without commit() or rollback(), so the destructor runs.
 	var after_auto: MySQLResult = session.execute_text("SELECT COUNT(*) FROM t_mysql_module_smoke_test WHERE txt = 'tx_auto_rollback'")
 	check(after_auto.is_ok() and int(after_auto.get_rows()[0][0]) == 0, "the automatic rollback (destructor without commit or rollback) undid the row")
+
+	print("=== 7c. COMMIT refused while the session is busy ===")
+	# Regression test: commit() on a busy session is refused before anything is sent. It
+	# used to mark the transaction finished anyway, leaving it open on the server for good
+	# (holding its locks): rollback() then said "already finished" and the destructor did
+	# nothing. The transaction must stay open, and a later rollback() must end it.
+	var busy_tx := session.begin_transaction()
+	session.execute_text("INSERT INTO t_mysql_module_smoke_test (txt) VALUES ('tx_busy')")
+	var busy_op: MySQLAsyncOperation = session.async_execute_text("SELECT SLEEP(0.3)")
+	var refused_commit: Dictionary = busy_tx.commit()
+	check(not refused_commit.is_empty(), "commit() while an asynchronous operation runs is refused (%s)" % [refused_commit.get("message", "")])
+	await await_operation(busy_op)
+	var late_rollback: Dictionary = busy_tx.rollback()
+	check(late_rollback.is_empty(), "rollback() works once the session is free again (%s)" % [late_rollback])
+	var busy_row: MySQLResult = session.execute_text("SELECT COUNT(*) FROM t_mysql_module_smoke_test WHERE txt = 'tx_busy'")
+	check(busy_row.is_ok() and int(busy_row.get_rows()[0][0]) == 0, "the transaction was rolled back, not left open")
+	busy_tx = null
+
+	print("=== 7d. Transaction across a lost connection ===")
+	# Regression test: when the connection is lost, the server rolls back its transaction.
+	# After connect_db(), commit() used to run COMMIT on the new connection and report
+	# success for data that was gone. It must fail explicitly instead.
+	var lost_session := MySQLSession.new()
+	lost_session.set_config(config)
+	lost_session.connect_db()
+	var lost_tx := lost_session.begin_transaction()
+	lost_session.execute_text("INSERT INTO t_mysql_module_smoke_test (txt) VALUES ('tx_lost')")
+	var lost_id: MySQLResult = lost_session.execute_text("SELECT CONNECTION_ID()")
+	if lost_id.is_ok():
+		session.execute_text("KILL %d" % [int(lost_id.get_rows()[0][0])])
+	lost_session.execute_text("SELECT 1") # Fails: the connection is gone, and is dropped.
+	check(lost_session.connect_db().is_empty(), "connect_db() reconnects after the connection was killed")
+	var lost_commit: Dictionary = lost_tx.commit()
+	check(not lost_commit.is_empty(), "commit() of a transaction whose connection was lost fails explicitly (%s)" % [lost_commit.get("message", "")])
+	var lost_row: MySQLResult = session.execute_text("SELECT COUNT(*) FROM t_mysql_module_smoke_test WHERE txt = 'tx_lost'")
+	check(lost_row.is_ok() and int(lost_row.get_rows()[0][0]) == 0, "nothing of the lost transaction was stored")
+	check(not lost_tx.rollback().is_empty(), "rollback() after that reports the transaction as finished")
+	lost_tx = null
+	lost_session = null
 
 	print("=== 8. Streaming ===")
 	for i in range(20):
@@ -746,23 +829,40 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	var after_cursor_cancel: MySQLResult = cancel_session.execute_text("SELECT 'after_cursor_cancel' AS v")
 	check(after_cursor_cancel.is_ok() and after_cursor_cancel.get_rows()[0][0] == "after_cursor_cancel", "the session is usable after cancelling a cursor step (%s)" % [after_cursor_cancel.get_error()])
 
-	# If the side connection cannot reach the server (here: the config now points to a
-	# closed port, and the session is already connected), cancel() falls back to
-	# cancelling locally, which drops the connection.
-	var fallback_op: MySQLAsyncOperation = cancel_session.async_execute_text(LONG_QUERY)
-	await create_timer(0.2).timeout
-	cancel_config.port = 1
-	var fallback_start := Time.get_ticks_msec()
-	check(fallback_op.cancel(), "cancel() with a side connection that cannot connect returns true")
-	var fallback: MySQLResult = await await_operation(fallback_op)
-	var fallback_elapsed := Time.get_ticks_msec() - fallback_start
-	cancel_config.port = port
-	check(not fallback.is_ok() and fallback.get_error().get("is_fatal") == true, "the locally cancelled operation fails with a fatal error (%s)" % [fallback.get_error()])
-	check(fallback_elapsed < 3000, "the locally cancelled operation finishes early (%d ms)" % [fallback_elapsed])
-	check(not cancel_session.is_db_connected(), "the session is no longer connected after a local cancellation")
-	check(cancel_session.connect_db().is_empty(), "connect_db() reconnects after a local cancellation")
-	var after_fallback: MySQLResult = cancel_session.execute_text("SELECT 'after_fallback' AS v")
-	check(after_fallback.is_ok() and after_fallback.get_rows()[0][0] == "after_fallback", "the reconnected session gets its own result (%s)" % [after_fallback.get_rows() if after_fallback.is_ok() else after_fallback.get_error()])
+	# If the side connection cannot connect, cancel() falls back to cancelling locally,
+	# which drops the connection. A session keeps a copy of its config, so the side
+	# connection is made to fail by filling the server's max_connections: this briefly
+	# refuses new connections for every client of this server. Skipped if the server allows
+	# too many connections to fill quickly.
+	var max_connections_result: MySQLResult = session.execute_text("SELECT @@max_connections")
+	var max_connections: int = int(max_connections_result.get_rows()[0][0]) if max_connections_result.is_ok() else 0
+	if max_connections <= 0 or max_connections > 1000:
+		print("  SKIP the local cancel fallback: max_connections is %d." % [max_connections])
+	else:
+		var fallback_op: MySQLAsyncOperation = cancel_session.async_execute_text(LONG_QUERY)
+		await create_timer(0.2).timeout
+		var fillers: Array[MySQLSession] = []
+		var filled := false
+		for i in range(max_connections + 5):
+			var filler := MySQLSession.new()
+			filler.set_config(cancel_config)
+			var filler_error: Dictionary = filler.connect_db()
+			if not filler_error.is_empty():
+				filled = String(filler_error.get("server_message", "")).contains("Too many connections")
+				break
+			fillers.append(filler)
+		check(filled, "the server refuses new connections once max_connections is reached (%d opened)" % [fillers.size()])
+		var fallback_start := Time.get_ticks_msec()
+		check(fallback_op.cancel(), "cancel() with a side connection that cannot connect returns true")
+		var fallback: MySQLResult = await await_operation(fallback_op)
+		var fallback_elapsed := Time.get_ticks_msec() - fallback_start
+		fillers.clear() # Frees the connections again.
+		check(not fallback.is_ok() and fallback.get_error().get("is_fatal") == true, "the locally cancelled operation fails with a fatal error (%s)" % [fallback.get_error()])
+		check(fallback_elapsed < 3000, "the locally cancelled operation finishes early (%d ms)" % [fallback_elapsed])
+		check(not cancel_session.is_db_connected(), "the session is no longer connected after a local cancellation")
+		check(cancel_session.connect_db().is_empty(), "connect_db() reconnects after a local cancellation")
+		var after_fallback: MySQLResult = cancel_session.execute_text("SELECT 'after_fallback' AS v")
+		check(after_fallback.is_ok() and after_fallback.get_rows()[0][0] == "after_fallback", "the reconnected session gets its own result (%s)" % [after_fallback.get_rows() if after_fallback.is_ok() else after_fallback.get_error()])
 	# A local cancellation does not stop the query on the server; stop it here.
 	var leftover: MySQLResult = session.execute_text("SELECT ID FROM information_schema.PROCESSLIST WHERE INFO LIKE 'WITH RECURSIVE r(n)%'")
 	if leftover.is_ok():
@@ -799,6 +899,20 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 		var pool_async_c: MySQLAsyncOperation = pool_session_c.async_execute_text("SELECT 'recycled_async'")
 		var pool_async_c_result: MySQLResult = await await_operation(pool_async_c)
 		check(pool_async_c_result.is_ok() and pool_async_c_result.get_rows()[0][0] == "recycled_async", "an asynchronous operation works on a recycled pooled connection (%s)" % [pool_async_c_result.get_error()])
+
+	print("=== 10a. acquire() with a time limit ===")
+	var limited_pool := MySQLPool.new()
+	limited_pool.set_config(config)
+	limited_pool.max_size = 1
+	var holder: MySQLSession = limited_pool.acquire()
+	var wait_start := Time.get_ticks_msec()
+	var no_session: MySQLSession = limited_pool.acquire(200)
+	var waited := Time.get_ticks_msec() - wait_start
+	check(no_session == null and waited >= 190 and waited < 2000, "acquire(200) on an exhausted pool returns null after about 200 ms (%d ms)" % [waited])
+	holder = null # Back to the pool.
+	var freed_session: MySQLSession = limited_pool.acquire(200)
+	check(freed_session != null, "acquire(200) returns a session once one is free")
+	freed_session = null
 
 	print("=== 10b. Pool used from several threads ===")
 	# More threads than max_size: the extra ones must block in acquire() until a session is
@@ -929,8 +1043,14 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	print("=== 11. execute_script ===")
 	var script_off: Array = session.execute_script("SELECT 1")
 	check(script_off.size() == 1 and not (script_off[0] as MySQLResult).is_ok(), "execute_script is refused while allow_sql_script_execution is off (the default)")
-	config.allow_sql_script_execution = true
-	var script_result: Array = session.execute_script(
+	# A session keeps a copy of its config: scripts need a session whose config allows them.
+	var script_config := make_config(host, port, user, password, database)
+	script_config.transport_mode = MySQLConfig.TCP_TLS_DISABLED
+	script_config.allow_sql_script_execution = true
+	var script_session := MySQLSession.new()
+	script_session.set_config(script_config)
+	script_session.connect_db()
+	var script_result: Array = script_session.execute_script(
 		"""
 		INSERT INTO t_mysql_module_smoke_test (txt) VALUES ('script_1');
 		INSERT INTO t_mysql_module_smoke_test (txt) VALUES ('script_2;with_semicolon');
@@ -948,9 +1068,9 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 		check(int(last.get_rows()[0][0]) == 2, "both statements of the script really inserted (COUNT = %s)" % [last.get_rows()[0][0]])
 		var literal: MySQLResult = session.execute_text("SELECT txt FROM t_mysql_module_smoke_test WHERE txt LIKE 'script_2%'")
 		check(literal.is_ok() and literal.get_rows().size() == 1 and literal.get_rows()[0][0] == "script_2;with_semicolon", "a semicolon inside a quoted literal did not split the statement")
-	var failing_script: Array = session.execute_script("SELECT 1; SELEC nothing; SELECT 3")
+	var failing_script: Array = script_session.execute_script("SELECT 1; SELEC nothing; SELECT 3")
 	check(failing_script.size() == 2 and (failing_script[0] as MySQLResult).is_ok() and not (failing_script[1] as MySQLResult).is_ok(), "the script stops at the first failing statement (%d results)" % [failing_script.size()])
-	var commented_script: Array = session.execute_script(
+	var commented_script: Array = script_session.execute_script(
 		"""
 		-- header; not a statement
 		/* block; comment */ SELECT 1;
@@ -965,7 +1085,7 @@ func _run_all_tests(session: MySQLSession, config: MySQLConfig, host: String, po
 	check(commented_ok, "semicolons inside comments do not split the script, comment-only fragments are dropped (%d results)" % [commented_script.size()])
 	# The script itself turns NO_BACKSLASH_ESCAPES on and off: each statement must be split
 	# with the SQL mode in force when it runs, not the one from before the script started.
-	var mode_script: Array = session.execute_script(
+	var mode_script: Array = script_session.execute_script(
 		"""
 		SET @smoke_script_sql_mode = @@SESSION.sql_mode;
 		SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_BACKSLASH_ESCAPES');

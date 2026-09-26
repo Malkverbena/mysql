@@ -16,6 +16,7 @@
 			<return type="Dictionary" />
 			<description>
 				Runs [code]COMMIT[/code]. Returns an empty [Dictionary] on success, or an error [Dictionary] (same shape as [method MySQLResult.get_error]) otherwise — including when called on a transaction that has already been committed or rolled back, or that never started (then it is the [method get_error] error).
+				If the session is busy (an asynchronous operation is running, or a streaming cursor still holds the connection), nothing is sent: the call returns that error and the transaction stays open, so it can be called again once the session is free. If the connection was closed or lost after the transaction started (even if [method MySQLSession.connect_db] reconnected it since), the server has already rolled the transaction back: the call returns an error and sends nothing.
 			</description>
 		</method>
 		<method name="get_error" qualifiers="const">
@@ -34,6 +35,7 @@
 			<return type="Dictionary" />
 			<description>
 				Runs [code]ROLLBACK[/code]. Returns an empty [Dictionary] on success, or an error [Dictionary] (same shape as [method MySQLResult.get_error]) otherwise — including when called on a transaction that has already been committed or rolled back, or that never started (then it is the [method get_error] error).
+				If the session is busy (an asynchronous operation is running, or a streaming cursor still holds the connection), nothing is sent: the call returns that error and the transaction stays open, so it can be called again once the session is free. If the connection was closed or lost after the transaction started (even if [method MySQLSession.connect_db] reconnected it since), the server has already rolled the transaction back: the call returns an error and sends nothing.
 			</description>
 		</method>
 	</methods>

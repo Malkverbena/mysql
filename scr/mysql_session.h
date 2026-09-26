@@ -96,8 +96,10 @@ public:
 	// Internal use by `MySQLPool`, not bound.
 	static Ref<MySQLSession> create_pooled(const Ref<MySQLConfig> &p_config, MySQLConnection *p_connection, const Ref<MySQLPool> &p_owner_pool);
 
+	// Keeps a copy of `p_config` (see the comment on `MySQLConfig`).
 	void set_config(const Ref<MySQLConfig> &p_config);
-	Ref<MySQLConfig> get_config() const { return config; }
+	// A copy: changing it has no effect on this session.
+	Ref<MySQLConfig> get_config() const { return config.is_valid() ? config->duplicate_config() : Ref<MySQLConfig>(); }
 
 	// Named `*_db` on purpose: `Object` already reserves `connect()`, `close()` and
 	// `is_connected()` for signals. Reusing those names would hide the signal methods and
@@ -117,6 +119,12 @@ public:
 	Ref<MySQLTransaction> begin_transaction();
 	// Internal use by `MySQLTransaction`, not bound.
 	Dictionary run_control_statement(const String &p_sql);
+	// Internal use by `MySQLTransaction`, not bound: the error a statement would get right
+	// now because the session is busy (see `_busy_error()`), or an empty `Dictionary`.
+	Dictionary get_busy_error() const { return _busy_error(); }
+	// Internal use by `MySQLTransaction`, not bound: see `MySQLConnection::generation`.
+	// 0 when there is no connection.
+	uint64_t get_connection_generation() const;
 
 	Ref<MySQLAsyncOperation> async_execute_text(const String &p_sql);
 	Ref<MySQLAsyncOperation> async_execute_prepared(const String &p_sql, const Array &p_params);

@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		Holds everything needed to open a connection: [member host]/[member port] or [member unix_socket_path], [member user]/[member database] and the password (write-only, see [method set_password]), plus [member transport_mode] and a set of limits and behavior toggles below.
-		Meant to be set up once and then treated as immutable: build it, configure it, then pass it to [method MySQLSession.set_config] or [method MySQLPool.set_config]. Changing it afterwards is not supported and can produce inconsistent behavior between connections that already used the old values and ones that have not connected yet.
+		Build it, configure it, then pass it to [method MySQLSession.set_config] or [method MySQLPool.set_config]. Both keep their own copy: changing this object afterwards has no effect on a session or pool that already received it. To use different settings, configure a [MySQLConfig] and pass it to a new session or pool.
 		[b]This module talks to a real database over the network and is meant for a headless Godot server or an internal tool, never for a game shipped to players.[/b] Anyone who can reach the exported game can also reach whatever this [MySQLConfig] points to. Use a database user with the minimum privileges the game needs (for example, no [code]DROP[/code]/[code]ALTER[/code] on a user that only ever runs [code]SELECT[/code]/[code]INSERT[/code]), never a database administrator account, and keep [member transport_mode] at [constant TCP_TLS_REQUIRED] (the default) unless you have a specific, trusted reason not to.
 	</description>
 	<tutorials>
@@ -75,7 +75,7 @@
 			Plain TCP, no TLS. Credentials and data travel unencrypted. Setting [member transport_mode] to this value emits a warning.
 		</constant>
 		<constant name="TCP_TLS_PREFERRED" value="1" enum="TransportMode">
-			TCP, using TLS if the server offers it, falling back to plaintext otherwise. Vulnerable to a downgrade attack by anyone who can intercept the connection before it is established; prefer [constant TCP_TLS_REQUIRED] unless you have a specific reason not to.
+			TCP, using TLS if the server offers it, falling back to plaintext otherwise. Vulnerable to a downgrade attack by anyone who can intercept the connection before it is established; prefer [constant TCP_TLS_REQUIRED] unless you have a specific reason not to. Setting it prints a warning, like [constant TCP_TLS_DISABLED].
 		</constant>
 		<constant name="TCP_TLS_REQUIRED" value="2" enum="TransportMode">
 			TCP with TLS required; the connection fails if the server does not offer TLS or its certificate cannot be validated. The default, and the recommended setting for anything that is not a fully trusted local/test network.

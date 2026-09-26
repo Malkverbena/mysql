@@ -615,7 +615,7 @@ Ref<MySQLSession> MySQLSession::create_pooled(const Ref<MySQLConfig> &p_config, 
 void MySQLSession::set_config(const Ref<MySQLConfig> &p_config) {
 	ERR_FAIL_COND_MSG(connection != nullptr, "MySQLSession: The config cannot be changed after the connection has been created.");
 	ERR_FAIL_COND_MSG(p_config.is_null(), "MySQLSession: The config cannot be null.");
-	config = p_config;
+	config = p_config->duplicate_config();
 	connection = memnew(MySQLConnection(config));
 }
 
@@ -667,6 +667,10 @@ Dictionary MySQLSession::close_db() {
 		return mysql_module::make_error_dict(connection->get_last_error(), connection->get_last_diagnostics());
 	}
 	return Dictionary();
+}
+
+uint64_t MySQLSession::get_connection_generation() const {
+	return connection ? connection->get_generation() : 0;
 }
 
 bool MySQLSession::is_db_connected() const {

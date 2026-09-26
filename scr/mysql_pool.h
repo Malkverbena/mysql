@@ -25,8 +25,11 @@ class MySQLPool : public RefCounted {
 	Ref<MySQLConfig> config;
 	int max_size = 8;
 
-	BinaryMutex mutex;
-	ConditionVariable condition;
+	// The threading classes Godot itself is built on (`std`, or `mingw_stdthread` on MinGW),
+	// not Godot's `BinaryMutex`/`ConditionVariable` wrappers: those have no timed wait,
+	// which `acquire(timeout_ms)` needs.
+	THREADING_NAMESPACE::mutex mutex;
+	THREADING_NAMESPACE::condition_variable condition;
 	LocalVector<MySQLConnection *> idle;
 	int total_count = 0;
 
@@ -36,14 +39,19 @@ protected:
 public:
 	~MySQLPool();
 
+	// Keeps a copy of `p_config` (see the comment on `MySQLConfig`); every connection of the
+	// pool uses that copy.
 	void set_config(const Ref<MySQLConfig> &p_config);
-	Ref<MySQLConfig> get_config() const { return config; }
+	// A copy: changing it has no effect on this pool.
+	Ref<MySQLConfig> get_config() const { return config.is_valid() ? config->duplicate_config() : Ref<MySQLConfig>(); }
 
 	void set_max_size(int p_max_size);
 	int get_max_size() const { return max_size; }
 
-	// Blocks until a connection is free if the pool is already at its maximum size.
-	Ref<MySQLSession> acquire();
+	// Blocks until a connection is free if the pool is already at its maximum size: without
+	// a limit when `p_timeout_ms` is 0, otherwise for at most `p_timeout_ms` milliseconds,
+	// returning null if no connection became free in time.
+	Ref<MySQLSession> acquire(int p_timeout_ms = 0);
 
 	// Internal use by `MySQLSession`, which hands its connection back on destruction.
 	// Takes ownership of `p_connection`. `p_healthy` is false when the session still had

@@ -19,8 +19,11 @@
 
 namespace {
 
+// Fail-safe: anything but the two modes that never use TLS gets the verifying context, so
+// that `make_ssl_context()` and `make_connect_params()` can never disagree into a TLS
+// connection without certificate verification.
 bool wants_tls(MySQLConfig::TransportMode p_mode) {
-	return p_mode == MySQLConfig::TCP_TLS_PREFERRED || p_mode == MySQLConfig::TCP_TLS_REQUIRED;
+	return p_mode != MySQLConfig::TCP_TLS_DISABLED && p_mode != MySQLConfig::UNIX_SOCKET;
 }
 
 } //namespace
@@ -105,6 +108,11 @@ bool MySQLConnection::connect() {
 	state = CONNECTING;
 	last_error.clear();
 	last_diagnostics.clear();
+	// `connect()` on a connection that is already open replaces it (Boost.MySQL closes the
+	// old one at the transport level): the prepared statement handles cached for it are
+	// not valid on the new one. Without this, `execute_prepared()` kept reusing them and
+	// failed with "Unknown prepared statement handler" after a reconnection.
+	statement_cache->clear();
 
 	boost::mysql::connect_params params = make_connect_params(config);
 	connection.connect(params, last_error, last_diagnostics);
@@ -120,6 +128,7 @@ bool MySQLConnection::connect() {
 	// required here.
 	connection.set_meta_mode(boost::mysql::metadata_mode::full);
 
+	generation++;
 	state = CONNECTED;
 	return true;
 }
@@ -168,6 +177,7 @@ bool MySQLConnection::reset_session() {
 		last_diagnostics = reset_diagnostics;
 		return false;
 	}
+	generation++;
 	return true;
 }
 

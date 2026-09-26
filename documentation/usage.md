@@ -12,7 +12,7 @@ the example project in [`../examples/`](../examples/); to measure it, see
 
 | Class | What it is |
 |---|---|
-| `MySQLConfig` | Connection settings: host/port/database, credentials, `transport_mode`, timeouts and limits. Passed to a session or a pool with `set_config()`. |
+| `MySQLConfig` | Connection settings: host/port/database, credentials, `transport_mode`, timeouts and limits. Passed to a session or a pool with `set_config()`, which keeps its own copy: changing the config afterwards has no effect on them. |
 | `MySQLSession` | A single connection. `connect_db()`/`close_db()`, and every way to run SQL: `execute_text`, `execute_formatted`, `execute_prepared`, `execute_streaming`, `execute_script`, `async_execute_text`, `async_execute_prepared`, `async_execute_streaming`, `begin_transaction`. |
 | `MySQLPool` | Hands out `MySQLSession` instances (`acquire()`) from a shared, thread-safe pool — one session per thread that needs one, never one session shared between threads. |
 | `MySQLResult` | The outcome of a non-streaming query: `is_ok()`, `get_error()`, `get_rows()`, `get_column_names()`, `get_affected_rows()`, `get_last_insert_id()`; multi-resultset aware (`get_resultset_count()`, and a `resultset` index on the other getters). |
@@ -60,6 +60,10 @@ if not result.is_ok():
 for row in result.get_rows():
     print(row[0], " ", row[1])  # row is an Array, one entry per column, in get_column_names() order
 ```
+
+`get_rows()` returns a new copy of the row list on every call. To index rows in a loop,
+keep it in a variable first (`var rows = result.get_rows()`), not `result.get_rows()[i]`
+inside the loop, which copies every row on each pass.
 
 ### Formatted text (safe interpolation, no prepared statement)
 
@@ -212,7 +216,7 @@ in [features.md](features.md).
 
 ```gdscript
 var pool = MySQLPool.new()
-pool.set_config(config)  # same MySQLConfig every acquired session will connect with
+pool.set_config(config)  # the pool keeps a copy; every acquired session connects with it
 
 # From any thread:
 var session = pool.acquire()
@@ -223,7 +227,9 @@ var result = session.execute_text("SELECT 1")
 
 Each thread must use its own acquired `MySQLSession` — never share one session between
 threads at the same time. `pool.acquire()` blocks if the pool is already at
-`MySQLPool.max_size`.
+`MySQLPool.max_size`, until another thread releases a session. `pool.acquire(timeout_ms)`
+waits for at most that many milliseconds and returns `null` if none became free; use it
+on the main thread, where waiting without a limit freezes the game.
 
 A recycled connection is reset before it is handed out, so a lease never sees what the
 previous one left behind (open transaction, temporary tables, variables, `sql_mode`, a

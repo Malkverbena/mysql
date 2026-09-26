@@ -36,7 +36,7 @@ classDiagram
     }
     class MySQLPool {
       +set_config(config)
-      +acquire() MySQLSession
+      +acquire(timeout_ms) MySQLSession
     }
     class MySQLResult {
       +is_ok() bool
@@ -123,6 +123,9 @@ universal.
 * Authentication methods: `mysql_native_password` and `caching_sha2_password`.
 * Every setting that lowers security (TLS disabled, multi-queries enabled, etc.) emits a
   warning at the moment it is set.
+* A session or pool keeps its own copy of the `MySQLConfig` it receives in
+  `set_config()`. Changing the config afterwards has no effect on it, so the TLS settings a
+  connection verifies with are always the ones it connects with.
 
 ## Methods
 
@@ -276,6 +279,17 @@ example, if the script leaves scope too early, raises an error before reaching
 transaction yourself, on the success path and on the error path (`commit()` on one,
 `rollback()` on the other). Relying on the automatic rollback keeps the transaction open
 for longer than needed, until Godot's reference counting destroys the object.
+
+If the session is busy when `commit()` or `rollback()` is called (an asynchronous
+operation is running, or a streaming cursor still holds the connection), nothing is sent:
+the call fails with that error and the transaction stays open, so it can be called again
+once the session is free. The automatic rollback cannot run on a busy session either: the
+transaction then stays open until the connection closes, and the warning says so.
+
+A transaction belongs to the connection it started on. If that connection is closed or
+lost, the server rolls the transaction back; `commit()` and `rollback()` then return an
+error, even after `connect_db()` reconnected the session, instead of running on the new
+connection and reporting a success for data that is gone.
 
 ## Limits
 

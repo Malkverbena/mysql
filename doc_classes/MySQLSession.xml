@@ -49,6 +49,7 @@
 			<return type="Dictionary" />
 			<description>
 				Opens the connection using the [MySQLConfig] passed to [method set_config]. Returns an empty [Dictionary] on success, or an error [Dictionary] (same shape as [method MySQLResult.get_error]) otherwise — for example, if [member MySQLConfig.transport_mode] is [constant MySQLConfig.TCP_TLS_REQUIRED] and the server's certificate cannot be validated.
+				On a session that is already connected, it opens a new connection in place of the current one: whatever the server kept for the old one (an open transaction, temporary tables, variables, prepared statements) is discarded.
 			</description>
 		</method>
 		<method name="execute_formatted">
@@ -92,7 +93,7 @@
 		<method name="get_config" qualifiers="const">
 			<return type="MySQLConfig" />
 			<description>
-				Returns the [MySQLConfig] passed to [method set_config], or [code]null[/code] if it has not been called yet.
+				Returns a copy of this session's [MySQLConfig], or [code]null[/code] if [method set_config] has not been called yet. Changing the copy has no effect on the session.
 			</description>
 		</method>
 		<method name="is_db_connected" qualifiers="const">
@@ -105,7 +106,7 @@
 			<return type="void" />
 			<param index="0" name="config" type="MySQLConfig" />
 			<description>
-				Sets the [MySQLConfig] this session connects with and creates the underlying connection. Must be called exactly once, before [method connect_db]; calling it again on a session that already has one is an error. Not needed when the session comes from [method MySQLPool.acquire], which already calls it.
+				Sets the [MySQLConfig] this session connects with and creates the underlying connection. The session keeps a copy: changing [param config] afterwards has no effect on it. Must be called exactly once, before [method connect_db]; calling it again on a session that already has one is an error. Not needed when the session comes from [method MySQLPool.acquire], which already calls it.
 			</description>
 		</method>
 	</methods>

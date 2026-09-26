@@ -2,8 +2,6 @@
 
 #include "mysql_config.h"
 
-#include "godot_convert.h"
-
 #include "core/object/class_db.h"
 
 #include <boost/mysql/defaults.hpp>
@@ -16,6 +14,29 @@ void MySQLConfig::_wipe_password() {
 		OPENSSL_cleanse(password.data(), password.size());
 	}
 	password.clear();
+}
+
+Ref<MySQLConfig> MySQLConfig::duplicate_config() const {
+	Ref<MySQLConfig> copy;
+	copy.instantiate();
+	copy->host = host;
+	copy->port = port;
+	copy->unix_socket_path = unix_socket_path;
+	copy->user = user;
+	copy->password = password;
+	copy->database = database;
+	copy->transport_mode = transport_mode;
+	copy->tinyint1_mode = tinyint1_mode;
+	copy->json_result_mode = json_result_mode;
+	copy->allow_sql_script_execution = allow_sql_script_execution;
+	copy->allow_multi_queries = allow_multi_queries;
+	copy->async_timeout_ms = async_timeout_ms;
+	copy->cancel_timeout_ms = cancel_timeout_ms;
+	copy->async_batch_rows = async_batch_rows;
+	copy->max_buffer_size = max_buffer_size;
+	copy->max_result_bytes = max_result_bytes;
+	copy->statement_cache_size = statement_cache_size;
+	return copy;
 }
 
 MySQLConfig::~MySQLConfig() {
@@ -57,7 +78,13 @@ String MySQLConfig::get_user() const {
 
 void MySQLConfig::set_password(const String &p_password) {
 	_wipe_password();
-	password = mysql_module::to_std_string(p_password);
+	// Not through `to_std_string()`: its temporary UTF-8 copy would be freed with the
+	// password still in it. This one is wiped before it goes away.
+	CharString utf8 = p_password.utf8();
+	password.assign(utf8.get_data(), (size_t)utf8.length());
+	if (utf8.length() > 0) {
+		OPENSSL_cleanse(utf8.ptrw(), (size_t)utf8.length());
+	}
 }
 
 const std::string &MySQLConfig::get_password_std() const {
@@ -73,9 +100,12 @@ String MySQLConfig::get_database() const {
 }
 
 void MySQLConfig::set_transport_mode(TransportMode p_mode) {
+	ERR_FAIL_COND_MSG(p_mode < TCP_TLS_DISABLED || p_mode > UNIX_SOCKET, vformat("MySQLConfig: transport_mode %d is not a TransportMode value.", (int)p_mode));
 	// Every insecure setting emits a warning at the moment it is set.
 	if (p_mode == TCP_TLS_DISABLED) {
 		WARN_PRINT("MySQLConfig: transport_mode = TCP_TLS_DISABLED turns TLS off. The connection sends credentials and data unencrypted.");
+	} else if (p_mode == TCP_TLS_PREFERRED) {
+		WARN_PRINT("MySQLConfig: transport_mode = TCP_TLS_PREFERRED falls back to an unencrypted connection, without an error, when the server does not offer TLS. Anyone who can intercept the connection can force that fallback; use TCP_TLS_REQUIRED instead.");
 	}
 	transport_mode = p_mode;
 }
@@ -93,6 +123,7 @@ bool MySQLConfig::get_tinyint1_mode() const {
 }
 
 void MySQLConfig::set_json_result_mode(JsonResultMode p_mode) {
+	ERR_FAIL_COND_MSG(p_mode < RAW_STRING || p_mode > LAZY_PARSED_VARIANT, vformat("MySQLConfig: json_result_mode %d is not a JsonResultMode value.", (int)p_mode));
 	json_result_mode = p_mode;
 }
 
