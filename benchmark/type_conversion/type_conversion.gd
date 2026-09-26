@@ -61,8 +61,13 @@ func run_benchmark() -> void:
 			config.json_result_mode = MySQLConfig.LAZY_PARSED_VARIANT
 		elif mode >= 0:
 			config.json_result_mode = mode
-		session.execute_text("DROP TEMPORARY TABLE IF EXISTS bench_values")
-		var fill: MySQLResult = session.execute_text(FILL % [ROWS, entry[1]])
+		# A session keeps a copy of its config: each case gets its own session (and the
+		# temporary table lives in it).
+		var case_session := Bench.connect_session(config, log_line)
+		if case_session == null:
+			return
+		case_session.execute_text("SET SESSION cte_max_recursion_depth = %d" % ROWS)
+		var fill: MySQLResult = case_session.execute_text(FILL % [ROWS, entry[1]])
 		if not fill.is_ok():
 			log_line("[color=red]%s: filling the table failed: %s[/color]" % [entry[0], fill.get_error()])
 			return
@@ -70,7 +75,7 @@ func run_benchmark() -> void:
 		var best := -1
 		for run in range(RUNS):
 			var start := Time.get_ticks_usec()
-			var result: MySQLResult = session.execute_text(sql)
+			var result: MySQLResult = case_session.execute_text(sql)
 			if not result.is_ok():
 				log_line("[color=red]%s failed: %s[/color]" % [entry[0], result.get_error()])
 				return
@@ -82,7 +87,7 @@ func run_benchmark() -> void:
 				log_line("[color=red]%s returned %d rows[/color]" % [entry[0], result.get_rows().size()])
 				return
 			best = elapsed if best < 0 else mini(best, elapsed)
-		session.execute_text("DROP TEMPORARY TABLE bench_values")
+		case_session.close_db()
 		if baseline_usec == 0:
 			baseline_usec = best
 		rows.append([

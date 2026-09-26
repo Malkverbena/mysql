@@ -36,8 +36,11 @@ protected:
 public:
 	~MySQLPool();
 
+	// Keeps a copy of `p_config` (see the comment on `MySQLConfig`); every connection of the
+	// pool uses that copy.
 	void set_config(const Ref<MySQLConfig> &p_config);
-	Ref<MySQLConfig> get_config() const { return config; }
+	// A copy: changing it has no effect on this pool.
+	Ref<MySQLConfig> get_config() const { return config.is_valid() ? config->duplicate_config() : Ref<MySQLConfig>(); }
 
 	void set_max_size(int p_max_size);
 	int get_max_size() const { return max_size; }

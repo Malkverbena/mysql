@@ -96,8 +96,10 @@ public:
 	// Internal use by `MySQLPool`, not bound.
 	static Ref<MySQLSession> create_pooled(const Ref<MySQLConfig> &p_config, MySQLConnection *p_connection, const Ref<MySQLPool> &p_owner_pool);
 
+	// Keeps a copy of `p_config` (see the comment on `MySQLConfig`).
 	void set_config(const Ref<MySQLConfig> &p_config);
-	Ref<MySQLConfig> get_config() const { return config; }
+	// A copy: changing it has no effect on this session.
+	Ref<MySQLConfig> get_config() const { return config.is_valid() ? config->duplicate_config() : Ref<MySQLConfig>(); }
 
 	// Named `*_db` on purpose: `Object` already reserves `connect()`, `close()` and
 	// `is_connected()` for signals. Reusing those names would hide the signal methods and

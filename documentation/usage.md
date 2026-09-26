@@ -12,7 +12,7 @@ the example project in [`../examples/`](../examples/); to measure it, see
 
 | Class | What it is |
 |---|---|
-| `MySQLConfig` | Connection settings: host/port/database, credentials, `transport_mode`, timeouts and limits. Passed to a session or a pool with `set_config()`. |
+| `MySQLConfig` | Connection settings: host/port/database, credentials, `transport_mode`, timeouts and limits. Passed to a session or a pool with `set_config()`, which keeps its own copy: changing the config afterwards has no effect on them. |
 | `MySQLSession` | A single connection. `connect_db()`/`close_db()`, and every way to run SQL: `execute_text`, `execute_formatted`, `execute_prepared`, `execute_streaming`, `execute_script`, `async_execute_text`, `async_execute_prepared`, `async_execute_streaming`, `begin_transaction`. |
 | `MySQLPool` | Hands out `MySQLSession` instances (`acquire()`) from a shared, thread-safe pool — one session per thread that needs one, never one session shared between threads. |
 | `MySQLResult` | The outcome of a non-streaming query: `is_ok()`, `get_error()`, `get_rows()`, `get_column_names()`, `get_affected_rows()`, `get_last_insert_id()`; multi-resultset aware (`get_resultset_count()`, and a `resultset` index on the other getters). |
@@ -212,7 +212,7 @@ in [features.md](features.md).
 
 ```gdscript
 var pool = MySQLPool.new()
-pool.set_config(config)  # same MySQLConfig every acquired session will connect with
+pool.set_config(config)  # the pool keeps a copy; every acquired session connects with it
 
 # From any thread:
 var session = pool.acquire()

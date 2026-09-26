@@ -19,8 +19,11 @@
 
 namespace {
 
+// Fail-safe: anything but the two modes that never use TLS gets the verifying context, so
+// that `make_ssl_context()` and `make_connect_params()` can never disagree into a TLS
+// connection without certificate verification.
 bool wants_tls(MySQLConfig::TransportMode p_mode) {
-	return p_mode == MySQLConfig::TCP_TLS_PREFERRED || p_mode == MySQLConfig::TCP_TLS_REQUIRED;
+	return p_mode != MySQLConfig::TCP_TLS_DISABLED && p_mode != MySQLConfig::UNIX_SOCKET;
 }
 
 } //namespace

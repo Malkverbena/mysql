@@ -18,6 +18,29 @@ void MySQLConfig::_wipe_password() {
 	password.clear();
 }
 
+Ref<MySQLConfig> MySQLConfig::duplicate_config() const {
+	Ref<MySQLConfig> copy;
+	copy.instantiate();
+	copy->host = host;
+	copy->port = port;
+	copy->unix_socket_path = unix_socket_path;
+	copy->user = user;
+	copy->password = password;
+	copy->database = database;
+	copy->transport_mode = transport_mode;
+	copy->tinyint1_mode = tinyint1_mode;
+	copy->json_result_mode = json_result_mode;
+	copy->allow_sql_script_execution = allow_sql_script_execution;
+	copy->allow_multi_queries = allow_multi_queries;
+	copy->async_timeout_ms = async_timeout_ms;
+	copy->cancel_timeout_ms = cancel_timeout_ms;
+	copy->async_batch_rows = async_batch_rows;
+	copy->max_buffer_size = max_buffer_size;
+	copy->max_result_bytes = max_result_bytes;
+	copy->statement_cache_size = statement_cache_size;
+	return copy;
+}
+
 MySQLConfig::~MySQLConfig() {
 	_wipe_password();
 }
@@ -73,6 +96,7 @@ String MySQLConfig::get_database() const {
 }
 
 void MySQLConfig::set_transport_mode(TransportMode p_mode) {
+	ERR_FAIL_COND_MSG(p_mode < TCP_TLS_DISABLED || p_mode > UNIX_SOCKET, vformat("MySQLConfig: transport_mode %d is not a TransportMode value.", (int)p_mode));
 	// Every insecure setting emits a warning at the moment it is set.
 	if (p_mode == TCP_TLS_DISABLED) {
 		WARN_PRINT("MySQLConfig: transport_mode = TCP_TLS_DISABLED turns TLS off. The connection sends credentials and data unencrypted.");
@@ -93,6 +117,7 @@ bool MySQLConfig::get_tinyint1_mode() const {
 }
 
 void MySQLConfig::set_json_result_mode(JsonResultMode p_mode) {
+	ERR_FAIL_COND_MSG(p_mode < RAW_STRING || p_mode > LAZY_PARSED_VARIANT, vformat("MySQLConfig: json_result_mode %d is not a JsonResultMode value.", (int)p_mode));
 	json_result_mode = p_mode;
 }
 

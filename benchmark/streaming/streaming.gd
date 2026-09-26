@@ -87,13 +87,18 @@ func run_benchmark() -> void:
 
 	# Asynchronous batches.
 	for batch_rows in BATCH_SIZES:
+		# A session keeps a copy of its config: each batch size gets its own session.
 		config.async_batch_rows = batch_rows
+		var batch_session := Bench.connect_session(config, log_line)
+		if batch_session == null:
+			return
+		batch_session.execute_text("SET SESSION cte_max_recursion_depth = %d" % ROWS)
 		await get_tree().process_frame
 		baseline = OS.get_static_memory_usage()
 		peak = 0
 		_start_tracking()
 		start = Time.get_ticks_usec()
-		var async_cursor := session.async_execute_streaming(sql)
+		var async_cursor := batch_session.async_execute_streaming(sql)
 		read = 0
 		batches = 0
 		while async_cursor.has_more():

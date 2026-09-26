@@ -21,14 +21,14 @@
 		<method name="get_config" qualifiers="const">
 			<return type="MySQLConfig" />
 			<description>
-				Returns the [MySQLConfig] passed to [method set_config], or [code]null[/code] if it has not been called yet.
+				Returns a copy of this pool's [MySQLConfig], or [code]null[/code] if [method set_config] has not been called yet. Changing the copy has no effect on the pool.
 			</description>
 		</method>
 		<method name="set_config">
 			<return type="void" />
 			<param index="0" name="config" type="MySQLConfig" />
 			<description>
-				Sets the [MySQLConfig] every connection of this pool is created with. Must be called before the first [method acquire], and cannot be changed afterwards.
+				Sets the [MySQLConfig] every connection of this pool is created with. The pool keeps a copy: changing [param config] afterwards has no effect on it. Must be called before the first [method acquire], and cannot be changed afterwards.
 			</description>
 		</method>
 	</methods>

@@ -17,7 +17,7 @@ MySQLPool::~MySQLPool() {
 void MySQLPool::set_config(const Ref<MySQLConfig> &p_config) {
 	ERR_FAIL_COND_MSG(total_count > 0, "MySQLPool: The config cannot be changed after a connection has been created.");
 	ERR_FAIL_COND_MSG(p_config.is_null(), "MySQLPool: The config cannot be null.");
-	config = p_config;
+	config = p_config->duplicate_config();
 }
 
 void MySQLPool::set_max_size(int p_max_size) {

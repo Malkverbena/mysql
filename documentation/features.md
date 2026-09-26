@@ -123,6 +123,9 @@ universal.
 * Authentication methods: `mysql_native_password` and `caching_sha2_password`.
 * Every setting that lowers security (TLS disabled, multi-queries enabled, etc.) emits a
   warning at the moment it is set.
+* A session or pool keeps its own copy of the `MySQLConfig` it receives in
+  `set_config()`. Changing the config afterwards has no effect on it, so the TLS settings a
+  connection verifies with are always the ones it connects with.
 
 ## Methods
 

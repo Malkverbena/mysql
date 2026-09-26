@@ -7,11 +7,17 @@
 #include <string>
 
 // Connection configuration: credentials, `transport_mode`, `tinyint1_mode`,
-// `json_result_mode`, `allow_sql_script_execution` and `allow_multi_queries`. It is meant
-// to be immutable after the first `connect_db()` (a usage convention, not enforced in C++:
-// whoever builds the connection must not reconfigure a `MySQLConfig` already in use). It is
-// shared by reference between all the `MySQLConnection`s created from it, including the
-// ones inside a `MySQLPool`.
+// `json_result_mode`, `allow_sql_script_execution` and `allow_multi_queries`.
+//
+// `MySQLSession::set_config()` and `MySQLPool::set_config()` keep their own copy
+// (`duplicate_config()`), never the object the script passed: changing that object later
+// has no effect on them. The copy is never handed out (`get_config()` returns another
+// copy), so it never changes while in use. This matters for more than convenience: the TLS
+// context of a connection is built from the config when the connection is created and
+// the transport mode is read again when it connects, so a config changed in between (for
+// example from TCP_TLS_DISABLED to TCP_TLS_REQUIRED) used to connect with TLS but without
+// any certificate verification. It also keeps the I/O thread and pool threads from
+// reading a config that the main thread is changing.
 //
 // There is no `get_password()`: the password is never returned to GDScript. It is only
 // available through `get_password_std()`, for internal use, which is never bound.
@@ -143,6 +149,10 @@ public:
 	int get_statement_cache_size() const { return statement_cache_size; }
 
 	MySQLConfig() = default;
+	// A copy of every setting, the password included. Internal use by `MySQLSession` and
+	// `MySQLPool`, not bound.
+	Ref<MySQLConfig> duplicate_config() const;
+
 	~MySQLConfig();
 };
 
