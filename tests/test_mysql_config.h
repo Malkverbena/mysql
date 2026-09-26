@@ -78,9 +78,9 @@ TEST_CASE("[Modules][MySQL] Config rejects a negative timeout or result limit") 
 TEST_CASE("[Modules][MySQL] Config rejects enum values it does not define") {
 	Ref<MySQLConfig> config;
 	config.instantiate();
+	ERR_PRINT_OFF; // TCP_TLS_PREFERRED warns, and so do the invalid values below.
 	config->set_transport_mode(MySQLConfig::TCP_TLS_PREFERRED);
 	config->set_json_result_mode(MySQLConfig::RAW_STRING);
-	ERR_PRINT_OFF;
 	config->set_transport_mode((MySQLConfig::TransportMode)7);
 	config->set_transport_mode((MySQLConfig::TransportMode)-1);
 	config->set_json_result_mode((MySQLConfig::JsonResultMode)3);

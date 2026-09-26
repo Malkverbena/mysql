@@ -75,7 +75,7 @@
 			Plain TCP, no TLS. Credentials and data travel unencrypted. Setting [member transport_mode] to this value emits a warning.
 		</constant>
 		<constant name="TCP_TLS_PREFERRED" value="1" enum="TransportMode">
-			TCP, using TLS if the server offers it, falling back to plaintext otherwise. Vulnerable to a downgrade attack by anyone who can intercept the connection before it is established; prefer [constant TCP_TLS_REQUIRED] unless you have a specific reason not to.
+			TCP, using TLS if the server offers it, falling back to plaintext otherwise. Vulnerable to a downgrade attack by anyone who can intercept the connection before it is established; prefer [constant TCP_TLS_REQUIRED] unless you have a specific reason not to. Setting it prints a warning, like [constant TCP_TLS_DISABLED].
 		</constant>
 		<constant name="TCP_TLS_REQUIRED" value="2" enum="TransportMode">
 			TCP with TLS required; the connection fails if the server does not offer TLS or its certificate cannot be validated. The default, and the recommended setting for anything that is not a fully trusted local/test network.

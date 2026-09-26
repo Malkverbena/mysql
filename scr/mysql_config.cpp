@@ -100,6 +100,8 @@ void MySQLConfig::set_transport_mode(TransportMode p_mode) {
 	// Every insecure setting emits a warning at the moment it is set.
 	if (p_mode == TCP_TLS_DISABLED) {
 		WARN_PRINT("MySQLConfig: transport_mode = TCP_TLS_DISABLED turns TLS off. The connection sends credentials and data unencrypted.");
+	} else if (p_mode == TCP_TLS_PREFERRED) {
+		WARN_PRINT("MySQLConfig: transport_mode = TCP_TLS_PREFERRED falls back to an unencrypted connection, without an error, when the server does not offer TLS. Anyone who can intercept the connection can force that fallback; use TCP_TLS_REQUIRED instead.");
 	}
 	transport_mode = p_mode;
 }
