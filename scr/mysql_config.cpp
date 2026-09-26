@@ -2,8 +2,6 @@
 
 #include "mysql_config.h"
 
-#include "godot_convert.h"
-
 #include "core/object/class_db.h"
 
 #include <boost/mysql/defaults.hpp>
@@ -80,7 +78,13 @@ String MySQLConfig::get_user() const {
 
 void MySQLConfig::set_password(const String &p_password) {
 	_wipe_password();
-	password = mysql_module::to_std_string(p_password);
+	// Not through `to_std_string()`: its temporary UTF-8 copy would be freed with the
+	// password still in it. This one is wiped before it goes away.
+	CharString utf8 = p_password.utf8();
+	password.assign(utf8.get_data(), (size_t)utf8.length());
+	if (utf8.length() > 0) {
+		OPENSSL_cleanse(utf8.ptrw(), (size_t)utf8.length());
+	}
 }
 
 const std::string &MySQLConfig::get_password_std() const {
